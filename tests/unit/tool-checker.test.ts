@@ -22,11 +22,11 @@ function makeConfig(overrides: Partial<HarnessConfig["enforcement"]> = {}): Harn
 }
 
 describe("extractToolNames", () => {
-  it("extracts actual tool from npx prefix", () => {
+  it("extracts actual tool from npx prefix with wrapper lookupCommand", () => {
     const config = makeConfig({ preCommit: ["npx vitest run", "npx tsc --noEmit"] });
     const names = extractToolNames(config);
-    expect(names).toContainEqual(expect.objectContaining({ name: "vitest", source: "pre-commit" }));
-    expect(names).toContainEqual(expect.objectContaining({ name: "tsc", source: "pre-commit" }));
+    expect(names).toContainEqual(expect.objectContaining({ name: "vitest", lookupCommand: "npx" }));
+    expect(names).toContainEqual(expect.objectContaining({ name: "tsc", lookupCommand: "npx" }));
     expect(names.find((n) => n.name === "npx")).toBeUndefined();
   });
 
@@ -88,16 +88,16 @@ describe("extractToolNames", () => {
     expect(names).toContainEqual(expect.objectContaining({ name: "prettier" }));
   });
 
-  it("extracts tool from poetry run prefix", () => {
+  it("extracts tool from poetry run with poetry lookupCommand", () => {
     const config = makeConfig({
       preCommit: ["poetry run pytest", "poetry run ruff check"],
     });
     const names = extractToolNames(config);
-    expect(names).toContainEqual(expect.objectContaining({ name: "pytest" }));
-    expect(names).toContainEqual(expect.objectContaining({ name: "ruff" }));
+    expect(names).toContainEqual(expect.objectContaining({ name: "pytest", lookupCommand: "poetry" }));
+    expect(names).toContainEqual(expect.objectContaining({ name: "ruff", lookupCommand: "poetry" }));
   });
 
-  it("extracts direct tool names from postSave commands", () => {
+  it("extracts direct tool names with self lookupCommand", () => {
     const config = makeConfig({
       postSave: [
         { pattern: "*.ts", command: "eslint --fix" },
@@ -105,8 +105,8 @@ describe("extractToolNames", () => {
       ],
     });
     const names = extractToolNames(config);
-    expect(names).toContainEqual(expect.objectContaining({ name: "eslint", source: "post-save hook" }));
-    expect(names).toContainEqual(expect.objectContaining({ name: "ruff", source: "post-save hook" }));
+    expect(names).toContainEqual(expect.objectContaining({ name: "eslint", lookupCommand: "eslint" }));
+    expect(names).toContainEqual(expect.objectContaining({ name: "ruff", lookupCommand: "ruff" }));
   });
 
   it("returns empty array when no commands configured", () => {
@@ -133,16 +133,35 @@ describe("extractToolNames", () => {
 });
 
 describe("checkReferencedTools", () => {
-  it("checks if referenced tools exist on system", async () => {
+  it("checks wrapper existence for npx-wrapped tools", async () => {
     const config = makeConfig({
       preCommit: ["npx vitest run"],
+    });
+    const results = await checkReferencedTools(config);
+    const vitest = results.find((r) => r.name === "vitest");
+    expect(vitest).toBeDefined();
+    // npx exists on this system, so wrapped tool should be marked installed
+    expect(vitest!.installed).toBe(true);
+  });
+
+  it("checks wrapper existence for poetry run tools", async () => {
+    const config = makeConfig({
+      preCommit: ["poetry run pytest"],
+    });
+    const results = await checkReferencedTools(config);
+    const pytest = results.find((r) => r.name === "pytest");
+    expect(pytest).toBeDefined();
+    // installed depends on whether poetry is on PATH
+  });
+
+  it("checks direct tool existence for non-wrapped commands", async () => {
+    const config = makeConfig({
       postSave: [{ pattern: "*.ts", command: "eslint --fix" }],
     });
     const results = await checkReferencedTools(config);
-    expect(Array.isArray(results)).toBe(true);
-    // vitest should be extracted from "npx vitest run"
-    const vitest = results.find((r) => r.name === "vitest");
-    expect(vitest).toBeDefined();
+    const eslint = results.find((r) => r.name === "eslint");
+    expect(eslint).toBeDefined();
+    // eslint checked directly via `which eslint`
   });
 
   it("returns installCmd suggestions", async () => {

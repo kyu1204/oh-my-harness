@@ -6,3 +6,8 @@ dist/
 .env
 .env.*
 !.env.example
+
+# oh-my-harness (generated - local only)
+harness.yaml
+CLAUDE.md
+.claude/

@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import yaml from "js-yaml";
 import { buildPresetSelectionPrompt, buildHarnessGenerationPrompt } from "./prompt-templates.js";
-import type { PresetInfo } from "./prompt-templates.js";
+import type { PresetInfo, CatalogBlockInfo } from "./prompt-templates.js";
 import { HarnessConfigSchema } from "../core/harness-schema.js";
 import type { HarnessConfig } from "../core/harness-schema.js";
 
@@ -120,8 +120,9 @@ function extractYaml(text: string): string {
 export async function generateHarnessConfig(
   description: string,
   runner: ClaudeRunner = defaultClaudeRunner,
+  catalogBlocks?: CatalogBlockInfo[],
 ): Promise<HarnessConfig> {
-  const prompt = buildHarnessGenerationPrompt(description);
+  const prompt = buildHarnessGenerationPrompt(description, catalogBlocks);
 
   let stdout: string;
   try {

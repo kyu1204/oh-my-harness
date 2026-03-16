@@ -153,6 +153,38 @@ describe("buildHarnessGenerationPrompt", () => {
     const prompt = buildHarnessGenerationPrompt("my app");
     expect(prompt).toContain("Example");
   });
+
+  it("includes catalog blocks when provided", () => {
+    const blocks = [
+      {
+        id: "branch-guard",
+        description: "Blocks commits on merged branches",
+        params: [{ name: "mainBranch", required: false, default: "main", description: "Main branch name" }],
+      },
+      {
+        id: "commit-test-gate",
+        description: "Runs tests before commit",
+        params: [{ name: "testCommand", required: true, description: "Test command to run" }],
+      },
+    ];
+    const prompt = buildHarnessGenerationPrompt("my app", blocks);
+    expect(prompt).toContain("branch-guard");
+    expect(prompt).toContain("Blocks commits on merged branches");
+    expect(prompt).toContain("commit-test-gate");
+    expect(prompt).toContain("Runs tests before commit");
+    expect(prompt).toContain("mainBranch");
+    expect(prompt).toContain("testCommand");
+  });
+
+  it("omits catalog section when no blocks provided", () => {
+    const prompt = buildHarnessGenerationPrompt("my app");
+    expect(prompt).not.toContain("Available building blocks");
+  });
+
+  it("includes hooks field description in schema section", () => {
+    const prompt = buildHarnessGenerationPrompt("my app");
+    expect(prompt).toContain("hooks");
+  });
 });
 
 describe("generateHarnessConfig", () => {

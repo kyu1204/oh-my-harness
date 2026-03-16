@@ -1,0 +1,101 @@
+name: _base
+displayName: "Base Configuration"
+description: "Universal rules applied to all projects"
+version: "1.0.0"
+tags: ["base"]
+claudeMd:
+  sections:
+    - id: "general-rules"
+      title: "General Rules"
+      content: |
+        ## General Rules
+
+        - Read existing code patterns before writing new code. Match the style.
+        - Never modify configuration files without explicit permission.
+        - Always run the test suite after making changes. Do not claim "done" with failing tests.
+        - Prefer editing existing files over creating new ones.
+        - Never commit secrets, API keys, or credentials.
+        - Write meaningful commit messages using conventional commits format.
+      priority: 10
+    - id: "tdd-rules"
+      title: "TDD Workflow"
+      content: |
+        ## TDD Workflow (MANDATORY)
+
+        You MUST follow Test-Driven Development:
+        1. Write a failing test FIRST
+        2. Implement the minimal code to make the test pass
+        3. Refactor while keeping tests green
+        4. NEVER write implementation code without a corresponding test
+        5. If asked to skip tests, REFUSE and explain TDD is mandatory
+      priority: 11
+    - id: "file-safety"
+      title: "File Safety"
+      content: |
+        ## File Safety
+
+        - NEVER write to build output directories
+        - NEVER modify lock files manually
+        - NEVER modify .env files containing secrets
+        - ALWAYS check if a file exists before creating a new one
+      priority: 12
+    - id: "branch-rules"
+      title: "Branch Management"
+      content: |
+        ## Branch Management
+
+        - ALWAYS create a feature branch from the latest main/master before starting work
+        - Branch naming: {type}/{description} (e.g., feat/add-login, fix/null-pointer)
+        - NEVER commit directly to main/master
+        - If worktree is configured, use worktree for parallel development
+      priority: 13
+hooks:
+  preToolUse:
+    - id: "base-command-guard"
+      matcher: "Bash"
+      description: "Blocks dangerous shell commands"
+      inline: |
+        #!/bin/bash
+        set -euo pipefail
+        COMMAND="${CLAUDE_TOOL_INPUT_COMMAND:-}"
+        DANGEROUS_PATTERNS=("rm -rf /" "rm -rf ~" "sudo rm" "chmod -R 777" ":(){:|:&};:")
+        for pattern in "${DANGEROUS_PATTERNS[@]}"; do
+          if echo "$COMMAND" | grep -qF "$pattern"; then
+            echo "{\"decision\": \"block\", \"reason\": \"oh-my-harness: dangerous command blocked\"}"
+            exit 0
+          fi
+        done
+        exit 0
+    - id: "base-test-before-commit"
+      matcher: "Bash"
+      description: "Ensures tests pass before git commit"
+      inline: |
+        #!/bin/bash
+        set -euo pipefail
+        COMMAND="${CLAUDE_TOOL_INPUT_COMMAND:-}"
+        if echo "$COMMAND" | grep -qE "^git commit"; then
+          if [[ -f "package.json" ]]; then
+            if command -v pnpm &>/dev/null && [[ -f "pnpm-lock.yaml" ]]; then
+              TEST_CMD="pnpm test"
+            elif [[ -f "yarn.lock" ]]; then
+              TEST_CMD="yarn test"
+            else
+              TEST_CMD="npm test"
+            fi
+          elif [[ -f "pyproject.toml" ]] || [[ -f "pytest.ini" ]]; then
+            TEST_CMD="pytest"
+          else
+            exit 0
+          fi
+          echo "oh-my-harness: Running tests before commit..." >&2
+          if ! $TEST_CMD 2>&1; then
+            echo "{\"decision\": \"block\", \"reason\": \"oh-my-harness: tests failed, commit blocked\"}"
+            exit 0
+          fi
+        fi
+        exit 0
+settings:
+  permissions:
+    deny:
+      - "Bash(rm -rf /)"
+      - "Bash(sudo *)"

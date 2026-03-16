@@ -1,0 +1,53 @@
+name: nextjs-fastapi
+displayName: "Next.js + FastAPI (Full Stack)"
+description: "Full stack with Next.js frontend and FastAPI backend, TDD enforcement"
+version: "1.0.0"
+extends: ["_base", "nextjs", "fastapi"]
+tags: ["nextjs", "fastapi", "fullstack", "typescript", "python", "react"]
+variables:
+  framework: "nextjs-fastapi"
+  type: "fullstack"
+claudeMd:
+  sections:
+    - id: "fullstack-rules"
+      title: "Full Stack Rules"
+      content: |
+        ## Full Stack Development Rules
+
+        - Frontend code lives in the project root (Next.js)
+        - Backend code lives in `backend/` directory (FastAPI)
+        - NEVER mix frontend and backend concerns in the same file
+        - API client: generate TypeScript types from FastAPI OpenAPI schema
+        - Use environment variables for API URL configuration
+        - Frontend fetches data from backend API, never accesses DB directly
+        - CORS: configure in FastAPI main.py, match frontend origin
+        - Both frontend and backend tests must pass before any commit
+        - Run both test suites: `pnpm test && cd backend && pytest`
+      priority: 15
+hooks:
+  preToolUse:
+    - id: "fullstack-test-before-commit"
+      matcher: "Bash"
+      description: "Runs both frontend and backend tests before commit"
+      inline: |
+        #!/bin/bash
+        set -euo pipefail
+        COMMAND="${CLAUDE_TOOL_INPUT_COMMAND:-}"
+        if echo "$COMMAND" | grep -qE "^git commit"; then
+          echo "oh-my-harness: Running full-stack tests before commit..." >&2
+          FAILED=0
+          if [[ -f "package.json" ]]; then
+            echo "Running frontend tests..." >&2
+            pnpm test 2>&1 || FAILED=1
+          fi
+          if [[ -d "backend" ]] && [[ -f "backend/pyproject.toml" ]]; then
+            echo "Running backend tests..." >&2
+            (cd backend && pytest 2>&1) || FAILED=1
+          fi
+          if [[ $FAILED -eq 1 ]]; then
+            echo "{\"decision\": \"block\", \"reason\": \"oh-my-harness: tests failed, commit blocked\"}"
+            exit 0
+          fi
+          echo "All tests passed!" >&2
+        fi
+        exit 0

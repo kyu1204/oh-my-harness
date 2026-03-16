@@ -1,0 +1,99 @@
+name: nextjs
+displayName: "Next.js (TypeScript)"
+description: "Next.js App Router with TypeScript, TDD enforcement"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["nextjs", "react", "typescript", "frontend", "tailwind"]
+variables:
+  framework: "nextjs"
+  language: "typescript"
+  packageManager: "pnpm"
+  testRunner: "vitest"
+  linter: "eslint"
+claudeMd:
+  sections:
+    - id: "nextjs-rules"
+      title: "Next.js Rules"
+      content: |
+        ## Next.js Development Rules
+
+        - Use App Router (app/ directory), never Pages Router
+        - All components default to Server Components unless explicitly marked 'use client'
+        - Use next/image for all images, next/link for all internal links
+        - API routes go in app/api/ using Route Handlers
+        - Use server actions for form mutations when possible
+        - Data fetching: use fetch in server components, not useEffect+useState
+        - Metadata: use generateMetadata or static metadata export
+        - Keep 'use client' components small and push them to leaf nodes
+        - Use Tailwind CSS utility classes
+        - Component files: PascalCase.tsx, utility files: camelCase.ts
+      priority: 20
+    - id: "nextjs-testing"
+      title: "Next.js Testing"
+      content: |
+        ## Next.js Testing Rules
+
+        - Use vitest + @testing-library/react for component tests
+        - Every component MUST have a corresponding .test.tsx file
+        - Test both server and client components
+        - Use MSW for API mocking in tests
+        - Run `pnpm test` before every commit
+        - Run `pnpm build` before every push to verify no build errors
+      priority: 21
+    - id: "nextjs-structure"
+      title: "Next.js Structure"
+      content: |
+        ## Next.js Project Structure
+
+        ```
+        src/
+          app/              # App Router pages and layouts
+          components/       # Shared React components
+            ui/             # Primitive UI components
+          lib/              # Utility functions, constants
+          hooks/            # Custom React hooks (client-side)
+          types/            # TypeScript type definitions
+        ```
+      priority: 22
+hooks:
+  preToolUse:
+    - id: "nextjs-file-guard"
+      matcher: "Edit|Write"
+      description: "Prevents writing to build output and config files"
+      inline: |
+        #!/bin/bash
+        set -euo pipefail
+        FILE_PATH="${CLAUDE_TOOL_INPUT_FILE_PATH:-${CLAUDE_TOOL_INPUT_PATH:-}}"
+        [[ -z "$FILE_PATH" ]] && exit 0
+        BLOCKED=(".next/" "out/" "node_modules/" "*.min.js" "*.min.css")
+        for pattern in "${BLOCKED[@]}"; do
+          if [[ "$FILE_PATH" == $pattern* ]] || [[ "$FILE_PATH" == *$pattern ]]; then
+            echo "{\"decision\": \"block\", \"reason\": \"oh-my-harness: protected path $pattern\"}"
+            exit 0
+          fi
+        done
+        exit 0
+  postToolUse:
+    - id: "nextjs-lint-on-save"
+      matcher: "Edit|Write"
+      description: "Runs ESLint after file writes"
+      inline: |
+        #!/bin/bash
+        FILE_PATH="${CLAUDE_TOOL_INPUT_FILE_PATH:-${CLAUDE_TOOL_INPUT_PATH:-}}"
+        [[ -z "$FILE_PATH" ]] && exit 0
+        if [[ "$FILE_PATH" == *.ts ]] || [[ "$FILE_PATH" == *.tsx ]]; then
+          npx eslint --fix "$FILE_PATH" 2>/dev/null || true
+        fi
+        exit 0
+settings:
+  permissions:
+    allow:
+      - "Bash(pnpm install*)"
+      - "Bash(pnpm dev*)"
+      - "Bash(pnpm test*)"
+      - "Bash(pnpm build*)"
+      - "Bash(pnpm lint*)"
+      - "Bash(npx vitest*)"
+    deny:
+      - "Bash(rm -rf /)"
+      - "Bash(sudo *)"

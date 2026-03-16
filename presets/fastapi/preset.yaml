@@ -1,0 +1,112 @@
+name: fastapi
+displayName: "FastAPI (Python)"
+description: "FastAPI with Python, async, Pydantic v2, TDD enforcement"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["fastapi", "python", "backend", "api", "async", "pydantic"]
+variables:
+  framework: "fastapi"
+  language: "python"
+  packageManager: "uv"
+  testRunner: "pytest"
+  linter: "ruff"
+claudeMd:
+  sections:
+    - id: "fastapi-rules"
+      title: "FastAPI Rules"
+      content: |
+        ## FastAPI Development Rules
+
+        - Use async def for all route handlers
+        - Use Pydantic v2 models for all request/response schemas
+        - Use dependency injection for database sessions, auth, and shared services
+        - Always define explicit response_model on route decorators
+        - Use HTTPException for error responses with appropriate status codes
+        - Use BackgroundTasks for non-blocking operations
+        - Database: use SQLAlchemy 2.0 async style with AsyncSession
+        - Migrations: use Alembic, never modify database schema manually
+        - Environment: use pydantic-settings for config, never hardcode values
+        - Never use global mutable state. Use dependency injection instead.
+      priority: 20
+    - id: "fastapi-testing"
+      title: "FastAPI Testing"
+      content: |
+        ## FastAPI Testing Rules
+
+        - Use pytest + httpx.AsyncClient for API tests
+        - Use pytest-asyncio for async test support
+        - Every endpoint MUST have tests (happy path + error cases)
+        - Use real database for integration tests, NOT mocks
+        - Run `pytest` before every commit
+        - Run `ruff check` and `mypy` before every push
+      priority: 21
+    - id: "fastapi-structure"
+      title: "FastAPI Structure"
+      content: |
+        ## FastAPI Project Structure
+
+        ```
+        backend/
+          app/
+            main.py           # FastAPI app instance, middleware
+            api/
+              v1/
+                routes/        # Route modules
+                deps.py        # Shared dependencies
+            models/            # SQLAlchemy models
+            schemas/           # Pydantic schemas
+            services/          # Business logic layer
+            core/
+              config.py        # Settings (pydantic-settings)
+              security.py      # Auth utilities
+              database.py      # DB engine, session factory
+          tests/
+            conftest.py
+            api/
+          alembic/
+        ```
+      priority: 22
+hooks:
+  preToolUse:
+    - id: "fastapi-file-guard"
+      matcher: "Edit|Write"
+      description: "Prevents writing to generated and virtual env files"
+      inline: |
+        #!/bin/bash
+        set -euo pipefail
+        FILE_PATH="${CLAUDE_TOOL_INPUT_FILE_PATH:-${CLAUDE_TOOL_INPUT_PATH:-}}"
+        [[ -z "$FILE_PATH" ]] && exit 0
+        BLOCKED=("__pycache__/" ".venv/" "venv/" "*.pyc" "alembic/versions/" ".mypy_cache/")
+        for pattern in "${BLOCKED[@]}"; do
+          if [[ "$FILE_PATH" == $pattern* ]] || [[ "$FILE_PATH" == *$pattern ]]; then
+            echo "{\"decision\": \"block\", \"reason\": \"oh-my-harness: protected path $pattern\"}"
+            exit 0
+          fi
+        done
+        exit 0
+  postToolUse:
+    - id: "fastapi-lint-on-save"
+      matcher: "Edit|Write"
+      description: "Runs ruff after Python file writes"
+      inline: |
+        #!/bin/bash
+        FILE_PATH="${CLAUDE_TOOL_INPUT_FILE_PATH:-${CLAUDE_TOOL_INPUT_PATH:-}}"
+        [[ -z "$FILE_PATH" ]] && exit 0
+        if [[ "$FILE_PATH" == *.py ]]; then
+          ruff check --fix "$FILE_PATH" 2>/dev/null || true
+          ruff format "$FILE_PATH" 2>/dev/null || true
+        fi
+        exit 0
+settings:
+  permissions:
+    allow:
+      - "Bash(pytest*)"
+      - "Bash(uv *)"
+      - "Bash(ruff *)"
+      - "Bash(mypy *)"
+      - "Bash(alembic *)"
+      - "Bash(python -m *)"
+    deny:
+      - "Bash(rm -rf /)"
+      - "Bash(sudo *)"
+      - "Bash(pip install*)"

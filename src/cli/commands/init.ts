@@ -15,6 +15,7 @@ export interface InitOptions {
   presetsDir?: string;
   preset?: string[];
   nlRunner?: ClaudeRunner;
+  _nlDescription?: string;
 }
 
 export interface HarnessState {
@@ -112,7 +113,10 @@ async function initWithNL(
 ): Promise<void> {
   let description: string;
 
-  if (options.yes && options.nlRunner) {
+  if (options._nlDescription) {
+    // Redirected from legacy flow with NL input
+    description = options._nlDescription;
+  } else if (options.yes && options.nlRunner) {
     // Test/automation mode: use provided runner with a default description
     description = "generate config";
   } else if (!options.yes) {
@@ -209,36 +213,19 @@ async function initWithPresetsLegacy(
     presetNames.length > 0 &&
     presetNames.some((name) => name.includes(" ") || !registry.has(name));
 
-  let resolvedPresetNames = presetNames;
   if (isNaturalLanguage) {
+    // Redirect to NL-first flow (generates harness.yaml, not preset selection)
     const description = presetNames.join(" ");
-    const availablePresets = registry.list().map((e) => ({
-      name: e.config.name,
-      displayName: e.config.displayName,
-      description: e.config.description,
-      tags: e.config.tags ?? [],
-    }));
-
     console.log(`Interpreting as natural language: "${description}"`);
-    const intent = await parseNaturalLanguage(description, availablePresets);
-    console.log(`Resolved presets: ${intent.presets.join(", ")}`);
-    console.log(`Confidence: ${intent.confidence}`);
-    console.log(`Reason: ${intent.explanation}`);
 
-    if (!options.yes) {
-      const { confirm } = await import("@inquirer/prompts");
-      const ok = await confirm({ message: "Proceed with these presets?", default: true });
-      if (!ok) {
-        console.log("Aborted.");
-        return;
-      }
-    }
-
-    resolvedPresetNames = intent.presets;
+    // Reuse initWithNL by injecting the description
+    const nlOptions = { ...options, _nlDescription: description };
+    await initWithNL(projectDir, presetsDir, nlOptions);
+    return;
   }
 
-  // Always include _base, deduplicate
-  const names = Array.from(new Set(["_base", ...resolvedPresetNames]));
+  // Direct preset names — use preset flow
+  const names = Array.from(new Set(["_base", ...presetNames]));
 
   const presetConfigs = await loadAndMergePresets(names, registry);
   const config = mergePresets(presetConfigs);

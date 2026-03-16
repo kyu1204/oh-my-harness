@@ -1,12 +1,9 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { spawn } from "node:child_process";
 import yaml from "js-yaml";
 import { buildPresetSelectionPrompt, buildHarnessGenerationPrompt } from "./prompt-templates.js";
 import type { PresetInfo } from "./prompt-templates.js";
 import { HarnessConfigSchema } from "../core/harness-schema.js";
 import type { HarnessConfig } from "../core/harness-schema.js";
-
-const execFileAsync = promisify(execFile);
 
 export interface ParsedIntent {
   presets: string[];
@@ -17,21 +14,38 @@ export interface ParsedIntent {
 export type ClaudeRunner = (prompt: string) => Promise<string>;
 
 export const defaultClaudeRunner: ClaudeRunner = async (prompt) => {
-  try {
-    const { stdout } = await execFileAsync("claude", ["-p", prompt], {
-      timeout: 30000,
+  return new Promise((resolve, reject) => {
+    const proc = spawn("claude", ["-p", "-"], {
+      stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env },
     });
-    return stdout;
-  } catch (err) {
-    const error = err as NodeJS.ErrnoException;
-    if (error.code === "ENOENT") {
-      throw new Error(
-        "claude CLI not found. Install it with: npm install -g @anthropic-ai/claude-code",
-      );
-    }
-    throw err;
-  }
+
+    let stdout = "";
+    let stderr = "";
+
+    proc.stdout.on("data", (data: Buffer) => { stdout += data.toString(); });
+    proc.stderr.on("data", (data: Buffer) => { stderr += data.toString(); });
+
+    proc.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") {
+        reject(new Error("claude CLI not found. Install it with: npm install -g @anthropic-ai/claude-code"));
+      } else {
+        reject(err);
+      }
+    });
+
+    proc.on("close", (code) => {
+      if (code === 0) {
+        resolve(stdout);
+      } else {
+        reject(new Error(`claude exited with code ${code}: ${stderr || stdout}`));
+      }
+    });
+
+    // Write prompt to stdin and close
+    proc.stdin.write(prompt);
+    proc.stdin.end();
+  });
 };
 
 function extractJson(text: string): string {

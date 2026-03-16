@@ -1,0 +1,33 @@
+{
+  "name": "oh-my-harness",
+  "version": "0.1.0",
+  "description": "Natural language-based AI code agent harness configuration tool",
+  "type": "module",
+  "bin": {
+    "oh-my-harness": "./bin/oh-my-harness.ts"
+  },
+  "scripts": {
+    "dev": "tsx bin/oh-my-harness.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "tsc",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "@inquirer/prompts": "^7.0.0",
+    "handlebars": "^4.7.8",
+    "js-yaml": "^4.1.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

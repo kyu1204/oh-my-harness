@@ -90,7 +90,7 @@ hooks:
             exit 0
           fi
           echo "oh-my-harness: Running tests before commit..." >&2
-          if ! $TEST_CMD 2>&1; then
+          if ! $TEST_CMD >&2 2>&1; then
             echo "{\"decision\": \"block\", \"reason\": \"oh-my-harness: tests failed, commit blocked\"}"
             exit 0
           fi

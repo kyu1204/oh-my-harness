@@ -16,8 +16,13 @@ export async function generateClaudeMd(options: GenerateClaudeMdOptions): Promis
   let content: string;
   try {
     content = await fs.readFile(claudeMdPath, "utf8");
-  } catch {
-    content = "";
+  } catch (err) {
+    const error = err as NodeJS.ErrnoException;
+    if (error.code === "ENOENT") {
+      content = "";
+    } else {
+      throw error;
+    }
   }
 
   // Sort sections by priority (lower = higher in file)

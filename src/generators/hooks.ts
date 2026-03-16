@@ -36,17 +36,20 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
   const hooksConfig: Record<string, Array<{ matcher: string; hooks: HookCommand[] }>> = {};
 
   for (const hook of allHooks) {
-    if (hook.inline) {
-      const scriptName = `${hook.id}.sh`;
-      const scriptPath = join(hooksDir, scriptName);
-      await writeFile(scriptPath, hook.inline, "utf8");
-      await chmod(scriptPath, 0o755);
-      generatedFiles.push(scriptPath);
+    if (!hook.inline) {
+      continue;
     }
+
+    const safeId = hook.id.replace(/[^a-zA-Z0-9_-]/g, "");
+    const scriptName = `${safeId}.sh`;
+    const scriptPath = join(hooksDir, scriptName);
+    await writeFile(scriptPath, hook.inline, "utf8");
+    await chmod(scriptPath, 0o755);
+    generatedFiles.push(scriptPath);
 
     const entry = {
       matcher: hook.matcher,
-      hooks: [{ type: "command" as const, command: `bash .claude/hooks/${hook.id}.sh` }],
+      hooks: [{ type: "command" as const, command: `bash .claude/hooks/${safeId}.sh` }],
     };
     if (!hooksConfig[hook.event]) {
       hooksConfig[hook.event] = [];

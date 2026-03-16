@@ -11,3 +11,6 @@ dist/
 harness.yaml
 CLAUDE.md
 .claude/
+
+# oh-my-harness
+.claude/hooks/

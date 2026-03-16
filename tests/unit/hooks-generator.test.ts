@@ -144,6 +144,46 @@ describe("generateHooks", () => {
     ]);
   });
 
+  it("sanitizes hook.id with path traversal characters", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          { id: "../../etc/passwd", matcher: "Bash", inline: "#!/bin/bash\nexit 0" },
+        ],
+        postToolUse: [],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+
+    // Sanitized id: only alphanumeric, hyphens, underscores remain
+    const safeId = "etcpasswd";
+    const scriptPath = join(projectDir, `.claude/hooks/${safeId}.sh`);
+    expect(result.generatedFiles).toContain(scriptPath);
+    expect(result.hooksConfig["PreToolUse"]).toEqual([
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash .claude/hooks/${safeId}.sh` }] },
+    ]);
+    // Ensure no file was written outside the hooks dir
+    const content = await readFile(scriptPath, "utf8");
+    expect(content).toBe("#!/bin/bash\nexit 0");
+  });
+
+  it("does not register hooks without inline content in hooksConfig", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          { id: "no-inline-hook", matcher: "Bash" } as never,
+        ],
+        postToolUse: [],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+
+    expect(result.hooksConfig).toEqual({});
+    expect(result.generatedFiles).toEqual([]);
+  });
+
   it("returns generated file paths in generatedFiles", async () => {
     const config = makeMergedConfig({
       hooks: {

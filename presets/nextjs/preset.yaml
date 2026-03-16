@@ -68,9 +68,17 @@ hooks:
         [[ -z "$FILE_PATH" ]] && exit 0
         BLOCKED=(".next/" "out/" "node_modules/" "*.min.js" "*.min.css")
         for pattern in "${BLOCKED[@]}"; do
-          if [[ "$FILE_PATH" == *"/$pattern"* ]] || [[ "$FILE_PATH" == "$pattern"* ]]; then
-            echo "{\"decision\": \"block\", \"reason\": \"oh-my-harness: protected path $pattern\"}"
-            exit 0
+          if [[ "$pattern" == */ ]]; then
+            if [[ "$FILE_PATH" == *"/$pattern"* ]] || [[ "$FILE_PATH" == "$pattern"* ]]; then
+              echo "{\"decision\": \"block\", \"reason\": \"oh-my-harness: protected path $pattern\"}"
+              exit 0
+            fi
+          elif [[ "$pattern" == \** ]]; then
+            suffix="${pattern#\*}"
+            if [[ "$FILE_PATH" == *"$suffix" ]]; then
+              echo "{\"decision\": \"block\", \"reason\": \"oh-my-harness: protected path $pattern\"}"
+              exit 0
+            fi
           fi
         done
         exit 0

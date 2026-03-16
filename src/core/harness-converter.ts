@@ -30,7 +30,10 @@ export function harnessToMergedConfig(harness: HarnessConfig): MergedConfig {
   // preCommit hook
   if (harness.enforcement.preCommit.length > 0) {
     const commands = harness.enforcement.preCommit
-      .map((cmd) => `    echo "oh-my-harness: Running ${cmd} before commit..." >&2\n    if ! ${cmd} >&2 2>&1; then\n      echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: ${cmd} failed, commit blocked\\"}"\n      exit 0\n    fi`)
+      .map((cmd) => {
+        const safeCmdJson = cmd.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+        return `    echo "oh-my-harness: Running ${cmd} before commit..." >&2\n    if ! ${cmd} >&2 2>&1; then\n      echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: ${safeCmdJson} failed, commit blocked\\"}"\n      exit 0\n    fi`;
+      })
       .join("\n");
 
     preToolUse.push({
@@ -66,9 +69,17 @@ FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // 
 [[ -z "$FILE_PATH" ]] && exit 0
 BLOCKED=(${patterns})
 for pattern in "\${BLOCKED[@]}"; do
-  if [[ "$FILE_PATH" == *"/$pattern"* ]] || [[ "$FILE_PATH" == "$pattern"* ]]; then
-    echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: protected path $pattern\\"}"
-    exit 0
+  if [[ "$pattern" == */ ]]; then
+    if [[ "$FILE_PATH" == *"/$pattern"* ]] || [[ "$FILE_PATH" == "$pattern"* ]]; then
+      echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: protected path $pattern\\"}"
+      exit 0
+    fi
+  elif [[ "$pattern" == \\** ]]; then
+    suffix="\${pattern#\\*}"
+    if [[ "$FILE_PATH" == *"\$suffix" ]]; then
+      echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: protected path $pattern\\"}"
+      exit 0
+    fi
   fi
 done
 exit 0

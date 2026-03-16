@@ -63,6 +63,9 @@ function validateParsedIntent(obj: unknown): ParsedIntent {
   if (!Array.isArray(record["presets"])) {
     throw new Error('Parsed JSON is missing required field "presets" (array)');
   }
+  if (!record["presets"].every((p: unknown) => typeof p === "string")) {
+    throw new Error('All elements in "presets" must be strings');
+  }
   if (typeof record["confidence"] !== "number") {
     throw new Error('Parsed JSON is missing required field "confidence" (number)');
   }

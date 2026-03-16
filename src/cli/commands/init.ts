@@ -29,8 +29,16 @@ function getDefaultPresetsDir(): string {
 
 export async function readHarnessState(projectDir: string): Promise<HarnessState> {
   const stateFile = path.join(projectDir, ".claude", "oh-my-harness.json");
-  const raw = await fs.readFile(stateFile, "utf-8");
-  return JSON.parse(raw) as HarnessState;
+  try {
+    const raw = await fs.readFile(stateFile, "utf-8");
+    return JSON.parse(raw) as HarnessState;
+  } catch (err) {
+    const error = err as NodeJS.ErrnoException;
+    if (error.code === "ENOENT") {
+      throw new Error("oh-my-harness is not initialized. Run `oh-my-harness init` first.");
+    }
+    throw new Error(`Failed to read harness state: ${error.message}`);
+  }
 }
 
 export async function writeHarnessState(projectDir: string, state: HarnessState): Promise<void> {

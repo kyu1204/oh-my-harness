@@ -4,10 +4,12 @@
 
 **Tame your AI coding agents with natural language.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/oh-my-harness.svg)](https://www.npmjs.com/package/oh-my-harness)
+[![npm downloads](https://img.shields.io/npm/dm/oh-my-harness.svg)](https://www.npmjs.com/package/oh-my-harness)
+[![CI](https://github.com/kyu1204/oh-my-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/kyu1204/oh-my-harness/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/kyu1204/oh-my-harness.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
-[![Tests](https://img.shields.io/badge/Tests-131%20passing-brightgreen.svg)](#)
 
 > Stop hand-writing CLAUDE.md files. Describe your project, get enforced guardrails.
 
@@ -43,15 +45,12 @@ That's it. oh-my-harness generates **enforced guardrails** — not just instruct
 ## Quick Start
 
 ```bash
-# Clone and install
-git clone https://github.com/your-username/oh-my-harness.git
-cd oh-my-harness && npm install
+# Zero-install: run directly with npx
+npx oh-my-harness init "TypeScript Next.js frontend with Python FastAPI backend"
 
-# NL-first: describe your project
-npx tsx bin/oh-my-harness.ts init "TypeScript Next.js frontend with Python FastAPI backend"
-
-# Or use built-in presets (offline, instant)
-npx tsx bin/oh-my-harness.ts init --preset nextjs fastapi
+# Or install globally
+npm install -g oh-my-harness
+oh-my-harness init --preset nextjs fastapi
 ```
 
 ### What Gets Generated

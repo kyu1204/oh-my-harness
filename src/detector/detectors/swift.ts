@@ -24,10 +24,17 @@ export const swiftDetector: Detector = {
     const frameworks: string[] = [];
     const testCommands: string[] = [];
     const buildCommands: string[] = [];
+    const lintCommands: string[] = [];
     const detectedFiles: string[] = [];
     const blockedPaths = [".build/", "DerivedData/"];
 
-    if (xcodeproj) {
+    if (xcworkspace) {
+      frameworks.push("xcode");
+      testCommands.push(`xcodebuild test -workspace ${xcworkspace}`);
+      buildCommands.push("xcodebuild build");
+      detectedFiles.push(xcworkspace);
+      if (xcodeproj) detectedFiles.push(xcodeproj);
+    } else if (xcodeproj) {
       frameworks.push("xcode");
       const scheme = path.basename(xcodeproj, ".xcodeproj");
       testCommands.push(`xcodebuild test -scheme ${scheme}`);
@@ -40,17 +47,11 @@ export const swiftDetector: Detector = {
       detectedFiles.push("Package.swift");
     }
 
-    if (xcworkspace) {
-      if (!frameworks.includes("xcode")) frameworks.push("xcode");
-      testCommands.push(`xcodebuild test -workspace ${xcworkspace}`);
-      detectedFiles.push(xcworkspace);
-    }
-
     if (hasSwiftlint) {
-      buildCommands.push("swiftlint");
+      lintCommands.push("swiftlint");
       detectedFiles.push(".swiftlint.yml");
     }
 
-    return { languages, frameworks, testCommands, buildCommands, blockedPaths, detectedFiles };
+    return { languages, frameworks, testCommands, buildCommands, lintCommands, blockedPaths, detectedFiles };
   },
 };

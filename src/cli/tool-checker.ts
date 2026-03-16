@@ -33,7 +33,28 @@ const INSTALL_HINTS: Record<string, string> = {
 function extractBinary(command: string): string | undefined {
   const trimmed = command.trim();
   if (!trimmed) return undefined;
-  return trimmed.split(/\s+/)[0];
+
+  const parts = trimmed.split(/\s+/);
+
+  // Skip gradle wrapper commands (managed by project)
+  if (parts[0] === "./gradlew" || parts[0] === "gradlew") return undefined;
+
+  // npx <tool> ... → extract <tool>
+  if (parts[0] === "npx" && parts.length > 1) return parts[1];
+
+  // npm run <script> / npm test / npm <script> → skip (package.json scripts)
+  if (parts[0] === "npm") return undefined;
+
+  // pnpm [run] <script> / pnpm test → skip
+  if (parts[0] === "pnpm") return undefined;
+
+  // yarn [run] <script> / yarn test → skip
+  if (parts[0] === "yarn") return undefined;
+
+  // poetry run <tool> → extract <tool>
+  if (parts[0] === "poetry" && parts[1] === "run" && parts.length > 2) return parts[2];
+
+  return parts[0];
 }
 
 export function extractToolNames(config: HarnessConfig): ToolRef[] {

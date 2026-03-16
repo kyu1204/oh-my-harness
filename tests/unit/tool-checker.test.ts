@@ -22,13 +22,32 @@ function makeConfig(overrides: Partial<HarnessConfig["enforcement"]> = {}): Harn
 }
 
 describe("extractToolNames", () => {
-  it("extracts binary names from preCommit commands", () => {
+  it("extracts actual tool from npx prefix", () => {
     const config = makeConfig({ preCommit: ["npx vitest run", "npx tsc --noEmit"] });
     const names = extractToolNames(config);
-    expect(names).toContainEqual(expect.objectContaining({ name: "npx", source: "pre-commit" }));
+    expect(names).toContainEqual(expect.objectContaining({ name: "vitest", source: "pre-commit" }));
+    expect(names).toContainEqual(expect.objectContaining({ name: "tsc", source: "pre-commit" }));
+    expect(names.find((n) => n.name === "npx")).toBeUndefined();
   });
 
-  it("extracts binary names from postSave commands", () => {
+  it("skips npm/pnpm/yarn script commands", () => {
+    const config = makeConfig({
+      preCommit: ["npm run lint", "pnpm test", "yarn lint", "npm test", "pnpm run build"],
+    });
+    const names = extractToolNames(config);
+    expect(names).toEqual([]);
+  });
+
+  it("extracts tool from poetry run prefix", () => {
+    const config = makeConfig({
+      preCommit: ["poetry run pytest", "poetry run ruff check"],
+    });
+    const names = extractToolNames(config);
+    expect(names).toContainEqual(expect.objectContaining({ name: "pytest" }));
+    expect(names).toContainEqual(expect.objectContaining({ name: "ruff" }));
+  });
+
+  it("extracts direct tool names from postSave commands", () => {
     const config = makeConfig({
       postSave: [
         { pattern: "*.ts", command: "eslint --fix" },
@@ -55,6 +74,12 @@ describe("extractToolNames", () => {
     const eslintEntries = names.filter((n) => n.name === "eslint");
     expect(eslintEntries.length).toBe(1);
   });
+
+  it("skips gradle wrapper commands", () => {
+    const config = makeConfig({ preCommit: ["./gradlew test", "./gradlew build"] });
+    const names = extractToolNames(config);
+    expect(names).toEqual([]);
+  });
 });
 
 describe("checkReferencedTools", () => {
@@ -65,10 +90,9 @@ describe("checkReferencedTools", () => {
     });
     const results = await checkReferencedTools(config);
     expect(Array.isArray(results)).toBe(true);
-    // npx should be installed (comes with node)
-    const npx = results.find((r) => r.name === "npx");
-    expect(npx).toBeDefined();
-    expect(npx!.installed).toBe(true);
+    // vitest should be extracted from "npx vitest run"
+    const vitest = results.find((r) => r.name === "vitest");
+    expect(vitest).toBeDefined();
   });
 
   it("returns installCmd suggestions", async () => {

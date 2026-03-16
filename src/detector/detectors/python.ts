@@ -35,6 +35,7 @@ export const pythonDetector: Detector = {
     const detectedFiles: string[] = [];
 
     let isPython = false;
+    let isPoetry = false;
 
     const pyprojectPath = path.join(projectDir, "pyproject.toml");
     const uvLockPath = path.join(projectDir, "uv.lock");
@@ -56,8 +57,6 @@ export const pythonDetector: Detector = {
     if (hasUvSection || hasUvLock) {
       isPython = true;
       packageManagers.push("uv");
-      testCommands.push("pytest");
-      lintCommands.push("ruff check");
       if (pyprojectContent && hasUvSection) detectedFiles.push("pyproject.toml");
       if (hasUvLock) detectedFiles.push("uv.lock");
     }
@@ -68,9 +67,8 @@ export const pythonDetector: Detector = {
 
     if (hasPoetrySection || hasPoetryLock) {
       isPython = true;
+      isPoetry = true;
       packageManagers.push("poetry");
-      testCommands.push("poetry run pytest");
-      lintCommands.push("poetry run ruff");
       if (pyprojectContent && hasPoetrySection && !detectedFiles.includes("pyproject.toml")) {
         detectedFiles.push("pyproject.toml");
       }
@@ -81,21 +79,20 @@ export const pythonDetector: Detector = {
     if (await fileExists(requirementsTxtPath)) {
       isPython = true;
       packageManagers.push("pip");
-      testCommands.push("pytest");
       detectedFiles.push("requirements.txt");
     }
 
     // pytest.ini detection
     if (await fileExists(pytestIniPath)) {
       isPython = true;
-      testCommands.push("pytest");
+      testCommands.push(isPoetry ? "poetry run pytest" : "pytest");
       detectedFiles.push("pytest.ini");
     }
 
     // conftest.py detection
     if (await fileExists(conftestPath)) {
       isPython = true;
-      testCommands.push("pytest");
+      testCommands.push(isPoetry ? "poetry run pytest" : "pytest");
       detectedFiles.push("conftest.py");
     }
 
@@ -103,7 +100,7 @@ export const pythonDetector: Detector = {
     const setupCfgContent = await readTextFile(setupCfgPath);
     if (setupCfgContent?.includes("[tool:pytest]")) {
       isPython = true;
-      testCommands.push("pytest");
+      testCommands.push(isPoetry ? "poetry run pytest" : "pytest");
       detectedFiles.push("setup.cfg");
     }
 
@@ -117,14 +114,14 @@ export const pythonDetector: Detector = {
     // ruff.toml detection
     if (await fileExists(ruffTomlPath)) {
       isPython = true;
-      lintCommands.push("ruff check");
+      lintCommands.push(isPoetry ? "poetry run ruff check" : "ruff check");
       detectedFiles.push("ruff.toml");
     }
 
     // pyproject.toml [tool.ruff] detection
     if (pyprojectContent?.includes("[tool.ruff]")) {
       isPython = true;
-      lintCommands.push("ruff check");
+      lintCommands.push(isPoetry ? "poetry run ruff check" : "ruff check");
       if (!detectedFiles.includes("pyproject.toml")) detectedFiles.push("pyproject.toml");
     }
 

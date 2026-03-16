@@ -89,4 +89,27 @@ describe("dotnetDetector", () => {
     expect(result.languages ?? []).not.toContain("csharp");
     expect(result.languages ?? []).not.toContain("fsharp");
   });
+
+  it("includes all matching .csproj files in detectedFiles", async () => {
+    await writeFile(tmpDir, "Alpha.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+    await writeFile(tmpDir, "Beta.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+    await writeFile(tmpDir, "Gamma.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+
+    const result = await dotnetDetector.detect(tmpDir);
+
+    expect(result.detectedFiles).toContain("Alpha.csproj");
+    expect(result.detectedFiles).toContain("Beta.csproj");
+    expect(result.detectedFiles).toContain("Gamma.csproj");
+  });
+
+  it("returns .csproj files in sorted order", async () => {
+    await writeFile(tmpDir, "Zebra.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+    await writeFile(tmpDir, "Alpha.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+    await writeFile(tmpDir, "Mango.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+
+    const result = await dotnetDetector.detect(tmpDir);
+
+    const csprojFiles = (result.detectedFiles ?? []).filter((f) => f.endsWith(".csproj"));
+    expect(csprojFiles).toEqual(["Alpha.csproj", "Mango.csproj", "Zebra.csproj"]);
+  });
 });

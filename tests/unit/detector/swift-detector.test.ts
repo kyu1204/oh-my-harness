@@ -117,7 +117,7 @@ describe("swiftDetector", () => {
     });
   });
 
-  describe("Xcode project with Package.swift (xcodeproj takes precedence)", () => {
+  describe("Xcode project with Package.swift (xcodeproj takes precedence when no workspace)", () => {
     const projectName = "HybridApp";
 
     beforeEach(async () => {
@@ -137,7 +137,7 @@ describe("swiftDetector", () => {
     });
   });
 
-  describe("Xcode workspace (.xcworkspace present)", () => {
+  describe("Xcode workspace (.xcworkspace present, no .xcodeproj)", () => {
     const workspaceName = "MyWorkspace";
 
     beforeEach(async () => {
@@ -161,9 +161,48 @@ describe("swiftDetector", () => {
       );
     });
 
+    it("sets xcodebuild build command", async () => {
+      const result = await swiftDetector.detect(tmpDir);
+      expect(result.buildCommands).toContain("xcodebuild build");
+    });
+
     it("includes .xcworkspace in detectedFiles", async () => {
       const result = await swiftDetector.detect(tmpDir);
       expect(result.detectedFiles).toContain(`${workspaceName}.xcworkspace`);
+    });
+  });
+
+  describe("Xcode workspace + xcodeproj (workspace takes priority)", () => {
+    const workspaceName = "MyWorkspace";
+    const projectName = "MyApp";
+
+    beforeEach(async () => {
+      await fs.mkdir(path.join(tmpDir, `${workspaceName}.xcworkspace`));
+      await fs.mkdir(path.join(tmpDir, `${projectName}.xcodeproj`));
+    });
+
+    it("uses workspace test command, not xcodeproj scheme", async () => {
+      const result = await swiftDetector.detect(tmpDir);
+      expect(result.testCommands).toContain(
+        `xcodebuild test -workspace ${workspaceName}.xcworkspace`
+      );
+      expect(result.testCommands).not.toContain(`xcodebuild test -scheme ${projectName}`);
+    });
+
+    it("sets xcodebuild build command", async () => {
+      const result = await swiftDetector.detect(tmpDir);
+      expect(result.buildCommands).toContain("xcodebuild build");
+    });
+
+    it("includes both workspace and xcodeproj in detectedFiles", async () => {
+      const result = await swiftDetector.detect(tmpDir);
+      expect(result.detectedFiles).toContain(`${workspaceName}.xcworkspace`);
+      expect(result.detectedFiles).toContain(`${projectName}.xcodeproj`);
+    });
+
+    it("does not duplicate xcode in frameworks", async () => {
+      const result = await swiftDetector.detect(tmpDir);
+      expect(result.frameworks?.filter((f) => f === "xcode").length).toBe(1);
     });
   });
 
@@ -172,9 +211,10 @@ describe("swiftDetector", () => {
       await fs.writeFile(path.join(tmpDir, ".swiftlint.yml"), "disabled_rules: []\n");
     });
 
-    it("sets swiftlint build command", async () => {
+    it("sets swiftlint in lintCommands (not buildCommands)", async () => {
       const result = await swiftDetector.detect(tmpDir);
-      expect(result.buildCommands).toContain("swiftlint");
+      expect(result.lintCommands).toContain("swiftlint");
+      expect(result.buildCommands).not.toContain("swiftlint");
     });
 
     it("includes .swiftlint.yml in detectedFiles", async () => {
@@ -194,14 +234,15 @@ describe("swiftDetector", () => {
       expect(result.frameworks).toContain("spm");
     });
 
-    it("includes swift build command", async () => {
+    it("includes swift build command in buildCommands", async () => {
       const result = await swiftDetector.detect(tmpDir);
       expect(result.buildCommands).toContain("swift build");
     });
 
-    it("includes swiftlint build command", async () => {
+    it("includes swiftlint in lintCommands (not buildCommands)", async () => {
       const result = await swiftDetector.detect(tmpDir);
-      expect(result.buildCommands).toContain("swiftlint");
+      expect(result.lintCommands).toContain("swiftlint");
+      expect(result.buildCommands).not.toContain("swiftlint");
     });
   });
 

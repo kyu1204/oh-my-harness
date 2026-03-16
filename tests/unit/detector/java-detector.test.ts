@@ -46,8 +46,9 @@ describe("javaDetector", () => {
     expect(result.detectedFiles).toContain("pom.xml");
   });
 
-  it("detects Gradle project from build.gradle", async () => {
+  it("detects Gradle project from build.gradle (with gradlew)", async () => {
     await writeFile(tmpDir, "build.gradle", "// gradle build file");
+    await writeFile(tmpDir, "gradlew", "#!/bin/sh");
 
     const result = await javaDetector.detect(tmpDir);
 
@@ -56,10 +57,12 @@ describe("javaDetector", () => {
     expect(result.testCommands).toContain("./gradlew test");
     expect(result.buildCommands).toContain("./gradlew build");
     expect(result.detectedFiles).toContain("build.gradle");
+    expect(result.detectedFiles).toContain("gradlew");
   });
 
-  it("detects Gradle Kotlin DSL project from build.gradle.kts", async () => {
+  it("detects Gradle Kotlin DSL project from build.gradle.kts (with gradlew)", async () => {
     await writeFile(tmpDir, "build.gradle.kts", "// kotlin dsl build file");
+    await writeFile(tmpDir, "gradlew", "#!/bin/sh");
 
     const result = await javaDetector.detect(tmpDir);
 
@@ -69,6 +72,29 @@ describe("javaDetector", () => {
     expect(result.testCommands).toContain("./gradlew test");
     expect(result.buildCommands).toContain("./gradlew build");
     expect(result.detectedFiles).toContain("build.gradle.kts");
+    expect(result.detectedFiles).toContain("gradlew");
+  });
+
+  it("uses gradle (not ./gradlew) when build.gradle exists but gradlew does not", async () => {
+    await writeFile(tmpDir, "build.gradle", "// gradle build file");
+
+    const result = await javaDetector.detect(tmpDir);
+
+    expect(result.testCommands).toContain("gradle test");
+    expect(result.buildCommands).toContain("gradle build");
+    expect(result.testCommands).not.toContain("./gradlew test");
+    expect(result.detectedFiles).not.toContain("gradlew");
+  });
+
+  it("uses gradle (not ./gradlew) when build.gradle.kts exists but gradlew does not", async () => {
+    await writeFile(tmpDir, "build.gradle.kts", "// kotlin dsl build file");
+
+    const result = await javaDetector.detect(tmpDir);
+
+    expect(result.testCommands).toContain("gradle test");
+    expect(result.buildCommands).toContain("gradle build");
+    expect(result.testCommands).not.toContain("./gradlew test");
+    expect(result.detectedFiles).not.toContain("gradlew");
   });
 
   it("includes standard blocked paths for Maven projects", async () => {
@@ -81,6 +107,7 @@ describe("javaDetector", () => {
 
   it("includes standard blocked paths for Gradle projects", async () => {
     await writeFile(tmpDir, "build.gradle", "// gradle");
+    await writeFile(tmpDir, "gradlew", "#!/bin/sh");
 
     const result = await javaDetector.detect(tmpDir);
 

@@ -28,7 +28,7 @@ describe("pythonDetector", () => {
     expect(result).toEqual({});
   });
 
-  it("detects uv project via pyproject.toml [tool.uv] section", async () => {
+  it("detects uv project via pyproject.toml [tool.uv] section - no test/lint without explicit signals", async () => {
     await writeFile(
       tmpDir,
       "pyproject.toml",
@@ -37,22 +37,22 @@ describe("pythonDetector", () => {
     const result = await pythonDetector.detect(tmpDir);
     expect(result.languages).toContain("python");
     expect(result.packageManagers).toContain("uv");
-    expect(result.testCommands).toContain("pytest");
-    expect(result.lintCommands).toContain("ruff check");
+    expect(result.testCommands).toEqual([]);
+    expect(result.lintCommands).toEqual([]);
     expect(result.detectedFiles).toContain("pyproject.toml");
   });
 
-  it("detects uv project via uv.lock file", async () => {
+  it("detects uv project via uv.lock file - no test/lint without explicit signals", async () => {
     await writeFile(tmpDir, "uv.lock", "version = 1\n");
     const result = await pythonDetector.detect(tmpDir);
     expect(result.languages).toContain("python");
     expect(result.packageManagers).toContain("uv");
-    expect(result.testCommands).toContain("pytest");
-    expect(result.lintCommands).toContain("ruff check");
+    expect(result.testCommands).toEqual([]);
+    expect(result.lintCommands).toEqual([]);
     expect(result.detectedFiles).toContain("uv.lock");
   });
 
-  it("detects poetry project via pyproject.toml [tool.poetry] section", async () => {
+  it("detects poetry project via pyproject.toml [tool.poetry] section - no test/lint without explicit signals", async () => {
     await writeFile(
       tmpDir,
       "pyproject.toml",
@@ -61,27 +61,27 @@ describe("pythonDetector", () => {
     const result = await pythonDetector.detect(tmpDir);
     expect(result.languages).toContain("python");
     expect(result.packageManagers).toContain("poetry");
-    expect(result.testCommands).toContain("poetry run pytest");
-    expect(result.lintCommands).toContain("poetry run ruff");
+    expect(result.testCommands).toEqual([]);
+    expect(result.lintCommands).toEqual([]);
     expect(result.detectedFiles).toContain("pyproject.toml");
   });
 
-  it("detects poetry project via poetry.lock file", async () => {
+  it("detects poetry project via poetry.lock file - no test/lint without explicit signals", async () => {
     await writeFile(tmpDir, "poetry.lock", "# This file is auto-generated\n");
     const result = await pythonDetector.detect(tmpDir);
     expect(result.languages).toContain("python");
     expect(result.packageManagers).toContain("poetry");
-    expect(result.testCommands).toContain("poetry run pytest");
-    expect(result.lintCommands).toContain("poetry run ruff");
+    expect(result.testCommands).toEqual([]);
+    expect(result.lintCommands).toEqual([]);
     expect(result.detectedFiles).toContain("poetry.lock");
   });
 
-  it("detects pip project via requirements.txt", async () => {
+  it("detects pip project via requirements.txt - no test commands without explicit signals", async () => {
     await writeFile(tmpDir, "requirements.txt", "requests==2.31.0\n");
     const result = await pythonDetector.detect(tmpDir);
     expect(result.languages).toContain("python");
     expect(result.packageManagers).toContain("pip");
-    expect(result.testCommands).toContain("pytest");
+    expect(result.testCommands).toEqual([]);
     expect(result.detectedFiles).toContain("requirements.txt");
   });
 
@@ -167,6 +167,59 @@ describe("pythonDetector", () => {
     expect(result.packageManagers).toContain("uv");
     expect(result.lintCommands).toContain("ruff check");
     expect(result.typecheckCommands).toContain("mypy .");
+  });
+
+  it("uv + pytest.ini -> testCommands includes pytest", async () => {
+    await writeFile(tmpDir, "pyproject.toml", "[tool.uv]\ndev-dependencies = []\n");
+    await writeFile(tmpDir, "pytest.ini", "[pytest]\n");
+    const result = await pythonDetector.detect(tmpDir);
+    expect(result.testCommands).toContain("pytest");
+    expect(result.packageManagers).toContain("uv");
+  });
+
+  it("poetry + conftest.py -> testCommands uses poetry run pytest", async () => {
+    await writeFile(tmpDir, "poetry.lock", "# auto-generated\n");
+    await writeFile(tmpDir, "conftest.py", "import pytest\n");
+    const result = await pythonDetector.detect(tmpDir);
+    expect(result.testCommands).toContain("poetry run pytest");
+    expect(result.testCommands).not.toContain("pytest");
+    expect(result.packageManagers).toContain("poetry");
+  });
+
+  it("poetry + pytest.ini -> testCommands uses poetry run pytest", async () => {
+    await writeFile(tmpDir, "poetry.lock", "# auto-generated\n");
+    await writeFile(tmpDir, "pytest.ini", "[pytest]\ntestpaths = tests\n");
+    const result = await pythonDetector.detect(tmpDir);
+    expect(result.testCommands).toContain("poetry run pytest");
+    expect(result.testCommands).not.toContain("pytest");
+  });
+
+  it("uv + ruff.toml -> lintCommands includes ruff check", async () => {
+    await writeFile(tmpDir, "uv.lock", "version = 1\n");
+    await writeFile(tmpDir, "ruff.toml", "line-length = 88\n");
+    const result = await pythonDetector.detect(tmpDir);
+    expect(result.lintCommands).toContain("ruff check");
+    expect(result.packageManagers).toContain("uv");
+  });
+
+  it("poetry + [tool.ruff] -> lintCommands uses poetry run ruff check", async () => {
+    await writeFile(
+      tmpDir,
+      "pyproject.toml",
+      "[tool.poetry]\nname = \"my-pkg\"\n\n[tool.ruff]\nline-length = 88\n",
+    );
+    const result = await pythonDetector.detect(tmpDir);
+    expect(result.lintCommands).toContain("poetry run ruff check");
+    expect(result.lintCommands).not.toContain("ruff check");
+    expect(result.packageManagers).toContain("poetry");
+  });
+
+  it("poetry + ruff.toml -> lintCommands uses poetry run ruff check", async () => {
+    await writeFile(tmpDir, "poetry.lock", "# auto-generated\n");
+    await writeFile(tmpDir, "ruff.toml", "line-length = 88\n");
+    const result = await pythonDetector.detect(tmpDir);
+    expect(result.lintCommands).toContain("poetry run ruff check");
+    expect(result.lintCommands).not.toContain("ruff check");
   });
 
   it("deduplicates commands when multiple signals present", async () => {

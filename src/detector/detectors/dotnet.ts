@@ -12,27 +12,28 @@ export const dotnetDetector: Detector = {
       return {};
     }
 
-    const csprojFile = entries.find((e) => e.endsWith(".csproj"));
-    const fsprojFile = entries.find((e) => e.endsWith(".fsproj"));
-    const slnFile = entries.find((e) => e.endsWith(".sln"));
+    const sorted = [...entries].sort();
+    const csprojFiles = sorted.filter((e) => e.endsWith(".csproj"));
+    const fsprojFiles = sorted.filter((e) => e.endsWith(".fsproj"));
+    const slnFiles = sorted.filter((e) => e.endsWith(".sln"));
 
-    if (!csprojFile && !fsprojFile && !slnFile) {
+    if (!csprojFiles.length && !fsprojFiles.length && !slnFiles.length) {
       return {};
     }
 
     const detectedFiles: string[] = [];
     const languages: string[] = [];
 
-    if (csprojFile) {
-      detectedFiles.push(csprojFile);
+    if (csprojFiles.length > 0) {
+      detectedFiles.push(...csprojFiles);
       languages.push("csharp");
     }
-    if (fsprojFile) {
-      detectedFiles.push(fsprojFile);
+    if (fsprojFiles.length > 0) {
+      detectedFiles.push(...fsprojFiles);
       languages.push("fsharp");
     }
-    if (slnFile) {
-      detectedFiles.push(slnFile);
+    if (slnFiles.length > 0) {
+      detectedFiles.push(...slnFiles);
     }
 
     return {

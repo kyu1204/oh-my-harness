@@ -45,6 +45,9 @@ export const rubyDetector: Detector = {
     if (hasRoutes) {
       isRuby = true;
       frameworks.push("rails");
+      if (!packageManagers.includes("bundler")) {
+        packageManagers.push("bundler");
+      }
       testCommands.push("bundle exec rails test");
       if (!lintCommands.includes("bundle exec rubocop")) {
         lintCommands.push("bundle exec rubocop");

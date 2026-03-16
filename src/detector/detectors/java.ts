@@ -18,10 +18,13 @@ export const javaDetector: Detector = {
     const gradlePath = path.join(projectDir, "build.gradle");
     const gradleKtsPath = path.join(projectDir, "build.gradle.kts");
 
-    const [hasPom, hasGradle, hasGradleKts] = await Promise.all([
+    const gradlewPath = path.join(projectDir, "gradlew");
+
+    const [hasPom, hasGradle, hasGradleKts, hasGradlew] = await Promise.all([
       fileExists(pomPath),
       fileExists(gradlePath),
       fileExists(gradleKtsPath),
+      fileExists(gradlewPath),
     ]);
 
     if (hasPom) {
@@ -35,14 +38,17 @@ export const javaDetector: Detector = {
       };
     }
 
+    const gradleCmd = hasGradlew ? "./gradlew" : "gradle";
+    const gradlewFiles = hasGradlew ? ["gradlew"] : [];
+
     if (hasGradleKts) {
       return {
         languages: ["java", "kotlin"],
         packageManagers: ["gradle"],
-        testCommands: ["./gradlew test"],
-        buildCommands: ["./gradlew build"],
+        testCommands: [`${gradleCmd} test`],
+        buildCommands: [`${gradleCmd} build`],
         blockedPaths: ["build/", ".gradle/"],
-        detectedFiles: ["build.gradle.kts"],
+        detectedFiles: ["build.gradle.kts", ...gradlewFiles],
       };
     }
 
@@ -50,10 +56,10 @@ export const javaDetector: Detector = {
       return {
         languages: ["java"],
         packageManagers: ["gradle"],
-        testCommands: ["./gradlew test"],
-        buildCommands: ["./gradlew build"],
+        testCommands: [`${gradleCmd} test`],
+        buildCommands: [`${gradleCmd} build`],
         blockedPaths: ["build/", ".gradle/"],
-        detectedFiles: ["build.gradle"],
+        detectedFiles: ["build.gradle", ...gradlewFiles],
       };
     }
 

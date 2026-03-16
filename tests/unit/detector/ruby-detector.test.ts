@@ -51,6 +51,16 @@ describe("rubyDetector", () => {
     expect(result.detectedFiles).toContain("config/routes.rb");
   });
 
+  it("includes bundler in packageManagers when only config/routes.rb is present (no Gemfile)", async () => {
+    await fs.mkdir(path.join(tmpDir, "config"), { recursive: true });
+    await writeFile(path.join(tmpDir, "config"), "routes.rb", "Rails.application.routes.draw do\nend\n");
+    const result = await rubyDetector.detect(tmpDir);
+    expect(result.languages).toContain("ruby");
+    expect(result.frameworks).toContain("rails");
+    expect(result.packageManagers).toContain("bundler");
+    expect(result.detectedFiles).toContain("config/routes.rb");
+  });
+
   it("detects Ruby/Rake project via Rakefile only", async () => {
     await writeFile(tmpDir, "Rakefile", "task :default => [:test]\n");
     const result = await rubyDetector.detect(tmpDir);

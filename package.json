@@ -4,7 +4,8 @@
   "description": "Tame your AI coding agents with natural language",
   "type": "module",
   "bin": {
-    "oh-my-harness": "dist/bin/oh-my-harness.js"
+    "oh-my-harness": "dist/bin/oh-my-harness.js",
+    "omh": "dist/bin/oh-my-harness.js"
   },
   "main": "dist/cli/index.js",
   "types": "dist/cli/index.d.ts",

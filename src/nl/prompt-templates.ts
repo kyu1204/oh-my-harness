@@ -73,7 +73,7 @@ The harness.yaml schema has these fields:
 - version: must be "1.0"
 - project: object with name (optional string), description (optional string), stacks (array of {name, framework, language, packageManager?, testRunner?, linter?})
 - rules: array of {id, title, content (markdown), priority (number, lower = higher in file)}
-- enforcement: object with preCommit (array of commands like "test", "lint"), blockedPaths (array of glob patterns), blockedCommands (array of dangerous commands), postSave (array of {pattern, command})
+- enforcement: object with preCommit (array of full executable shell commands like "pnpm test", "npx eslint", "npx tsc --noEmit"), blockedPaths (array of glob patterns), blockedCommands (array of dangerous commands), postSave (array of {pattern, command})
 - hooks: array of {block, params} — use catalog building blocks instead of manual enforcement where possible (preferred for new configs)
 - permissions: object with allow (array of permission strings like "Bash(npm test*)") and deny (array)
 ${catalogSection}${factsSection}
@@ -105,7 +105,7 @@ rules:
       - Every component MUST have a corresponding .test.tsx file
     priority: 21
 enforcement:
-  preCommit: ["test", "lint", "build"]
+  preCommit: ["pnpm test", "npx eslint .", "npx tsc --noEmit"]
   blockedPaths: [".next/", "node_modules/", "*.min.js"]
   blockedCommands: ["rm -rf /", "sudo rm"]
   postSave:
@@ -143,7 +143,7 @@ rules:
       - Use dependency injection for database sessions, auth, and shared services
     priority: 20
 enforcement:
-  preCommit: ["pytest", "ruff check"]
+  preCommit: ["uv run pytest", "uv run ruff check"]
   blockedPaths: ["__pycache__/", ".venv/", "*.pyc"]
   blockedCommands: ["rm -rf /", "sudo rm", "pip install"]
   postSave:

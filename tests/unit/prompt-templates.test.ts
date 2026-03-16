@@ -131,4 +131,18 @@ describe("buildHarnessGenerationPrompt with projectFacts", () => {
     expect(prompt).toContain("branch-guard");
     expect(prompt).toContain("Project facts (detected automatically):");
   });
+
+  it("examples use full executable commands, not bare script names", () => {
+    const prompt = buildHarnessGenerationPrompt("my app");
+    // preCommit examples should NOT contain bare words like "test", "lint", "build"
+    // They should use full commands like "pnpm test", "npx eslint", etc.
+    expect(prompt).not.toMatch(/preCommit:\s*\[.*"test".*\]/);
+    expect(prompt).not.toMatch(/preCommit:\s*\[.*"lint".*\]/);
+    expect(prompt).not.toMatch(/preCommit:\s*\[.*"build".*\]/);
+  });
+
+  it("schema description mentions full executable commands", () => {
+    const prompt = buildHarnessGenerationPrompt("my app");
+    expect(prompt).toContain("full executable shell commands");
+  });
 });

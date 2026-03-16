@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { formatDepResults, formatConfigSummary } from "../../src/cli/tui/init-flow.js";
+import { formatDepResults, formatConfigSummary, formatProjectFacts } from "../../src/cli/tui/init-flow.js";
 import type { DepCheck } from "../../src/cli/deps-checker.js";
 import type { HarnessConfig } from "../../src/core/harness-schema.js";
+import { emptyFacts } from "../../src/detector/types.js";
 
 describe("formatDepResults", () => {
   it("formats installed deps with checkmark and version", () => {
@@ -134,5 +135,42 @@ describe("formatConfigSummary", () => {
     };
     const output = formatConfigSummary(config);
     expect(typeof output).toBe("string");
+  });
+});
+
+describe("formatProjectFacts", () => {
+  it("displays detected languages and frameworks", () => {
+    const facts = {
+      ...emptyFacts(),
+      languages: ["typescript"],
+      frameworks: ["nextjs"],
+      packageManagers: ["pnpm"],
+      testCommands: ["pnpm test"],
+      lintCommands: ["eslint --fix"],
+    };
+    const output = formatProjectFacts(facts);
+    expect(output).toContain("typescript");
+    expect(output).toContain("nextjs");
+    expect(output).toContain("pnpm");
+    expect(output).toContain("pnpm test");
+    expect(output).toContain("eslint --fix");
+  });
+
+  it("omits empty fields", () => {
+    const facts = {
+      ...emptyFacts(),
+      languages: ["go"],
+      testCommands: ["go test ./..."],
+    };
+    const output = formatProjectFacts(facts);
+    expect(output).toContain("go");
+    expect(output).toContain("go test ./...");
+    expect(output).not.toContain("Frameworks");
+    expect(output).not.toContain("Package managers");
+  });
+
+  it("shows fallback message for empty facts", () => {
+    const output = formatProjectFacts(emptyFacts());
+    expect(output).toContain("No project signals detected");
   });
 });

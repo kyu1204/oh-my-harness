@@ -15,6 +15,8 @@ import { generateHarnessConfig } from "../../nl/parse-intent.js";
 import { harnessToMergedConfig } from "../../core/harness-converter.js";
 import type { HarnessConfig } from "../../core/harness-schema.js";
 import { HarnessConfigSchema } from "../../core/harness-schema.js";
+import { detectProject } from "../../detector/project-detector.js";
+import type { ProjectFacts } from "../../detector/types.js";
 
 function getDefaultPresetsDir(): string {
   return path.resolve(import.meta.dirname, "../../../presets");
@@ -90,6 +92,28 @@ export function formatConfigSummary(config: HarnessConfig): string {
   return lines.join("\n");
 }
 
+export function formatProjectFacts(facts: ProjectFacts): string {
+  const lines: string[] = [];
+  const entries: Array<[string, string[]]> = [
+    ["Languages", facts.languages],
+    ["Frameworks", facts.frameworks],
+    ["Package managers", facts.packageManagers],
+    ["Test commands", facts.testCommands],
+    ["Lint commands", facts.lintCommands],
+    ["Build commands", facts.buildCommands],
+    ["Typecheck", facts.typecheckCommands],
+    ["Blocked paths", facts.blockedPaths],
+  ];
+
+  for (const [label, values] of entries) {
+    if (values.length > 0) {
+      lines.push(`  ${chalk.bold(label)}: ${values.join(", ")}`);
+    }
+  }
+
+  return lines.length > 0 ? lines.join("\n") : `  ${chalk.dim("No project signals detected")}`;
+}
+
 function handleCancel(value: unknown): void {
   if (p.isCancel(value)) {
     p.cancel("Operation cancelled.");
@@ -139,6 +163,26 @@ export async function runInitTUI(options?: {
 
   if (!claudeInstalled) {
     p.log.warn("claude CLI not installed. AI-powered mode will not be available.");
+  }
+
+  // Step 2.5: Project Detection
+  const detectSpinner = p.spinner();
+  detectSpinner.start("Detecting project type...");
+
+  let projectFacts: ProjectFacts | undefined;
+  try {
+    const facts = await detectProject(projectDir);
+    const hasAnyFacts = facts.languages.length > 0 || facts.frameworks.length > 0;
+    if (hasAnyFacts) {
+      projectFacts = facts;
+    }
+    detectSpinner.stop("Project detected");
+  } catch {
+    detectSpinner.stop("Project detection skipped");
+  }
+
+  if (projectFacts) {
+    p.note(formatProjectFacts(projectFacts), "Detected Project");
   }
 
   // Step 3: Mode Selection
@@ -200,7 +244,7 @@ export async function runInitTUI(options?: {
     genSpinner.start("Generating harness configuration...");
 
     try {
-      harnessConfig = await generateHarnessConfig(description as string);
+      harnessConfig = await generateHarnessConfig(description as string, undefined, undefined, projectFacts);
       genSpinner.stop("Configuration generated");
     } catch (err) {
       genSpinner.stop("Generation failed");

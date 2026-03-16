@@ -7,6 +7,8 @@ import { generate } from "../../core/generator.js";
 import type { PresetConfig } from "../../core/preset-types.js";
 import { parseNaturalLanguage, generateHarnessConfig } from "../../nl/parse-intent.js";
 import type { ClaudeRunner } from "../../nl/parse-intent.js";
+import { detectProject } from "../../detector/project-detector.js";
+import type { ProjectFacts } from "../../detector/project-detector.js";
 import { harnessToMergedConfig } from "../../core/harness-converter.js";
 import { harnessToMergedConfigV2 } from "../../core/harness-converter-v2.js";
 import { createDefaultRegistry } from "../../catalog/registry.js";
@@ -149,6 +151,14 @@ async function initWithNL(
 
   console.log(`Generating harness config for: "${description}"`);
 
+  // Detect project facts for richer prompt context
+  let facts: ProjectFacts | undefined;
+  try {
+    facts = await detectProject(projectDir);
+  } catch {
+    // Non-fatal: continue with no facts
+  }
+
   // Load catalog blocks so LLM knows available building blocks
   const registry = await createDefaultRegistry();
   const catalogBlocks = registry.list().map((b) => ({
@@ -160,7 +170,7 @@ async function initWithNL(
     params: b.params.map((p) => ({ name: p.name, type: p.type, description: p.description, required: p.required, default: p.default })),
   }));
 
-  const harness = await generateHarnessConfig(description, options.nlRunner, catalogBlocks);
+  const harness = await generateHarnessConfig(description, options.nlRunner, catalogBlocks, facts);
 
   // Show summary
   const stackNames = harness.project.stacks.map((s) => `${s.name} (${s.framework})`).join(", ");

@@ -4,6 +4,7 @@ import { buildPresetSelectionPrompt, buildHarnessGenerationPrompt } from "./prom
 import type { PresetInfo, CatalogBlockInfo } from "./prompt-templates.js";
 import { HarnessConfigSchema } from "../core/harness-schema.js";
 import type { HarnessConfig } from "../core/harness-schema.js";
+import type { ProjectFacts } from "../detector/project-detector.js";
 
 export interface ParsedIntent {
   presets: string[];
@@ -121,8 +122,9 @@ export async function generateHarnessConfig(
   description: string,
   runner: ClaudeRunner = defaultClaudeRunner,
   catalogBlocks?: CatalogBlockInfo[],
+  projectFacts?: ProjectFacts,
 ): Promise<HarnessConfig> {
-  const prompt = buildHarnessGenerationPrompt(description, catalogBlocks);
+  const prompt = buildHarnessGenerationPrompt(description, catalogBlocks, projectFacts);
 
   let stdout: string;
   try {

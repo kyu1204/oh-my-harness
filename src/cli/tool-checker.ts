@@ -12,9 +12,10 @@ export interface ToolCheck {
   installed: boolean;
 }
 
-interface ToolRef {
+export interface ToolRef {
   name: string;
   source: string;
+  lookupCommand: string;
 }
 
 const INSTALL_HINTS: Record<string, string> = {
@@ -30,10 +31,55 @@ const INSTALL_HINTS: Record<string, string> = {
   biome: "npm install -D @biomejs/biome",
 };
 
-function extractBinary(command: string): string | undefined {
+interface ExtractResult {
+  name: string;
+  lookupCommand: string;
+}
+
+function extractBinary(command: string): ExtractResult | undefined {
   const trimmed = command.trim();
   if (!trimmed) return undefined;
-  return trimmed.split(/\s+/)[0];
+
+  const parts = trimmed.split(/\s+/);
+
+  // Skip gradle wrapper commands (managed by project)
+  if (parts[0] === "./gradlew" || parts[0] === "gradlew") return undefined;
+
+  // npx [options] <tool> ... → skip option flags, extract first non-option token
+  if (parts[0] === "npx") {
+    let i = 1;
+    while (i < parts.length && parts[i].startsWith("-")) {
+      if (parts[i] === "-p" || parts[i] === "--package") i += 2;
+      else i += 1;
+    }
+    return i < parts.length ? { name: parts[i], lookupCommand: "npx" } : undefined;
+  }
+
+  // npm exec <tool> → extract tool; other npm subcommands → skip
+  if (parts[0] === "npm") {
+    if (parts[1] === "exec" && parts.length > 2) return { name: parts[2], lookupCommand: "npm" };
+    return undefined;
+  }
+
+  // pnpm exec <tool> → wrapper lookup; pnpm dlx <tool> → direct lookup
+  if (parts[0] === "pnpm") {
+    if (parts[1] === "exec" && parts.length > 2) return { name: parts[2], lookupCommand: "pnpm" };
+    if (parts[1] === "dlx" && parts.length > 2) return { name: parts[2], lookupCommand: "pnpm" };
+    return undefined;
+  }
+
+  // yarn dlx <tool> → direct lookup
+  if (parts[0] === "yarn") {
+    if (parts[1] === "dlx" && parts.length > 2) return { name: parts[2], lookupCommand: "yarn" };
+    return undefined;
+  }
+
+  // poetry run <tool> → check poetry existence
+  if (parts[0] === "poetry" && parts[1] === "run" && parts.length > 2) {
+    return { name: parts[2], lookupCommand: "poetry" };
+  }
+
+  return { name: parts[0], lookupCommand: parts[0] };
 }
 
 export function extractToolNames(config: HarnessConfig): ToolRef[] {
@@ -41,20 +87,20 @@ export function extractToolNames(config: HarnessConfig): ToolRef[] {
   const tools: ToolRef[] = [];
 
   for (const cmd of config.enforcement.preCommit) {
-    const name = extractBinary(cmd);
-    if (!name) continue;
-    if (!seen.has(name)) {
-      seen.add(name);
-      tools.push({ name, source: "pre-commit" });
+    const result = extractBinary(cmd);
+    if (!result) continue;
+    if (!seen.has(result.name)) {
+      seen.add(result.name);
+      tools.push({ name: result.name, lookupCommand: result.lookupCommand, source: "pre-commit" });
     }
   }
 
   for (const ps of config.enforcement.postSave) {
-    const name = extractBinary(ps.command);
-    if (!name) continue;
-    if (!seen.has(name)) {
-      seen.add(name);
-      tools.push({ name, source: "post-save hook" });
+    const result = extractBinary(ps.command);
+    if (!result) continue;
+    if (!seen.has(result.name)) {
+      seen.add(result.name);
+      tools.push({ name: result.name, lookupCommand: result.lookupCommand, source: "post-save hook" });
     }
   }
 
@@ -79,7 +125,7 @@ export async function checkReferencedTools(config: HarnessConfig): Promise<ToolC
   const results: ToolCheck[] = [];
 
   for (const ref of refs) {
-    const installed = await commandExists(ref.name);
+    const installed = await commandExists(ref.lookupCommand);
     results.push({
       name: ref.name,
       command: ref.name,

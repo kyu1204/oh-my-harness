@@ -23,13 +23,37 @@ Project description: ${description}
 Output format: {"presets": ["preset-name-1", "preset-name-2"], "confidence": 0.9, "explanation": "brief reason"}`;
 }
 
+import type { ProjectFacts } from "../detector/types.js";
+
 export interface CatalogBlockInfo {
   id: string;
   description: string;
   params: Array<{ name: string; required: boolean; default?: unknown; description: string }>;
 }
 
-export function buildHarnessGenerationPrompt(description: string, catalogBlocks?: CatalogBlockInfo[]): string {
+function buildProjectFactsSection(facts: ProjectFacts): string {
+  const lines: string[] = [];
+  if (facts.languages.length > 0) lines.push(`- Languages: ${facts.languages.join(", ")}`);
+  if (facts.frameworks.length > 0) lines.push(`- Frameworks: ${facts.frameworks.join(", ")}`);
+  if (facts.packageManagers.length > 0) lines.push(`- Package managers: ${facts.packageManagers.join(", ")}`);
+  if (facts.testCommands.length > 0) lines.push(`- Test commands: ${facts.testCommands.join(", ")}`);
+  if (facts.lintCommands.length > 0) lines.push(`- Lint commands: ${facts.lintCommands.join(", ")}`);
+  if (facts.buildCommands.length > 0) lines.push(`- Build commands: ${facts.buildCommands.join(", ")}`);
+  if (facts.typecheckCommands.length > 0) lines.push(`- Typecheck commands: ${facts.typecheckCommands.join(", ")}`);
+  if (facts.blockedPaths.length > 0) lines.push(`- Blocked paths: ${facts.blockedPaths.join(", ")}`);
+
+  if (lines.length === 0) return "";
+
+  return `\nProject facts (detected automatically):
+${lines.join("\n")}
+
+Use these facts when selecting building blocks and generating parameters.
+Do NOT guess commands — use the detected values above.\n`;
+}
+
+export function buildHarnessGenerationPrompt(description: string, catalogBlocks?: CatalogBlockInfo[], projectFacts?: ProjectFacts): string {
+  const factsSection = projectFacts ? buildProjectFactsSection(projectFacts) : "";
+
   const catalogSection = catalogBlocks && catalogBlocks.length > 0
     ? `\nAvailable building blocks (use in the hooks field):
 ${catalogBlocks
@@ -52,8 +76,7 @@ The harness.yaml schema has these fields:
 - enforcement: object with preCommit (array of commands like "test", "lint"), blockedPaths (array of glob patterns), blockedCommands (array of dangerous commands), postSave (array of {pattern, command})
 - hooks: array of {block, params} — use catalog building blocks instead of manual enforcement where possible (preferred for new configs)
 - permissions: object with allow (array of permission strings like "Bash(npm test*)") and deny (array)
-${catalogSection}
-
+${catalogSection}${factsSection}
 Example 1 - Next.js app:
 version: "1.0"
 project:

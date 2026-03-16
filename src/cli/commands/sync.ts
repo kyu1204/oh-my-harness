@@ -3,7 +3,7 @@ import path from "node:path";
 import yaml from "js-yaml";
 import chalk from "chalk";
 import { HarnessConfigSchema } from "../../core/harness-schema.js";
-import { harnessToMergedConfig } from "../../core/harness-converter.js";
+import { harnessToMergedConfigV2 } from "../../core/harness-converter-v2.js";
 import { generate } from "../../core/generator.js";
 
 export interface SyncOptions {
@@ -50,8 +50,13 @@ export async function syncCommand(options: SyncOptions = {}): Promise<void> {
   }
 
   const harness = result.data;
-  const config = harnessToMergedConfig(harness);
-  const genResult = await generate({ projectDir, config });
+  const mergedV2 = await harnessToMergedConfigV2(harness, undefined, projectDir);
+  if (mergedV2.catalogErrors && mergedV2.catalogErrors.length > 0) {
+    for (const err of mergedV2.catalogErrors) {
+      console.log(chalk.yellow(`  ⚠ ${err}`));
+    }
+  }
+  const genResult = await generate({ projectDir, config: mergedV2 });
 
   console.log(chalk.green("oh-my-harness: sync complete"));
   console.log("Generated files:");

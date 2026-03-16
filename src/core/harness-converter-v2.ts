@@ -12,6 +12,7 @@ export interface MergedConfigV2 extends MergedConfig {
 export async function harnessToMergedConfigV2(
   harness: HarnessConfig,
   registry?: CatalogRegistry,
+  projectDir?: string,
 ): Promise<MergedConfigV2> {
   // Start with v1 conversion (handles enforcement field)
   const base = harnessToMergedConfig(harness);
@@ -24,7 +25,7 @@ export async function harnessToMergedConfigV2(
   // Resolve registry — use provided one or create the default
   const resolvedRegistry = registry ?? (await createDefaultRegistry());
 
-  const catalogResult = await convertHookEntries(harness.hooks, resolvedRegistry, ".");
+  const catalogResult = await convertHookEntries(harness.hooks, resolvedRegistry, projectDir ?? ".");
 
   // If there are errors, return base config with catalogErrors attached
   if (catalogResult.errors.length > 0) {

@@ -28,7 +28,10 @@ export type BuildingBlockCategory =
   | "security"
   | "notification"
   | "formatting"
-  | "custom";
+  | "custom"
+  | "auto-fix"
+  | "automation"
+  | "file-protection";
 
 export interface ParamDefinition {
   name: string;

@@ -20,14 +20,14 @@ if echo "$COMMAND" | grep -qE "git commit|git push"; then
   BRANCH=$(git branch --show-current 2>/dev/null)
   [[ -z "$BRANCH" ]] && exit 0
   MAIN="{{mainBranch}}"
-  if [[ "$BRANCH" == "$MAIN" ]]; then
+  if [[ "$BRANCH" == "$MAIN" ]] || [[ "$BRANCH" == "master" && "$MAIN" == "main" ]]; then
     echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: direct commits to $BRANCH are blocked. Create a feature branch.\\"}"
     exit 0
   fi
   MERGED=0
   if command -v gh >&2 2>&1; then
-    COUNT=$(gh pr list --state merged --head "$BRANCH" --json number --jq 'length' 2>/dev/null || echo 0)
-    [[ "$COUNT" -gt 0 ]] && MERGED=1
+    COUNT=$(gh pr list --state merged --head "$BRANCH" --json number --jq 'length' 2>/dev/null || echo "0")
+    [[ "\${COUNT:-0}" -gt 0 ]] && MERGED=1
   else
     git fetch origin "$MAIN" --quiet >&2 2>&1 || true
     if git branch -r --merged "origin/$MAIN" 2>/dev/null | grep -q "origin/$BRANCH"; then

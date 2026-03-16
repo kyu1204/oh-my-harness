@@ -21,10 +21,10 @@ export const lockfileGuard: BuildingBlock = {
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null)
 [[ -z "$FILE_PATH" ]] && exit 0
 BASENAME=$(basename "$FILE_PATH")
-LOCKFILES=({{lockfiles}})
+LOCKFILES=({{#each lockfiles}}"{{this}}" {{/each}})
 for LOCKFILE in "\${LOCKFILES[@]}"; do
   if [[ "$BASENAME" == "$LOCKFILE" ]]; then
     echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: direct edits to lockfile $BASENAME are blocked. Use the package manager instead.\\"}"

@@ -20,9 +20,9 @@ export const pathGuard: BuildingBlock = {
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null)
 [[ -z "$FILE_PATH" ]] && exit 0
-BLOCKED_PATHS=({{blockedPaths}})
+BLOCKED_PATHS=({{#each blockedPaths}}"{{this}}" {{/each}})
 for BLOCKED in "\${BLOCKED_PATHS[@]}"; do
   if [[ "$BLOCKED" == */ ]]; then
     if [[ "$FILE_PATH" == "$BLOCKED"* || "$FILE_PATH" == *"/$BLOCKED"* ]]; then

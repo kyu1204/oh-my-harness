@@ -32,8 +32,12 @@ export function validateParams(
       errors.push(`Param "${param.name}" must be a boolean, got ${actualType}`);
     } else if (param.type === "number" && actualType !== "number") {
       errors.push(`Param "${param.name}" must be a number, got ${actualType}`);
-    } else if (param.type === "string[]" && !Array.isArray(value)) {
-      errors.push(`Param "${param.name}" must be a string[], got ${actualType}`);
+    } else if (param.type === "string[]") {
+      if (!Array.isArray(value)) {
+        errors.push(`Param "${param.name}" must be an array`);
+      } else if (!value.every((v: unknown) => typeof v === "string")) {
+        errors.push(`All elements in "${param.name}" must be strings`);
+      }
     }
   }
 

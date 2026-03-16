@@ -23,6 +23,7 @@ export async function convertHookEntries(
   const hooksConfig: Record<string, HookConfigEntry[]> = {};
   const scripts: Map<string, string> = new Map();
   const errors: string[] = [];
+  const seenBlockIds = new Set<string>();
 
   for (const entry of entries) {
     const block = registry.get(entry.block);
@@ -37,6 +38,12 @@ export async function convertHookEntries(
       errors.push(...paramErrors);
       continue;
     }
+
+    if (seenBlockIds.has(entry.block)) {
+      errors.push(`Duplicate block id skipped: "${entry.block}"`);
+      continue;
+    }
+    seenBlockIds.add(entry.block);
 
     const scriptContent = renderTemplate(block.template, entry.params as Record<string, unknown>);
     const scriptName = `${entry.block}.sh`;

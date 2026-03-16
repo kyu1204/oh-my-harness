@@ -19,7 +19,7 @@ COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 if echo "$COMMAND" | grep -qE "git commit"; then
   echo "oh-my-harness: Running {{testCommand}} before commit..." >&2
   if ! {{testCommand}} >&2 2>&1; then
-    echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: {{testCommand}} failed, commit blocked\\"}"
+    echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: pre-commit check failed\\"}"
     exit 0
   fi
 fi

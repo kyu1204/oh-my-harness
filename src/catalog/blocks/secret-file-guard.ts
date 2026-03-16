@@ -21,10 +21,10 @@ export const secretFileGuard: BuildingBlock = {
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null)
 [[ -z "$FILE_PATH" ]] && exit 0
 BASENAME=$(basename "$FILE_PATH")
-PATTERNS=({{patterns}})
+PATTERNS=({{#each patterns}}"{{this}}" {{/each}})
 for PATTERN in "\${PATTERNS[@]}"; do
   if [[ "$BASENAME" == $PATTERN ]]; then
     echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: file $BASENAME matches secret file pattern: $PATTERN\\"}"

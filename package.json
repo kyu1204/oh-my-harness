@@ -1,17 +1,41 @@
 {
   "name": "oh-my-harness",
   "version": "0.1.0",
-  "description": "Natural language-based AI code agent harness configuration tool",
+  "description": "Tame your AI coding agents with natural language",
   "type": "module",
   "bin": {
-    "oh-my-harness": "./bin/oh-my-harness.ts"
+    "oh-my-harness": "dist/bin/oh-my-harness.js"
+  },
+  "main": "dist/cli/index.js",
+  "types": "dist/cli/index.d.ts",
+  "files": [
+    "dist/",
+    "presets/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
   },
   "scripts": {
     "dev": "tsx bin/oh-my-harness.ts",
+    "build": "tsc",
+    "postbuild": "chmod +x dist/bin/oh-my-harness.js",
+    "prepublishOnly": "npm run build && npm test",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "tsc",
     "lint": "tsc --noEmit"
+  },
+  "keywords": ["claude", "ai", "harness", "claude-code", "tdd", "hooks", "cli"],
+  "author": "kyu1204",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kyu1204/oh-my-harness.git"
+  },
+  "homepage": "https://github.com/kyu1204/oh-my-harness#readme",
+  "bugs": {
+    "url": "https://github.com/kyu1204/oh-my-harness/issues"
   },
   "dependencies": {
     "@clack/prompts": "^1.1.0",
@@ -28,8 +52,5 @@
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
-  },
-  "engines": {
-    "node": ">=20"
   }
 }

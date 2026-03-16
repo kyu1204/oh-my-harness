@@ -145,6 +145,17 @@ oh-my-harness init "your project description"
 # Initialize with presets
 oh-my-harness init --preset nextjs fastapi
 
+# Browse building block catalog
+oh-my-harness catalog list
+oh-my-harness catalog info branch-guard
+
+# Add/remove building blocks
+oh-my-harness hook add branch-guard
+oh-my-harness hook remove auto-pr
+
+# Regenerate from harness.yaml
+oh-my-harness sync
+
 # Add a preset to existing config
 oh-my-harness add nextjs
 
@@ -232,6 +243,19 @@ enforcement:
   postSave:
     - pattern: "*.ts"
       command: "eslint --fix"
+
+# v2: Building block catalog (recommended)
+hooks:
+  - block: branch-guard
+    params:
+      mainBranch: main
+  - block: commit-test-gate
+    params:
+      testCommand: "npx vitest run"
+  - block: auto-pr
+    params:
+      baseBranch: main
+      draft: false
 ```
 
 ---
@@ -242,7 +266,13 @@ enforcement:
 oh-my-harness/
 ├── bin/                    # CLI entry point
 ├── src/
-│   ├── cli/commands/       # init, add, remove, doctor
+│   ├── catalog/
+│   │   ├── blocks/        # 10 building block definitions
+│   │   ├── types.ts       # BuildingBlock, HookEntry schemas
+│   │   ├── registry.ts    # Block discovery & search
+│   │   ├── template-engine.ts # Handlebars-based rendering
+│   │   └── converter.ts   # HookEntry[] → settings.json
+│   ├── cli/commands/       # init, add, remove, doctor, catalog, hook, sync
 │   ├── core/
 │   │   ├── preset-types.ts     # Zod schemas
 │   │   ├── preset-loader.ts    # YAML → typed config
@@ -267,7 +297,7 @@ oh-my-harness/
 │   ├── nextjs/
 │   ├── fastapi/
 │   └── nextjs-fastapi/
-└── tests/                  # 131 tests (unit + integration)
+└── tests/                  # 219 tests (unit + integration)
 ```
 
 ---
@@ -317,13 +347,15 @@ No code changes required. The registry auto-discovers it.
 
 ## Roadmap
 
+- [x] `npx oh-my-harness` — zero-install usage
+- [x] `oh-my-harness sync` — regenerate from harness.yaml
+- [x] Building block catalog — 10 verified hook templates
 - [ ] Cursor (`.cursor/rules/`) emitter
 - [ ] Codex (`AGENTS.md`) emitter
 - [ ] GitHub Copilot emitter
-- [ ] `oh-my-harness sync` — drift detection
 - [ ] Community preset registry
-- [ ] `npx oh-my-harness` — zero-install usage
 - [ ] `oh-my-harness modify "change X"` — NL config editing
+- [ ] More building blocks (20+ Claude Code hook events)
 
 ---
 

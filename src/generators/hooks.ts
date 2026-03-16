@@ -7,8 +7,13 @@ export interface GenerateHooksOptions {
   config: MergedConfig;
 }
 
+export interface HookCommand {
+  type: "command";
+  command: string;
+}
+
 export interface HooksOutput {
-  hooksConfig: Record<string, Array<{ matcher: string; hooks: string[] }>>;
+  hooksConfig: Record<string, Array<{ matcher: string; hooks: HookCommand[] }>>;
   generatedFiles: string[];
 }
 
@@ -28,7 +33,7 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
   await mkdir(hooksDir, { recursive: true });
 
   const generatedFiles: string[] = [];
-  const hooksConfig: Record<string, Array<{ matcher: string; hooks: string[] }>> = {};
+  const hooksConfig: Record<string, Array<{ matcher: string; hooks: HookCommand[] }>> = {};
 
   for (const hook of allHooks) {
     if (hook.inline) {
@@ -39,7 +44,10 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
       generatedFiles.push(scriptPath);
     }
 
-    const entry = { matcher: hook.matcher, hooks: [`bash .claude/hooks/${hook.id}.sh`] };
+    const entry = {
+      matcher: hook.matcher,
+      hooks: [{ type: "command" as const, command: `bash .claude/hooks/${hook.id}.sh` }],
+    };
     if (!hooksConfig[hook.event]) {
       hooksConfig[hook.event] = [];
     }

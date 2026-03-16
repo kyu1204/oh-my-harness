@@ -94,10 +94,10 @@ describe("generateHooks", () => {
     expect(result.hooksConfig).toHaveProperty("PostToolUse");
 
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: ["bash .claude/hooks/command-guard.sh"] },
+      { matcher: "Bash", hooks: [{ type: "command", command: "bash .claude/hooks/command-guard.sh" }] },
     ]);
     expect(result.hooksConfig["PostToolUse"]).toEqual([
-      { matcher: "Edit|Write", hooks: ["bash .claude/hooks/lint-on-save.sh"] },
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: "bash .claude/hooks/lint-on-save.sh" }] },
     ]);
   });
 
@@ -139,8 +139,8 @@ describe("generateHooks", () => {
 
     expect(result.hooksConfig["PreToolUse"]).toHaveLength(2);
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: ["bash .claude/hooks/guard-bash.sh"] },
-      { matcher: "Edit|Write", hooks: ["bash .claude/hooks/guard-edit.sh"] },
+      { matcher: "Bash", hooks: [{ type: "command", command: "bash .claude/hooks/guard-bash.sh" }] },
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: "bash .claude/hooks/guard-edit.sh" }] },
     ]);
   });
 

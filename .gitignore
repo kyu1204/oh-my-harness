@@ -14,3 +14,4 @@ CLAUDE.md
 
 # oh-my-harness
 .claude/hooks/
+.claude/hooks/.state/

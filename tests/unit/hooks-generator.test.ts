@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { generateHooks } from "../../src/generators/hooks.js";
+import { generateHooks, wrapWithLogger } from "../../src/generators/hooks.js";
 import type { MergedConfig } from "../../src/core/preset-types.js";
 
 function makeMergedConfig(overrides: Partial<MergedConfig> = {}): MergedConfig {
@@ -55,7 +55,8 @@ describe("generateHooks", () => {
     expect(result.generatedFiles).toHaveLength(1);
     const scriptPath = join(projectDir, ".claude/hooks/command-guard.sh");
     const content = await readFile(scriptPath, "utf8");
-    expect(content).toBe("#!/bin/bash\nexit 0");
+    expect(content).toContain("#!/bin/bash");
+    expect(content).toContain("exit 0");
   });
 
   it("sets executable permissions on generated scripts", async () => {
@@ -165,7 +166,8 @@ describe("generateHooks", () => {
     ]);
     // Ensure no file was written outside the hooks dir
     const content = await readFile(scriptPath, "utf8");
-    expect(content).toBe("#!/bin/bash\nexit 0");
+    expect(content).toContain("#!/bin/bash");
+    expect(content).toContain("exit 0");
   });
 
   it("does not register hooks without inline content in hooksConfig", async () => {
@@ -205,5 +207,85 @@ describe("generateHooks", () => {
     expect(result.generatedFiles).toContain(
       join(projectDir, ".claude/hooks/lint-on-save.sh")
     );
+  });
+
+  it("generated scripts contain logger snippet", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          { id: "command-guard", matcher: "Bash", inline: "#!/bin/bash\nset -euo pipefail\nINPUT=$(cat)\nexit 0" },
+        ],
+        postToolUse: [],
+      },
+    });
+
+    await generateHooks({ projectDir, config });
+
+    const scriptPath = join(projectDir, ".claude/hooks/command-guard.sh");
+    const content = await readFile(scriptPath, "utf8");
+    expect(content).toContain("_OMH_STATE_DIR");
+    expect(content).toContain("_log_event");
+    expect(content).toContain("trap '_log_event");
+  });
+});
+
+describe("wrapWithLogger", () => {
+  it("inserts logger after INPUT=$(cat)", () => {
+    const script = "#!/bin/bash\nset -euo pipefail\nINPUT=$(cat)\nexit 0";
+    const result = wrapWithLogger(script);
+    const inputIdx = result.indexOf("INPUT=$(cat)");
+    const loggerIdx = result.indexOf("_OMH_STATE_DIR");
+    expect(loggerIdx).toBeGreaterThan(inputIdx);
+  });
+
+  it("inserts logger after set -euo pipefail when no INPUT=$(cat)", () => {
+    const script = "#!/bin/bash\nset -euo pipefail\nexit 0";
+    const result = wrapWithLogger(script);
+    const pipeIdx = result.indexOf("set -euo pipefail");
+    const loggerIdx = result.indexOf("_OMH_STATE_DIR");
+    expect(loggerIdx).toBeGreaterThan(pipeIdx);
+    expect(result).not.toContain("INPUT=$(cat)");
+  });
+
+  it("inserts logger after shebang when no INPUT=$(cat) and no set -euo pipefail", () => {
+    const script = "#!/bin/bash\nexit 0";
+    const result = wrapWithLogger(script);
+    const shebangIdx = result.indexOf("#!/bin/bash");
+    const loggerIdx = result.indexOf("_OMH_STATE_DIR");
+    expect(loggerIdx).toBeGreaterThan(shebangIdx);
+  });
+
+  it("includes _log_event function in logger snippet", () => {
+    const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
+    const result = wrapWithLogger(script);
+    expect(result).toContain("_log_event()");
+  });
+
+  it("includes trap EXIT in logger snippet", () => {
+    const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
+    const result = wrapWithLogger(script);
+    expect(result).toContain("trap '_log_event");
+    expect(result).toContain("EXIT");
+  });
+
+  it("preserves original script content", () => {
+    const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
+    const result = wrapWithLogger(script);
+    expect(result).toContain("#!/bin/bash");
+    expect(result).toContain("INPUT=$(cat)");
+    expect(result).toContain("exit 0");
+  });
+
+  it("logger snippet includes event field in JSON output", () => {
+    const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
+    const result = wrapWithLogger(script);
+    expect(result).toContain('"event"');
+  });
+
+  it("handles #!/usr/bin/env bash shebang", () => {
+    const script = "#!/usr/bin/env bash\nexit 0";
+    const result = wrapWithLogger(script);
+    expect(result).toContain("_OMH_STATE_DIR");
+    expect(result).toContain("#!/usr/bin/env bash");
   });
 });

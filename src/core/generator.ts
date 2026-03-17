@@ -30,7 +30,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   files.push(`${projectDir}/.claude/settings.json`);
 
   // Update .gitignore
-  await updateGitignore(projectDir, [".claude/hooks/"]);
+  await updateGitignore(projectDir, [".claude/hooks/", ".claude/hooks/.state/"]);
   files.push(`${projectDir}/.gitignore`);
 
   return { files };

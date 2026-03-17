@@ -1,6 +1,6 @@
 {
   "name": "oh-my-harness",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Tame your AI coding agents with natural language",
   "type": "module",
   "bin": {

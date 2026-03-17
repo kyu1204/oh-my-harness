@@ -26,6 +26,7 @@ COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 PATTERNS=({{#each patterns}}"{{this}}" {{/each}})
 for PATTERN in "\${PATTERNS[@]}"; do
   if echo "$COMMAND" | grep -qF "$PATTERN"; then
+    _log_event "block" "oh-my-harness: command matches blocked pattern: $PATTERN"
     echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: command matches blocked pattern: $PATTERN\\"}"
     exit 0
   fi

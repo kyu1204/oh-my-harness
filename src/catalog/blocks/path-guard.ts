@@ -26,17 +26,20 @@ BLOCKED_PATHS=({{#each blockedPaths}}"{{this}}" {{/each}})
 for BLOCKED in "\${BLOCKED_PATHS[@]}"; do
   if [[ "$BLOCKED" == */ ]]; then
     if [[ "$FILE_PATH" == "$BLOCKED"* || "$FILE_PATH" == *"/$BLOCKED"* ]]; then
+      _log_event "block" "oh-my-harness: file path matches blocked directory: $BLOCKED"
       echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: file path matches blocked directory: $BLOCKED\\"}"
       exit 0
     fi
   elif [[ "$BLOCKED" == \\** ]]; then
     PATTERN="\${BLOCKED#\\*}"
     if [[ "$FILE_PATH" == *"$PATTERN" ]]; then
+      _log_event "block" "oh-my-harness: file path matches blocked pattern: $BLOCKED"
       echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: file path matches blocked pattern: $BLOCKED\\"}"
       exit 0
     fi
   else
     if [[ "$FILE_PATH" == "$BLOCKED" || "$FILE_PATH" == *"/$BLOCKED" ]]; then
+      _log_event "block" "oh-my-harness: file path matches blocked path: $BLOCKED"
       echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: file path matches blocked path: $BLOCKED\\"}"
       exit 0
     fi

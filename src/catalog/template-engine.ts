@@ -6,6 +6,19 @@ export function renderTemplate(template: string, params: Record<string, unknown>
   return compiled(params);
 }
 
+export function applyDefaults(
+  block: BuildingBlock,
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const result = { ...params };
+  for (const param of block.params) {
+    if (result[param.name] === undefined && param.default !== undefined) {
+      result[param.name] = param.default;
+    }
+  }
+  return result;
+}
+
 export function validateParams(
   block: BuildingBlock,
   params: Record<string, unknown>,

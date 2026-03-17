@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderTemplate, validateParams } from "../../src/catalog/template-engine.js";
+import { renderTemplate, validateParams, applyDefaults } from "../../src/catalog/template-engine.js";
 import type { BuildingBlock } from "../../src/catalog/types.js";
 
 function makeBlock(overrides: Partial<BuildingBlock> = {}): BuildingBlock {
@@ -160,5 +160,49 @@ describe("validateParams", () => {
     });
     const errors = validateParams(block, {});
     expect(errors).toHaveLength(2);
+  });
+});
+
+describe("applyDefaults", () => {
+  it("fills missing params with default values", () => {
+    const block = makeBlock({
+      params: [
+        { name: "pattern", type: "string", description: "pattern", required: false, default: "\\.(ts|tsx)$" },
+      ],
+    });
+    const result = applyDefaults(block, {});
+    expect(result.pattern).toBe("\\.(ts|tsx)$");
+  });
+
+  it("does not override provided params", () => {
+    const block = makeBlock({
+      params: [
+        { name: "pattern", type: "string", description: "pattern", required: false, default: "\\.(ts|tsx)$" },
+      ],
+    });
+    const result = applyDefaults(block, { pattern: "custom" });
+    expect(result.pattern).toBe("custom");
+  });
+
+  it("handles params without defaults", () => {
+    const block = makeBlock({
+      params: [
+        { name: "cmd", type: "string", description: "command", required: true },
+      ],
+    });
+    const result = applyDefaults(block, {});
+    expect(result.cmd).toBeUndefined();
+  });
+
+  it("applies defaults for multiple params", () => {
+    const block = makeBlock({
+      params: [
+        { name: "srcPattern", type: "string", description: "src", required: false, default: "\\.(ts|tsx|js|jsx)$" },
+        { name: "testPattern", type: "string", description: "test", required: false, default: "\\.(test|spec)\\.(ts|tsx|js|jsx)$" },
+      ],
+    });
+    const result = applyDefaults(block, {});
+    expect(result.srcPattern).toBe("\\.(ts|tsx|js|jsx)$");
+    expect(result.testPattern).toBe("\\.(test|spec)\\.(ts|tsx|js|jsx)$");
   });
 });

@@ -1,7 +1,7 @@
 import path from "path";
 import type { HookEntry } from "./types.js";
 import type { CatalogRegistry } from "./registry.js";
-import { renderTemplate, validateParams } from "./template-engine.js";
+import { renderTemplate, validateParams, applyDefaults } from "./template-engine.js";
 
 export interface HookConfigEntry {
   type: "command";
@@ -33,7 +33,8 @@ export async function convertHookEntries(
       continue;
     }
 
-    const paramErrors = validateParams(block, entry.params as Record<string, unknown>);
+    const resolvedParams = applyDefaults(block, entry.params as Record<string, unknown>);
+    const paramErrors = validateParams(block, resolvedParams);
     if (paramErrors.length > 0) {
       errors.push(...paramErrors);
       continue;
@@ -47,7 +48,7 @@ export async function convertHookEntries(
 
     let scriptContent: string;
     try {
-      scriptContent = renderTemplate(block.template, entry.params as Record<string, unknown>);
+      scriptContent = renderTemplate(block.template, resolvedParams);
     } catch (err) {
       errors.push(`Failed to render block "${entry.block}": ${(err as Error).message}`);
       continue;

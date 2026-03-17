@@ -55,16 +55,19 @@ export function buildHarnessGenerationPrompt(description: string, catalogBlocks?
   const factsSection = projectFacts ? buildProjectFactsSection(projectFacts) : "";
 
   const catalogSection = catalogBlocks && catalogBlocks.length > 0
-    ? `\nAvailable building blocks (use in the hooks field):
+    ? `\nAvailable building blocks (MUST use in the hooks field — prefer hooks over enforcement):
 ${catalogBlocks
   .map((b) => {
     const paramDesc =
       b.params.length > 0
-        ? ` Params: ${b.params.map((p) => `${p.name}${p.required ? " (required)" : p.default !== undefined ? ` (default: ${String(p.default)})` : ""}`).join(", ")}`
+        ? ` params: ${b.params.map((p) => `${p.name}${p.required ? " (required)" : p.default !== undefined ? ` (default: ${String(p.default)})` : ""}`).join(", ")}`
         : "";
-    return `- ${b.id}: ${b.description}.${paramDesc}`;
+    return `- block: ${b.id} — ${b.description}.${paramDesc}`;
   })
-  .join("\n")}\n`
+  .join("\n")}
+
+IMPORTANT: Match the user's description to the most relevant blocks above. Use hooks for ALL enforcement that has a matching block. Only use enforcement as a fallback for commands with no matching block.
+`
     : "";
 
   return `You are a configuration generator for oh-my-harness, an AI code agent harness tool. Given a project description, generate a complete harness.yaml configuration in YAML format. Return ONLY the YAML content with no markdown formatting.
@@ -74,7 +77,8 @@ The harness.yaml schema has these fields:
 - project: object with name (optional string), description (optional string), stacks (array of {name, framework, language, packageManager?, testRunner?, linter?})
 - rules: array of {id, title, content (markdown), priority (number, lower = higher in file)}
 - enforcement: object with preCommit (array of full executable shell commands like "pnpm test", "npx eslint", "npx tsc --noEmit"), blockedPaths (array of glob patterns), blockedCommands (array of dangerous commands), postSave (array of {pattern, command})
-- hooks: array of {block, params} — use catalog building blocks instead of manual enforcement where possible (preferred for new configs)
+- hooks: array of {block, params} — MUST use catalog building blocks here. This is the primary mechanism for enforcement. Match user requirements to available blocks.
+- enforcement: fallback for commands with no matching block. Only use enforcement.preCommit when no catalog block covers the use case.
 - permissions: object with allow (array of permission strings like "Bash(npm test*)") and deny (array)
 ${catalogSection}${factsSection}
 Example 1 - Next.js app:
@@ -104,15 +108,24 @@ rules:
       - Use vitest + @testing-library/react for component tests
       - Every component MUST have a corresponding .test.tsx file
     priority: 21
-enforcement:
-  preCommit: ["pnpm test", "npx eslint .", "npx tsc --noEmit"]
-  blockedPaths: [".next/", "node_modules/", "*.min.js"]
-  blockedCommands: ["rm -rf /", "sudo rm"]
-  postSave:
-    - pattern: "*.ts"
-      command: "eslint --fix"
-    - pattern: "*.tsx"
-      command: "eslint --fix"
+hooks:
+  - block: branch-guard
+  - block: commit-test-gate
+    params:
+      testCommand: "pnpm test"
+  - block: commit-typecheck-gate
+    params:
+      typecheckCommand: "npx tsc --noEmit"
+  - block: lint-on-save
+    params:
+      lintCommand: "npx eslint --fix"
+      pattern: "*.{ts,tsx}"
+  - block: path-guard
+    params:
+      blockedPaths: ".next/,node_modules/,*.min.js"
+  - block: command-guard
+    params:
+      blockedCommands: "rm -rf /,sudo rm"
 permissions:
   allow:
     - "Bash(pnpm install*)"
@@ -142,13 +155,21 @@ rules:
       - Use Pydantic v2 models for all request/response schemas
       - Use dependency injection for database sessions, auth, and shared services
     priority: 20
-enforcement:
-  preCommit: ["uv run pytest", "uv run ruff check"]
-  blockedPaths: ["__pycache__/", ".venv/", "*.pyc"]
-  blockedCommands: ["rm -rf /", "sudo rm", "pip install"]
-  postSave:
-    - pattern: "*.py"
-      command: "ruff check --fix"
+hooks:
+  - block: branch-guard
+  - block: commit-test-gate
+    params:
+      testCommand: "uv run pytest"
+  - block: lint-on-save
+    params:
+      lintCommand: "ruff check --fix"
+      pattern: "*.py"
+  - block: path-guard
+    params:
+      blockedPaths: "__pycache__/,.venv/,*.pyc"
+  - block: command-guard
+    params:
+      blockedCommands: "rm -rf /,sudo rm,pip install"
 permissions:
   allow:
     - "Bash(pytest*)"

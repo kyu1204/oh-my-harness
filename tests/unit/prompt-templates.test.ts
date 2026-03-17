@@ -145,4 +145,41 @@ describe("buildHarnessGenerationPrompt with projectFacts", () => {
     const prompt = buildHarnessGenerationPrompt("my app");
     expect(prompt).toContain("full executable shell commands");
   });
+
+  it("instructs LLM to prefer hooks (catalog blocks) over enforcement", () => {
+    const blocks = [
+      { id: "branch-guard", description: "Blocks commits on merged branches", params: [] },
+    ];
+    const prompt = buildHarnessGenerationPrompt("my app", blocks);
+    expect(prompt).toMatch(/prefer.*hooks|hooks.*prefer|MUST.*hooks|hooks.*first/i);
+  });
+
+  it("examples include hooks field with catalog blocks when blocks are provided", () => {
+    const blocks = [
+      { id: "branch-guard", description: "Blocks commits on merged branches", params: [] },
+      { id: "commit-test-gate", description: "Runs tests before commit", params: [{ name: "testCommand", required: true, description: "Test command" }] },
+    ];
+    const prompt = buildHarnessGenerationPrompt("my app", blocks);
+    expect(prompt).toContain("hooks:");
+    expect(prompt).toContain("block:");
+  });
+
+  it("describes enforcement as fallback for commands without matching blocks", () => {
+    const blocks = [
+      { id: "branch-guard", description: "Blocks commits on merged branches", params: [] },
+    ];
+    const prompt = buildHarnessGenerationPrompt("my app", blocks);
+    expect(prompt).toMatch(/enforcement.*fallback|fallback.*enforcement|enforcement.*no matching block/i);
+  });
+
+  it("groups blocks by category/purpose for easier LLM selection", () => {
+    const blocks = [
+      { id: "branch-guard", description: "Blocks commits on merged branches", params: [] },
+      { id: "commit-test-gate", description: "Runs tests before commit", params: [{ name: "testCommand", required: true, description: "Test command" }] },
+    ];
+    const prompt = buildHarnessGenerationPrompt("my app", blocks);
+    // Block listing should include usage guidance
+    expect(prompt).toContain("block:");
+    expect(prompt).toContain("params:");
+  });
 });

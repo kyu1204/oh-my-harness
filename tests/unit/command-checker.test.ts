@@ -95,6 +95,18 @@ eslint "$FILE_PATH"`;
     expect(commands).toEqual(["eslint"]);
   });
 
+  it("excludes BASENAME=$(basename) lines", () => {
+    const content = `#!/bin/bash
+BASENAME=$(basename "$FILE_PATH")
+if [[ "$BASENAME" == $PATTERN ]]; then
+  echo "oh-my-harness: Running eslint --fix on $FILE_PATH..." >&2
+  eslint --fix "$FILE_PATH" >&2 2>&1 || true
+fi`;
+    const commands = extractPostSaveCommands(content);
+    expect(commands).not.toContainEqual(expect.stringContaining("BASENAME"));
+    expect(commands).toContain("eslint --fix");
+  });
+
   it("returns empty array when no $FILE_PATH patterns found", () => {
     const content = `#!/bin/bash
 echo "no file path here"`;

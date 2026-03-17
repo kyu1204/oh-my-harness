@@ -52,7 +52,9 @@ export function extractPostSaveCommands(hookContent: string): string[] {
       trimmed.includes("$FILE_PATH") &&
       !trimmed.startsWith("#") &&
       !trimmed.startsWith("if") &&
-      !trimmed.startsWith("FILE_PATH")
+      !trimmed.startsWith("FILE_PATH") &&
+      !trimmed.startsWith("BASENAME") &&
+      !trimmed.startsWith("echo ")
     ) {
       const cmd = trimmed.split(/\s+"\$FILE_PATH"/)[0].trim();
       if (cmd && !cmd.startsWith("[")) {

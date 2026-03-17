@@ -103,9 +103,10 @@ export async function testCommand(options: TestCommandOptions = {}): Promise<{
 
   const enforcementCases = generateTestCases(hooks, enforcement, currentBranch);
   const blockCases = generateBlockTestCases(hookEntries, builtinBlocks, currentBranch);
-  const enforcementCategories = new Set(enforcementCases.map((c) => c.category));
-  const uniqueBlockCases = blockCases.filter((c) => !enforcementCategories.has(c.category));
-  const testCases = [...enforcementCases, ...uniqueBlockCases];
+  // Block cases take priority — only keep enforcement cases for categories not covered by blocks
+  const blockCategories = new Set(blockCases.map((c) => c.category));
+  const uniqueEnforcementCases = enforcementCases.filter((c) => !blockCategories.has(c.category));
+  const testCases = [...uniqueEnforcementCases, ...blockCases];
   const results: TestResult[] = [];
 
   // 카테고리별 그룹핑

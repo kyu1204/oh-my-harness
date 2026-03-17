@@ -1,4 +1,8 @@
 import { Command } from "commander";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const pkg = require("../../package.json") as { version: string };
 
 export function createCli(): Command {
   const program = new Command();
@@ -6,7 +10,7 @@ export function createCli(): Command {
   program
     .name("oh-my-harness")
     .description("AI code agent harness configuration tool")
-    .version("0.1.0");
+    .version(pkg.version);
 
   program
     .command("init [description...]")

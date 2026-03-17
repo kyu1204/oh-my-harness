@@ -32,6 +32,7 @@ export interface TestResult {
 export async function simulateHook(
   hookPath: string,
   input: HookInput,
+  cwd?: string,
 ): Promise<HookResult> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -39,7 +40,10 @@ export async function simulateHook(
       resolve({ decision: "allow" });
     }, 5000);
 
-    const child = spawn("bash", [hookPath], { stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn("bash", [hookPath], {
+      cwd,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
     let stdout = "";
 
     child.stdout.on("data", (chunk: Buffer) => {
@@ -68,6 +72,8 @@ export async function simulateHook(
       resolve({ decision: "allow" });
     });
 
+    // EPIPE 방지: 자식 프로세스가 이미 종료된 경우 stdin 에러 무시
+    child.stdin.on("error", () => {});
     child.stdin.write(JSON.stringify(input));
     child.stdin.end();
   });
@@ -108,6 +114,7 @@ export function generateTestCases(
     blockedPaths?: string[];
     blockedCommands?: string[];
   },
+  currentBranch?: string,
 ): TestCase[] {
   const cases: TestCase[] = [];
 
@@ -163,12 +170,13 @@ export function generateTestCases(
 
     // branch-guard
     if (scriptName.includes("branch-guard")) {
+      const isProtected = currentBranch === "main" || currentBranch === "master";
       cases.push({
-        name: "git commit on current branch → check",
+        name: `git commit on ${currentBranch ?? "unknown"} → ${isProtected ? "BLOCKED" : "ALLOWED"}`,
         category: "branch-guard",
         hookScript: scriptName,
         input: { tool_name: "Bash", tool_input: { command: "git commit -m 'test'" } },
-        expectation: "allow", // feature 브랜치에서는 allow 예상
+        expectation: isProtected ? "block" : "allow",
       });
     }
 
@@ -230,7 +238,7 @@ export async function runTestCase(
     };
   }
 
-  const result = await simulateHook(hookPath, testCase.input);
+  const result = await simulateHook(hookPath, testCase.input, projectDir);
   const passed = result.decision === testCase.expectation;
 
   return {

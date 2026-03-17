@@ -179,6 +179,26 @@ gh pr create --fill
     expect(typeof ghResult!.executable).toBe("boolean");
   });
 
+  it("detects pre-commit gate by content even if filename differs", async () => {
+    await writeFile(
+      join(tmpDir, "harness-custom-gate.sh"),
+      `#!/bin/bash
+if ! npm test >&2 2>&1; then
+  exit 1
+fi
+`,
+      "utf-8",
+    );
+    const hooks = [
+      { event: "PreToolUse", matcher: "Bash", command: `bash harness-custom-gate.sh` },
+    ];
+    const results = await checkHarnessCommands(hooks, tmpDir);
+    expect(results.length).toBeGreaterThan(0);
+    const npmResult = results.find((r) => r.command === "npm test");
+    expect(npmResult).toBeDefined();
+    expect(npmResult!.category).toBe("commit-test-gate");
+  });
+
   it("skips hooks whose script file does not exist", async () => {
     const hooks = [
       { event: "PreToolUse", matcher: "Bash", command: `bash nonexistent-script.sh` },

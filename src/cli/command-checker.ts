@@ -85,11 +85,13 @@ export async function checkHarnessCommands(
 
     const scriptName = path.basename(scriptPath);
 
-    // pre-commit gate류
+    // pre-commit gate류 — 파일명 매칭 확장 + 내용 기반 감지
     if (
       scriptName.includes("pre-commit") ||
       scriptName.includes("test-gate") ||
-      scriptName.includes("typecheck-gate")
+      scriptName.includes("typecheck-gate") ||
+      scriptName.includes("before-commit") ||
+      /if\s+!\s+.+\s+>&?2/.test(content)
     ) {
       const commands = extractPreCommitCommands(content);
       const category = scriptName.includes("typecheck") ? "commit-typecheck-gate" : "commit-test-gate";

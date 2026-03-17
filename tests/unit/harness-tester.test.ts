@@ -305,7 +305,7 @@ describe("generateTestCases", () => {
     }
   });
 
-  it("generates branch-guard cases", () => {
+  it("generates branch-guard cases with allow when no currentBranch provided", () => {
     const hooks = [
       { event: "PreToolUse", matcher: "Bash", command: "bash .claude/hooks/branch-guard.sh" },
     ];
@@ -314,6 +314,43 @@ describe("generateTestCases", () => {
     const branchCases = cases.filter((c) => c.category === "branch-guard");
     expect(branchCases).toHaveLength(1);
     expect(branchCases[0].expectation).toBe("allow");
+  });
+
+  it("generates branch-guard block expectation when currentBranch is main", () => {
+    const hooks = [
+      { event: "PreToolUse", matcher: "Bash", command: "bash .claude/hooks/branch-guard.sh" },
+    ];
+    const cases = generateTestCases(hooks, {}, "main");
+
+    const branchCases = cases.filter((c) => c.category === "branch-guard");
+    expect(branchCases).toHaveLength(1);
+    expect(branchCases[0].expectation).toBe("block");
+    expect(branchCases[0].name).toContain("main");
+    expect(branchCases[0].name).toContain("BLOCKED");
+  });
+
+  it("generates branch-guard block expectation when currentBranch is master", () => {
+    const hooks = [
+      { event: "PreToolUse", matcher: "Bash", command: "bash .claude/hooks/branch-guard.sh" },
+    ];
+    const cases = generateTestCases(hooks, {}, "master");
+
+    const branchCases = cases.filter((c) => c.category === "branch-guard");
+    expect(branchCases).toHaveLength(1);
+    expect(branchCases[0].expectation).toBe("block");
+  });
+
+  it("generates branch-guard allow expectation when currentBranch is a feature branch", () => {
+    const hooks = [
+      { event: "PreToolUse", matcher: "Bash", command: "bash .claude/hooks/branch-guard.sh" },
+    ];
+    const cases = generateTestCases(hooks, {}, "feat/x");
+
+    const branchCases = cases.filter((c) => c.category === "branch-guard");
+    expect(branchCases).toHaveLength(1);
+    expect(branchCases[0].expectation).toBe("allow");
+    expect(branchCases[0].name).toContain("feat/x");
+    expect(branchCases[0].name).toContain("ALLOWED");
   });
 
   it("generates lockfile-guard cases", () => {

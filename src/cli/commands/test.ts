@@ -50,9 +50,16 @@ export async function testCommand(options: TestCommandOptions = {}): Promise<{
         blockedPaths: result.data.enforcement.blockedPaths,
         blockedCommands: result.data.enforcement.blockedCommands,
       };
+    } else {
+      console.log(chalk.yellow(`Warning: harness.yaml schema validation failed: ${result.error.message}`));
     }
-  } catch {
-    // harness.yaml 없으면 settings.json만으로 진행
+  } catch (err) {
+    const error = err as NodeJS.ErrnoException;
+    if (error.code !== "ENOENT") {
+      console.log(chalk.red(`Error reading harness.yaml: ${error.message}`));
+      process.exit(1);
+    }
+    // ENOENT: harness.yaml 없으면 settings.json만으로 진행
   }
 
   // 2. settings.json에서 등록된 hook 가져오기
@@ -72,7 +79,19 @@ export async function testCommand(options: TestCommandOptions = {}): Promise<{
   // 3. 시뮬레이션 테스트 케이스 생성 + 실행
   p.intro(`${chalk.bgCyan(chalk.black(" omh test "))} ${chalk.dim("Harness dry-run verification")}`);
 
-  const testCases = generateTestCases(hooks, enforcement);
+  // 현재 브랜치 가져오기
+  let currentBranch: string | undefined;
+  try {
+    const { execFile: execFileCb } = await import("node:child_process");
+    const { promisify: promisifyFn } = await import("node:util");
+    const execFileAsync = promisifyFn(execFileCb);
+    const { stdout } = await execFileAsync("git", ["branch", "--show-current"], { cwd: projectDir });
+    currentBranch = stdout.trim() || undefined;
+  } catch {
+    // git 없으면 undefined
+  }
+
+  const testCases = generateTestCases(hooks, enforcement, currentBranch);
   const results: TestResult[] = [];
 
   // 카테고리별 그룹핑

@@ -117,6 +117,24 @@ describe("nodeDetector", () => {
     expect(result.testCommands).toEqual([]);
   });
 
+  it("ignores whitespace-only scripts.test", async () => {
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", scripts: { test: "   " } }));
+    await writeFile(tmpDir, "package-lock.json", "{}");
+
+    const result = await nodeDetector.detect(tmpDir);
+
+    expect(result.testCommands).toEqual([]);
+  });
+
+  it("ignores non-string scripts.test", async () => {
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", scripts: { test: 123 } }));
+    await writeFile(tmpDir, "package-lock.json", "{}");
+
+    const result = await nodeDetector.detect(tmpDir);
+
+    expect(result.testCommands).toEqual([]);
+  });
+
   it("detects eslint from .eslintrc file", async () => {
     await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test" }));
     await writeFile(tmpDir, "pnpm-lock.yaml", "");

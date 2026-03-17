@@ -90,9 +90,9 @@ export const nodeDetector: Detector = {
       : {};
 
     // Detect test runner from scripts.test — use direct command instead of npm test wrapper
-    const testScript = scripts["test"];
-    if (testScript) {
-      const resolved = resolveTestCommand(testScript);
+    const rawTestScript = scripts["test"];
+    if (typeof rawTestScript === "string" && rawTestScript.trim().length > 0) {
+      const resolved = resolveTestCommand(rawTestScript);
       testCommands.push(resolved);
     }
 

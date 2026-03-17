@@ -1,0 +1,243 @@
+import { spawn } from "node:child_process";
+import fs from "node:fs/promises";
+import path from "node:path";
+
+export interface HookInput {
+  tool_name: string;
+  tool_input: Record<string, unknown>;
+}
+
+export interface HookResult {
+  decision: "block" | "allow";
+  reason?: string;
+}
+
+export interface TestCase {
+  name: string;
+  category: string;
+  hookScript: string;
+  input: HookInput;
+  expectation: "block" | "allow";
+}
+
+export interface TestResult {
+  testCase: TestCase;
+  actual: "block" | "allow";
+  passed: boolean;
+  reason?: string;
+  error?: string;
+}
+
+// 핵심 함수: hook 스크립트에 JSON stdin을 넣고 결과 파싱
+export async function simulateHook(
+  hookPath: string,
+  input: HookInput,
+): Promise<HookResult> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      child.kill();
+      resolve({ decision: "allow" });
+    }, 5000);
+
+    const child = spawn("bash", [hookPath], { stdio: ["pipe", "pipe", "pipe"] });
+    let stdout = "";
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+
+    child.on("close", () => {
+      clearTimeout(timer);
+      const trimmed = stdout.trim();
+      if (!trimmed) {
+        resolve({ decision: "allow" });
+        return;
+      }
+      // stdout에서 {"decision":"block","reason":"..."} 찾기
+      const jsonMatch = trimmed.match(/\{[^}]*"decision"\s*:\s*"block"[^}]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]) as { decision: string; reason?: string };
+        resolve({ decision: "block", reason: parsed.reason });
+        return;
+      }
+      resolve({ decision: "allow" });
+    });
+
+    child.on("error", () => {
+      clearTimeout(timer);
+      resolve({ decision: "allow" });
+    });
+
+    child.stdin.write(JSON.stringify(input));
+    child.stdin.end();
+  });
+}
+
+// settings.json에서 등록된 hook 스크립트 목록 가져오기
+export async function getRegisteredHooks(
+  projectDir: string,
+): Promise<{ event: string; matcher: string; command: string }[]> {
+  const settingsPath = path.join(projectDir, ".claude", "settings.json");
+  const raw = await fs.readFile(settingsPath, "utf-8");
+  const settings = JSON.parse(raw) as {
+    hooks?: Record<string, Array<{ matcher?: string; hooks?: Array<{ type: string; command?: string }> }>>;
+  };
+
+  const hooks: { event: string; matcher: string; command: string }[] = [];
+
+  for (const event of ["PreToolUse", "PostToolUse"]) {
+    const eventHooks = settings.hooks?.[event];
+    if (!Array.isArray(eventHooks)) continue;
+    for (const entry of eventHooks) {
+      const matcher = entry.matcher ?? "";
+      for (const hook of entry.hooks ?? []) {
+        if (hook.type === "command" && hook.command) {
+          hooks.push({ event, matcher, command: hook.command });
+        }
+      }
+    }
+  }
+
+  return hooks;
+}
+
+// harness.yaml + settings.json에서 테스트 케이스 자동 생성
+export function generateTestCases(
+  hooks: { event: string; matcher: string; command: string }[],
+  enforcement: {
+    blockedPaths?: string[];
+    blockedCommands?: string[];
+  },
+): TestCase[] {
+  const cases: TestCase[] = [];
+
+  for (const hook of hooks) {
+    const scriptName = hook.command.replace(/^bash\s+/, "").replace(/^\.\//, "");
+
+    // path-guard / file-guard
+    if (scriptName.includes("file-guard") || scriptName.includes("path-guard")) {
+      for (const blocked of enforcement.blockedPaths ?? []) {
+        const testPath = blocked.endsWith("/")
+          ? `${blocked}test-file.js`
+          : blocked.startsWith("*")
+            ? `test${blocked.slice(1)}`
+            : blocked;
+        cases.push({
+          name: `${testPath} → BLOCKED`,
+          category: "path-guard",
+          hookScript: scriptName,
+          input: { tool_name: "Edit", tool_input: { file_path: testPath } },
+          expectation: "block",
+        });
+      }
+      // allow case
+      cases.push({
+        name: "src/index.ts → ALLOWED",
+        category: "path-guard",
+        hookScript: scriptName,
+        input: { tool_name: "Edit", tool_input: { file_path: "src/index.ts" } },
+        expectation: "allow",
+      });
+    }
+
+    // command-guard
+    if (scriptName.includes("command-guard")) {
+      for (const blocked of enforcement.blockedCommands ?? []) {
+        cases.push({
+          name: `"${blocked}" → BLOCKED`,
+          category: "command-guard",
+          hookScript: scriptName,
+          input: { tool_name: "Bash", tool_input: { command: blocked } },
+          expectation: "block",
+        });
+      }
+      // allow case
+      cases.push({
+        name: '"npm test" → ALLOWED',
+        category: "command-guard",
+        hookScript: scriptName,
+        input: { tool_name: "Bash", tool_input: { command: "npm test" } },
+        expectation: "allow",
+      });
+    }
+
+    // branch-guard
+    if (scriptName.includes("branch-guard")) {
+      cases.push({
+        name: "git commit on current branch → check",
+        category: "branch-guard",
+        hookScript: scriptName,
+        input: { tool_name: "Bash", tool_input: { command: "git commit -m 'test'" } },
+        expectation: "allow", // feature 브랜치에서는 allow 예상
+      });
+    }
+
+    // lockfile-guard
+    if (scriptName.includes("lockfile-guard")) {
+      cases.push({
+        name: "package-lock.json → BLOCKED",
+        category: "lockfile-guard",
+        hookScript: scriptName,
+        input: { tool_name: "Edit", tool_input: { file_path: "package-lock.json" } },
+        expectation: "block",
+      });
+      cases.push({
+        name: "package.json → ALLOWED",
+        category: "lockfile-guard",
+        hookScript: scriptName,
+        input: { tool_name: "Edit", tool_input: { file_path: "package.json" } },
+        expectation: "allow",
+      });
+    }
+
+    // secret-file-guard
+    if (scriptName.includes("secret-file-guard")) {
+      cases.push({
+        name: ".env → BLOCKED",
+        category: "secret-file-guard",
+        hookScript: scriptName,
+        input: { tool_name: "Edit", tool_input: { file_path: ".env" } },
+        expectation: "block",
+      });
+      cases.push({
+        name: "src/app.ts → ALLOWED",
+        category: "secret-file-guard",
+        hookScript: scriptName,
+        input: { tool_name: "Edit", tool_input: { file_path: "src/app.ts" } },
+        expectation: "allow",
+      });
+    }
+  }
+
+  return cases;
+}
+
+// 테스트 실행
+export async function runTestCase(
+  projectDir: string,
+  testCase: TestCase,
+): Promise<TestResult> {
+  const hookPath = path.join(projectDir, testCase.hookScript);
+
+  try {
+    await fs.access(hookPath);
+  } catch {
+    return {
+      testCase,
+      actual: "allow",
+      passed: false,
+      error: `Hook script not found: ${testCase.hookScript}`,
+    };
+  }
+
+  const result = await simulateHook(hookPath, testCase.input);
+  const passed = result.decision === testCase.expectation;
+
+  return {
+    testCase,
+    actual: result.decision,
+    passed,
+    reason: result.reason,
+    error: passed ? undefined : `expected ${testCase.expectation} but got ${result.decision}`,
+  };
+}

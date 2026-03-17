@@ -47,6 +47,15 @@ export function createCli(): Command {
     });
 
   program
+    .command("test")
+    .description("Dry-run test harness hooks and commands")
+    .option("-d, --project-dir <dir>", "Project directory")
+    .action(async (options: { projectDir?: string }) => {
+      const { testCommand } = await import("./commands/test.js");
+      await testCommand(options);
+    });
+
+  program
     .command("sync")
     .description("Regenerate files from harness.yaml")
     .option("-d, --project-dir <dir>", "Project directory")

@@ -6,10 +6,11 @@ const LOGGER_SNIPPET = `# --- oh-my-harness event logger ---
 _OMH_STATE_DIR=".claude/hooks/.state"
 mkdir -p "$_OMH_STATE_DIR" 2>/dev/null || true
 _OMH_HOOK_NAME="$(basename "$0")"
+_OMH_EVENT="\${_OMH_EVENT:-unknown}"
 _log_event() {
   local decision="\${1:-allow}" reason="\${2:-}"
-  printf '{"ts":"%s","hook":"%s","decision":"%s","reason":"%s"}\\n' \\
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_OMH_HOOK_NAME" "$decision" "$reason" \\
+  printf '{"ts":"%s","event":"%s","hook":"%s","decision":"%s","reason":"%s"}\\n' \\
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_OMH_EVENT" "$_OMH_HOOK_NAME" "$decision" "$reason" \\
     >> "$_OMH_STATE_DIR/events.jsonl"
 }
 trap '_log_event "allow"' EXIT
@@ -22,7 +23,12 @@ export function wrapWithLogger(script: string): string {
   if (script.includes("set -euo pipefail")) {
     return script.replace("set -euo pipefail", `set -euo pipefail\n\n${LOGGER_SNIPPET}`);
   }
-  return script.replace("#!/bin/bash", `#!/bin/bash\n\n${LOGGER_SNIPPET}`);
+  // shebang 패턴: #!/bin/bash, #!/usr/bin/env bash, #!/bin/sh 등
+  const shebangMatch = script.match(/^#!.+$/m);
+  if (shebangMatch) {
+    return script.replace(shebangMatch[0], `${shebangMatch[0]}\n\n${LOGGER_SNIPPET}`);
+  }
+  return `${LOGGER_SNIPPET}\n${script}`;
 }
 
 export interface GenerateHooksOptions {

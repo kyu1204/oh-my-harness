@@ -275,4 +275,17 @@ describe("wrapWithLogger", () => {
     expect(result).toContain("INPUT=$(cat)");
     expect(result).toContain("exit 0");
   });
+
+  it("logger snippet includes event field in JSON output", () => {
+    const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
+    const result = wrapWithLogger(script);
+    expect(result).toContain('"event"');
+  });
+
+  it("handles #!/usr/bin/env bash shebang", () => {
+    const script = "#!/usr/bin/env bash\nexit 0";
+    const result = wrapWithLogger(script);
+    expect(result).toContain("_OMH_STATE_DIR");
+    expect(result).toContain("#!/usr/bin/env bash");
+  });
 });

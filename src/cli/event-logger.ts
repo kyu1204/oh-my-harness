@@ -37,7 +37,14 @@ export async function readEvents(projectDir: string): Promise<HookEvent[]> {
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
-      events.push(JSON.parse(trimmed) as HookEvent);
+      const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+      if (
+        typeof parsed.ts === "string" &&
+        typeof parsed.hook === "string" &&
+        (parsed.decision === "block" || parsed.decision === "allow")
+      ) {
+        events.push(parsed as unknown as HookEvent);
+      }
     } catch {
       // 잘못된 줄 무시
     }

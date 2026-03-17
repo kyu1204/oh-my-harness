@@ -57,4 +57,9 @@ describe("tddGuard block", () => {
       expect(param.description).toBeTruthy();
     }
   });
+
+  it("template uses testPattern and srcPattern params via Handlebars", () => {
+    expect(tddGuard.template).toContain("{{testPattern}}");
+    expect(tddGuard.template).toContain("{{srcPattern}}");
+  });
 });

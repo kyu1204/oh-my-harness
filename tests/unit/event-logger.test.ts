@@ -113,6 +113,28 @@ describe("readEvents", () => {
     expect(events[0].hook).toBe("bash-guard");
     expect(events[1].hook).toBe("file-guard");
   });
+
+  it("필수 필드 누락된 JSON은 무시 (런타임 검증)", async () => {
+    const stateDir = path.join(tmpDir, ".claude/hooks/.state");
+    await fs.mkdir(stateDir, { recursive: true });
+    const filePath = path.join(stateDir, "events.jsonl");
+
+    await fs.writeFile(
+      filePath,
+      [
+        '{"ts":"2024-01-01T00:00:00Z","event":"PreToolUse","hook":"guard","decision":"block"}',
+        '{"ts":"2024-01-01T00:00:01Z","hook":"guard","decision":"allow"}',
+        '{"random":"data"}',
+        '{"ts":"2024-01-01T00:00:02Z","event":"PostToolUse","hook":"lint","decision":"allow"}',
+      ].join("\n") + "\n",
+      "utf-8",
+    );
+
+    const events = await readEvents(tmpDir);
+    // 필수 필드(ts, hook, decision) 있는 것만 반환
+    expect(events).toHaveLength(3);
+    expect(events.every(e => e.ts && e.hook && e.decision)).toBe(true);
+  });
 });
 
 describe("getSessionEvents", () => {

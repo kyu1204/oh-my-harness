@@ -40,7 +40,7 @@ STATE_DIR=".claude/hooks/.state"
 HISTORY_FILE="\$STATE_DIR/edit-history.json"
 mkdir -p "\$STATE_DIR" 2>/dev/null || true
 
-if echo "\$FILE_PATH" | grep -qE '\\.(test|spec)\\.(ts|tsx|js|jsx)$'; then
+if echo "\$FILE_PATH" | grep -qE '{{testPattern}}'; then
   # 테스트 파일 수정 → 기록 + 통과
   if [[ ! -f "\$HISTORY_FILE" ]]; then
     echo '{"edits":[]}' > "\$HISTORY_FILE"
@@ -53,7 +53,7 @@ if echo "\$FILE_PATH" | grep -qE '\\.(test|spec)\\.(ts|tsx|js|jsx)$'; then
 fi
 
 # 소스 파일 (.ts/.tsx/.js/.jsx) 이 아니면 통과
-if ! echo "\$FILE_PATH" | grep -qE '\\.(ts|tsx|js|jsx)$'; then
+if ! echo "\$FILE_PATH" | grep -qE '{{srcPattern}}'; then
   exit 0
 fi
 

@@ -82,5 +82,5 @@ export const BuildingBlockSchema = z.object({
 
 export const HookEntrySchema = z.object({
   block: z.string(),
-  params: z.record(z.unknown()),
+  params: z.record(z.unknown()).default({}),
 });

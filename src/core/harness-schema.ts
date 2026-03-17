@@ -35,7 +35,7 @@ export const HarnessConfigSchema = z.object({
       pattern: z.string(),
       command: z.string(),
     })).default([]),
-  }),
+  }).default({}),
 
   // Catalog-based hooks (v2)
   hooks: z.array(HookEntrySchema).default([]),

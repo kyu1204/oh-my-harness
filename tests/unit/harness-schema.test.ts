@@ -108,6 +108,40 @@ describe("HarnessConfigSchema", () => {
     }
   });
 
+  it("defaults enforcement when omitted entirely", () => {
+    const config = {
+      project: {
+        stacks: [{ name: "app", framework: "react", language: "typescript" }],
+      },
+      rules: [],
+    };
+    const result = HarnessConfigSchema.safeParse(config);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.enforcement).toEqual({
+        preCommit: [],
+        blockedPaths: [],
+        blockedCommands: [],
+        postSave: [],
+      });
+    }
+  });
+
+  it("defaults hooks[].params when omitted", () => {
+    const config = {
+      project: {
+        stacks: [{ name: "app", framework: "react", language: "typescript" }],
+      },
+      rules: [],
+      hooks: [{ block: "branch-guard" }],
+    };
+    const result = HarnessConfigSchema.safeParse(config);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.hooks[0].params).toEqual({});
+    }
+  });
+
   it("validates rule priority defaults to 50", () => {
     const config = {
       project: {

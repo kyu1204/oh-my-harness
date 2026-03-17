@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { builtinBlocks } from "../../src/catalog/blocks/index.js";
 
 describe("builtinBlocks", () => {
-  it("exports exactly 10 blocks", () => {
-    expect(builtinBlocks).toHaveLength(10);
+  it("exports exactly 11 blocks", () => {
+    expect(builtinBlocks).toHaveLength(11);
   });
 
   it("all blocks have required fields (id, name, event, template)", () => {
@@ -67,5 +67,15 @@ describe("builtinBlocks", () => {
         false
       );
     }
+  });
+
+  it("tdd-guard block is registered", () => {
+    const block = builtinBlocks.find((b) => b.id === "tdd-guard");
+    expect(block).toBeDefined();
+  });
+
+  it("tdd-guard has canBlock=true", () => {
+    const block = builtinBlocks.find((b) => b.id === "tdd-guard");
+    expect(block?.canBlock).toBe(true);
   });
 });

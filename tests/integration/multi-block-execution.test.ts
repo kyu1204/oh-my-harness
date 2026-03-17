@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import { execSync } from "node:child_process";
 import { generateHooks, wrapWithLogger } from "../../src/generators/hooks.js";
 import { readEvents } from "../../src/cli/event-logger.js";
@@ -27,16 +27,28 @@ function hasJq(): boolean {
   }
 }
 
-function runHookScript(scriptPath: string, stdin: string, cwd: string): string {
+interface HookResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
+
+function runHookScript(scriptPath: string, stdin: string, cwd: string): HookResult {
   try {
-    return execSync(`bash "${scriptPath}"`, {
+    const stdout = execSync(`bash "${scriptPath}"`, {
       input: stdin,
       cwd,
       encoding: "utf-8",
       timeout: 5000,
     });
+    return { stdout, stderr: "", exitCode: 0 };
   } catch (e) {
-    return (e as { stdout?: string }).stdout ?? "";
+    const err = e as { stdout?: string; stderr?: string; status?: number };
+    return {
+      stdout: err.stdout ?? "",
+      stderr: err.stderr ?? "",
+      exitCode: err.status ?? 1,
+    };
   }
 }
 
@@ -121,7 +133,7 @@ describe("multiple blocks with same matcher", () => {
 
     const result = await generateHooks({ projectDir: tmpDir, config });
 
-    const fileNames = result.generatedFiles.map((f) => f.split("/").pop());
+    const fileNames = result.generatedFiles.map((f) => basename(f));
     expect(fileNames).toContain("command-guard.sh");
     expect(fileNames).toContain("branch-guard.sh");
 
@@ -242,11 +254,7 @@ describe("PreToolUse + PostToolUse mix", () => {
 // ---------------------------------------------------------------------------
 
 describe("multi-block execution and event logging", () => {
-  it("6. command-guard + path-guard sequential execution → 2 events recorded", async () => {
-    if (!hasJq()) {
-      console.log("Skipping: jq not available");
-      return;
-    }
+  it.runIf(hasJq())("6. command-guard + path-guard sequential execution → 2 events recorded", async () => {
 
     const renderedCommandGuard = renderTemplate(getBlock("command-guard").template, {
       patterns: ["rm -rf /"],
@@ -265,19 +273,17 @@ describe("multi-block execution and event logging", () => {
     await writeFile(pgPath, pgScript, { mode: 0o755 });
 
     // command-guard: allow (no dangerous pattern)
-    runHookScript(cgPath, JSON.stringify({ tool_input: { command: "echo hello" } }), tmpDir);
+    const cgResult = runHookScript(cgPath, JSON.stringify({ tool_input: { command: "echo hello" } }), tmpDir);
+    expect(cgResult.exitCode).toBe(0);
     // path-guard: allow (not blocked path)
-    runHookScript(pgPath, JSON.stringify({ tool_input: { file_path: "src/index.ts" } }), tmpDir);
+    const pgResult = runHookScript(pgPath, JSON.stringify({ tool_input: { file_path: "src/index.ts" } }), tmpDir);
+    expect(pgResult.exitCode).toBe(0);
 
     const events = await readEvents(tmpDir);
     expect(events.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("7. one block → block, other → allow, events recorded with correct decisions", async () => {
-    if (!hasJq()) {
-      console.log("Skipping: jq not available");
-      return;
-    }
+  it.runIf(hasJq())("7. one block → block, other → allow, events recorded with correct decisions", async () => {
 
     const renderedCommandGuard = renderTemplate(getBlock("command-guard").template, {
       patterns: ["rm -rf /"],
@@ -296,9 +302,11 @@ describe("multi-block execution and event logging", () => {
     await writeFile(pgPath, pgScript, { mode: 0o755 });
 
     // command-guard: allow
-    runHookScript(cgPath, JSON.stringify({ tool_input: { command: "echo hello" } }), tmpDir);
+    const cgResult = runHookScript(cgPath, JSON.stringify({ tool_input: { command: "echo hello" } }), tmpDir);
+    expect(cgResult.exitCode).toBe(0);
     // path-guard: block (matches dist/)
-    runHookScript(pgPath, JSON.stringify({ tool_input: { file_path: "dist/bundle.js" } }), tmpDir);
+    const pgResult = runHookScript(pgPath, JSON.stringify({ tool_input: { file_path: "dist/bundle.js" } }), tmpDir);
+    expect(pgResult.exitCode).toBe(0);
 
     const events = await readEvents(tmpDir);
 
@@ -425,11 +433,7 @@ describe("hooksConfig structure validation", () => {
 // ---------------------------------------------------------------------------
 
 describe("script isolation", () => {
-  it("11. each script is independently executable without other scripts", async () => {
-    if (!hasJq()) {
-      console.log("Skipping: jq not available");
-      return;
-    }
+  it.runIf(hasJq())("11. each script is independently executable without other scripts", async () => {
 
     const renderedCommandGuard = renderTemplate(getBlock("command-guard").template, {
       patterns: ["rm -rf /"],
@@ -457,21 +461,22 @@ describe("script isolation", () => {
     const hooksDir = join(tmpDir, ".claude/hooks");
 
     // Run command-guard alone — should not error
-    const cgOut = runHookScript(
+    const cgResult = runHookScript(
       join(hooksDir, "command-guard.sh"),
       JSON.stringify({ tool_input: { command: "echo hello" } }),
       tmpDir,
     );
-    // No blocking output expected for a safe command
-    expect(cgOut).not.toContain('"decision": "block"');
+    expect(cgResult.exitCode).toBe(0);
+    expect(cgResult.stdout).not.toContain('"decision": "block"');
 
     // Run branch-guard alone — should not error (exits 0 on non-commit command)
-    const bgOut = runHookScript(
+    const bgResult = runHookScript(
       join(hooksDir, "branch-guard.sh"),
       JSON.stringify({ tool_input: { command: "echo hello" } }),
       tmpDir,
     );
-    expect(bgOut).not.toContain('"decision": "block"');
+    expect(bgResult.exitCode).toBe(0);
+    expect(bgResult.stdout).not.toContain('"decision": "block"');
   });
 
   it("12. each generated script contains its own logger wrapper", async () => {

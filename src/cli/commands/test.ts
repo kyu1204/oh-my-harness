@@ -3,11 +3,13 @@ import chalk from "chalk";
 import fs from "node:fs/promises";
 import path from "node:path";
 import yaml from "js-yaml";
-import { getRegisteredHooks, generateTestCases, runTestCase } from "../harness-tester.js";
+import { getRegisteredHooks, generateTestCases, generateBlockTestCases, runTestCase } from "../harness-tester.js";
 import { checkHarnessCommands } from "../command-checker.js";
 import type { TestResult } from "../harness-tester.js";
 import type { CommandCheckResult } from "../command-checker.js";
 import { HarnessConfigSchema } from "../../core/harness-schema.js";
+import { builtinBlocks } from "../../catalog/blocks/index.js";
+import type { HookEntry } from "../../catalog/types.js";
 
 export interface TestCommandOptions {
   projectDir?: string;
@@ -25,6 +27,7 @@ export function formatCategoryName(category: string): string {
     "lint-on-save": "Lint on save",
     "format-on-save": "Format on save",
     "auto-pr": "Auto PR",
+    "tdd-guard": "TDD Guard",
   };
   return names[category] ?? category;
 }
@@ -40,6 +43,7 @@ export async function testCommand(options: TestCommandOptions = {}): Promise<{
   // 1. harness.yaml 읽기
   const harnessPath = path.join(projectDir, "harness.yaml");
   let enforcement = { blockedPaths: [] as string[], blockedCommands: [] as string[] };
+  let hookEntries: HookEntry[] = [];
 
   try {
     const raw = await fs.readFile(harnessPath, "utf-8");
@@ -50,6 +54,7 @@ export async function testCommand(options: TestCommandOptions = {}): Promise<{
         blockedPaths: result.data.enforcement.blockedPaths,
         blockedCommands: result.data.enforcement.blockedCommands,
       };
+      hookEntries = result.data.hooks ?? [];
     } else {
       console.log(chalk.yellow(`Warning: harness.yaml schema validation failed: ${result.error.message}`));
     }
@@ -96,7 +101,11 @@ export async function testCommand(options: TestCommandOptions = {}): Promise<{
     // git 없으면 undefined
   }
 
-  const testCases = generateTestCases(hooks, enforcement, currentBranch);
+  const enforcementCases = generateTestCases(hooks, enforcement, currentBranch);
+  const blockCases = generateBlockTestCases(hookEntries, builtinBlocks, currentBranch);
+  const enforcementCategories = new Set(enforcementCases.map((c) => c.category));
+  const uniqueBlockCases = blockCases.filter((c) => !enforcementCategories.has(c.category));
+  const testCases = [...enforcementCases, ...uniqueBlockCases];
   const results: TestResult[] = [];
 
   // 카테고리별 그룹핑

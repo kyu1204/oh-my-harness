@@ -137,18 +137,34 @@ fi
 
   it("generates block-based test cases merged with enforcement cases without duplicates", async () => {
     const hooksDir = path.join(tmpDir, ".claude", "hooks");
+    const stateDir = path.join(tmpDir, ".claude", "hooks", ".state");
     await fs.mkdir(hooksDir, { recursive: true });
+    await fs.mkdir(stateDir, { recursive: true });
 
-    // A minimal script for lockfile-guard (catalog-based)
-    await fs.writeFile(
-      path.join(hooksDir, "catalog-lockfile-guard.sh"),
-      `#!/bin/bash\necho ""`,
-      { mode: 0o755 },
-    );
-    // A minimal script for tdd-guard (catalog-based)
+    // tdd-guard script: blocks src/*.ts when no edit-history (matches "block" expectation for first case),
+    // allows .md files and test files (matches "allow" expectation for those cases)
+    const tddScript = `#!/bin/bash
+INPUT=$(cat)
+FILE_PATH=$(echo "$INPUT" | grep -o '"file_path":"[^"]*"' | cut -d'"' -f4)
+[[ -z "$FILE_PATH" ]] && exit 0
+case "$FILE_PATH" in
+  *.json|*.yaml|*.yml|*.md|*.sh) exit 0 ;;
+esac
+if echo "$FILE_PATH" | grep -qE '\\.(test|spec)\\.(ts|tsx|js|jsx)$'; then
+  exit 0
+fi
+if echo "$FILE_PATH" | grep -qE '\\.(ts|tsx|js|jsx)$'; then
+  HISTORY=".claude/hooks/.state/edit-history.json"
+  if [[ ! -f "$HISTORY" ]]; then
+    echo '{"decision":"block","reason":"TDD: write test first"}'
+    exit 0
+  fi
+fi
+exit 0
+`;
     await fs.writeFile(
       path.join(hooksDir, "catalog-tdd-guard.sh"),
-      `#!/bin/bash\necho ""`,
+      tddScript,
       { mode: 0o755 },
     );
 
@@ -157,7 +173,7 @@ fi
         PreToolUse: [
           {
             matcher: "Edit",
-            hooks: [{ type: "command", command: "bash .claude/hooks/catalog-lockfile-guard.sh" }],
+            hooks: [{ type: "command", command: "bash .claude/hooks/catalog-tdd-guard.sh" }],
           },
         ],
       },
@@ -167,7 +183,7 @@ fi
       JSON.stringify(settings),
     );
 
-    // harness.yaml with both enforcement (lockfile handled via old path) and hooks[] (tdd-guard)
+    // harness.yaml with hooks[] containing tdd-guard (no enforcement overlap)
     const harnessYaml = yaml.dump({
       version: "1.0",
       project: { name: "test-project", stacks: [] },
@@ -181,7 +197,7 @@ fi
 
     const result = await testCommand({ projectDir: tmpDir });
 
-    // tdd-guard block cases should be included
+    // tdd-guard block cases should be included in results
     const categories = result.results.map((r) => r.testCase.category);
     expect(categories).toContain("tdd-guard");
   });

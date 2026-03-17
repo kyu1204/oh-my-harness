@@ -2,33 +2,38 @@ import { mkdir, writeFile, chmod } from "node:fs/promises";
 import { join } from "node:path";
 import type { MergedConfig } from "../core/preset-types.js";
 
-const LOGGER_SNIPPET = `# --- oh-my-harness event logger ---
+function buildLoggerSnippet(event: string): string {
+  return `# --- oh-my-harness event logger ---
 _OMH_STATE_DIR=".claude/hooks/.state"
 mkdir -p "$_OMH_STATE_DIR" 2>/dev/null || true
 _OMH_HOOK_NAME="$(basename "$0")"
-_OMH_EVENT="\${_OMH_EVENT:-unknown}"
+_OMH_EVENT="${event}"
+_OMH_LOGGED=0
 _log_event() {
+  _OMH_LOGGED=1
   local decision="\${1:-allow}" reason="\${2:-}"
   printf '{"ts":"%s","event":"%s","hook":"%s","decision":"%s","reason":"%s"}\\n' \\
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_OMH_EVENT" "$_OMH_HOOK_NAME" "$decision" "$reason" \\
     >> "$_OMH_STATE_DIR/events.jsonl"
 }
-trap '_log_event "allow"' EXIT
+trap '[ "$_OMH_LOGGED" -eq 0 ] && _log_event "allow"' EXIT
 # --- end logger ---`;
+}
 
-export function wrapWithLogger(script: string): string {
+export function wrapWithLogger(script: string, event: string = "unknown"): string {
+  const snippet = buildLoggerSnippet(event);
   if (script.includes("INPUT=$(cat)")) {
-    return script.replace("INPUT=$(cat)", `INPUT=$(cat)\n\n${LOGGER_SNIPPET}`);
+    return script.replace("INPUT=$(cat)", `INPUT=$(cat)\n\n${snippet}`);
   }
   if (script.includes("set -euo pipefail")) {
-    return script.replace("set -euo pipefail", `set -euo pipefail\n\n${LOGGER_SNIPPET}`);
+    return script.replace("set -euo pipefail", `set -euo pipefail\n\n${snippet}`);
   }
   // shebang 패턴: #!/bin/bash, #!/usr/bin/env bash, #!/bin/sh 등
   const shebangMatch = script.match(/^#!.+$/m);
   if (shebangMatch) {
-    return script.replace(shebangMatch[0], `${shebangMatch[0]}\n\n${LOGGER_SNIPPET}`);
+    return script.replace(shebangMatch[0], `${shebangMatch[0]}\n\n${snippet}`);
   }
-  return `${LOGGER_SNIPPET}\n${script}`;
+  return `${snippet}\n${script}`;
 }
 
 export interface GenerateHooksOptions {
@@ -72,7 +77,7 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
     const safeId = hook.id.replace(/[^a-zA-Z0-9_-]/g, "");
     const scriptName = `${safeId}.sh`;
     const scriptPath = join(hooksDir, scriptName);
-    const wrappedScript = wrapWithLogger(hook.inline);
+    const wrappedScript = wrapWithLogger(hook.inline, hook.event);
     await writeFile(scriptPath, wrappedScript, "utf8");
     await chmod(scriptPath, 0o755);
     generatedFiles.push(scriptPath);

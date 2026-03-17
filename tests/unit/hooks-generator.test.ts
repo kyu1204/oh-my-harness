@@ -225,7 +225,8 @@ describe("generateHooks", () => {
     const content = await readFile(scriptPath, "utf8");
     expect(content).toContain("_OMH_STATE_DIR");
     expect(content).toContain("_log_event");
-    expect(content).toContain("trap '_log_event");
+    expect(content).toContain("_log_event");
+    expect(content).toContain("EXIT");
   });
 });
 
@@ -264,7 +265,7 @@ describe("wrapWithLogger", () => {
   it("includes trap EXIT in logger snippet", () => {
     const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
     const result = wrapWithLogger(script);
-    expect(result).toContain("trap '_log_event");
+    expect(result).toContain("_log_event");
     expect(result).toContain("EXIT");
   });
 

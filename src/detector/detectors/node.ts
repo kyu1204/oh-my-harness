@@ -20,6 +20,28 @@ async function readJsonFile(filePath: string): Promise<Record<string, unknown> |
   }
 }
 
+/**
+ * Resolve scripts.test content into a direct executable command.
+ * - Prevents watch mode hang (vitest → vitest run)
+ * - Adds npx prefix for direct runner invocation
+ */
+function resolveTestCommand(testScript: string): string {
+  const trimmed = testScript.trim();
+
+  // vitest without "run" → add --run to prevent watch mode
+  if (/^vitest$/.test(trimmed)) {
+    return "npx vitest run";
+  }
+
+  // Known runners: prefix with npx if not already
+  if (/^(vitest|jest|mocha)\b/.test(trimmed)) {
+    return trimmed.startsWith("npx ") ? trimmed : `npx ${trimmed}`;
+  }
+
+  // Unknown script content: use as-is (e.g. custom shell commands)
+  return trimmed;
+}
+
 export const nodeDetector: Detector = {
   name: "node",
   detect: async (projectDir: string): Promise<Partial<ProjectFacts>> => {
@@ -58,9 +80,8 @@ export const nodeDetector: Detector = {
       detectedFiles.push("package-lock.json");
     }
 
-    // Determine lint command prefix and test command based on package manager
+    // Determine lint command prefix based on package manager
     const lintCmd = pm === "npm" ? "npm run lint" : `${pm} lint`;
-    const testCmdDefault = pm === "npm" ? "npm test" : `${pm} test`;
 
     // Read package.json to inspect scripts
     const pkg = await readJsonFile(packageJsonPath);
@@ -68,11 +89,11 @@ export const nodeDetector: Detector = {
       ? (pkg.scripts as Record<string, string>)
       : {};
 
-    // Detect test runner from scripts.test
-    const testScript = scripts["test"];
-    testCommands.push(testCmdDefault);
-    if (testScript && /vitest|jest|mocha/.test(testScript) && testScript !== testCmdDefault) {
-      testCommands.push(testScript);
+    // Detect test runner from scripts.test — use direct command instead of npm test wrapper
+    const rawTestScript = scripts["test"];
+    if (typeof rawTestScript === "string" && rawTestScript.trim().length > 0) {
+      const resolved = resolveTestCommand(rawTestScript);
+      testCommands.push(resolved);
     }
 
     lintCommands.push(lintCmd);

@@ -145,4 +145,45 @@ describe("buildHarnessGenerationPrompt with projectFacts", () => {
     const prompt = buildHarnessGenerationPrompt("my app");
     expect(prompt).toContain("full executable shell commands");
   });
+
+  it("instructs LLM to prefer hooks (catalog blocks) over enforcement", () => {
+    const blocks = [
+      { id: "branch-guard", description: "Blocks commits on merged branches", params: [] },
+    ];
+    const prompt = buildHarnessGenerationPrompt("my app", blocks);
+    expect(prompt).toMatch(/prefer.*hooks|hooks.*prefer|MUST.*hooks|hooks.*first/i);
+  });
+
+  it("examples include hooks field with catalog blocks when blocks are provided", () => {
+    const blocks = [
+      { id: "unique-test-block-xyz", description: "A unique test block for validation", params: [] },
+      { id: "another-unique-block-abc", description: "Another unique block", params: [{ name: "fooParam", required: true, description: "A test param" }] },
+    ];
+    const prompt = buildHarnessGenerationPrompt("my app", blocks);
+    expect(prompt).toContain("Available building blocks");
+    expect(prompt).toContain("unique-test-block-xyz");
+    expect(prompt).toContain("another-unique-block-abc");
+    expect(prompt).toContain("A unique test block for validation");
+    expect(prompt).toContain("fooParam");
+  });
+
+  it("describes enforcement as fallback for commands without matching blocks", () => {
+    const blocks = [
+      { id: "unique-fallback-block", description: "Fallback test block", params: [] },
+    ];
+    const prompt = buildHarnessGenerationPrompt("my app", blocks);
+    expect(prompt).toMatch(/enforcement.*fallback|fallback.*enforcement|enforcement.*no matching block/i);
+  });
+
+  it("renders catalogSection with unique block details distinct from examples", () => {
+    const blocks = [
+      { id: "custom-guard-qwerty", description: "Custom guard for testing", params: [] },
+      { id: "custom-gate-asdfgh", description: "Custom gate with params", params: [{ name: "customCmd", required: true, description: "Custom command" }] },
+    ];
+    const prompt = buildHarnessGenerationPrompt("my app", blocks);
+    // These IDs do not appear in hardcoded examples, so they must come from catalogSection
+    expect(prompt).toContain("block: custom-guard-qwerty");
+    expect(prompt).toContain("block: custom-gate-asdfgh");
+    expect(prompt).toContain("customCmd (required)");
+  });
 });

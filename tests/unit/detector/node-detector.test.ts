@@ -37,7 +37,8 @@ describe("nodeDetector", () => {
     const result = await nodeDetector.detect(tmpDir);
 
     expect(result.packageManagers).toContain("pnpm");
-    expect(result.testCommands).toContain("pnpm test");
+    expect(result.testCommands).toContain("npx vitest run");
+    expect(result.testCommands).not.toContain("pnpm test");
     expect(result.lintCommands).toContain("pnpm lint");
     expect(result.detectedFiles).toContain("package.json");
     expect(result.detectedFiles).toContain("pnpm-lock.yaml");
@@ -50,7 +51,8 @@ describe("nodeDetector", () => {
     const result = await nodeDetector.detect(tmpDir);
 
     expect(result.packageManagers).toContain("yarn");
-    expect(result.testCommands).toContain("yarn test");
+    expect(result.testCommands).toContain("npx jest");
+    expect(result.testCommands).not.toContain("yarn test");
     expect(result.lintCommands).toContain("yarn lint");
     expect(result.detectedFiles).toContain("package.json");
     expect(result.detectedFiles).toContain("yarn.lock");
@@ -63,37 +65,74 @@ describe("nodeDetector", () => {
     const result = await nodeDetector.detect(tmpDir);
 
     expect(result.packageManagers).toContain("npm");
-    expect(result.testCommands).toContain("npm test");
+    expect(result.testCommands).toContain("npx jest");
+    expect(result.testCommands).not.toContain("npm test");
     expect(result.lintCommands).toContain("npm run lint");
     expect(result.detectedFiles).toContain("package.json");
     expect(result.detectedFiles).toContain("package-lock.json");
   });
 
-  it("detects vitest as test runner from scripts.test", async () => {
+  it("extracts direct test command from scripts.test (vitest run)", async () => {
     await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", scripts: { test: "vitest run" } }));
     await writeFile(tmpDir, "pnpm-lock.yaml", "");
 
     const result = await nodeDetector.detect(tmpDir);
 
-    expect(result.testCommands).toContain("vitest run");
+    expect(result.testCommands).toEqual(["npx vitest run"]);
   });
 
-  it("detects jest as test runner from scripts.test", async () => {
+  it("adds --run flag when scripts.test is bare vitest (watch mode prevention)", async () => {
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", scripts: { test: "vitest" } }));
+    await writeFile(tmpDir, "pnpm-lock.yaml", "");
+
+    const result = await nodeDetector.detect(tmpDir);
+
+    expect(result.testCommands).toEqual(["npx vitest run"]);
+  });
+
+  it("extracts jest command from scripts.test", async () => {
     await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", scripts: { test: "jest --coverage" } }));
     await writeFile(tmpDir, "package-lock.json", "{}");
 
     const result = await nodeDetector.detect(tmpDir);
 
-    expect(result.testCommands).toContain("jest --coverage");
+    expect(result.testCommands).toEqual(["npx jest --coverage"]);
   });
 
-  it("detects mocha as test runner from scripts.test", async () => {
+  it("extracts mocha command from scripts.test", async () => {
     await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", scripts: { test: "mocha" } }));
     await writeFile(tmpDir, "package-lock.json", "{}");
 
     const result = await nodeDetector.detect(tmpDir);
 
-    expect(result.testCommands).toContain("mocha");
+    expect(result.testCommands).toEqual(["npx mocha"]);
+  });
+
+  it("does not add test command when scripts.test is missing", async () => {
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test" }));
+    await writeFile(tmpDir, "package-lock.json", "{}");
+
+    const result = await nodeDetector.detect(tmpDir);
+
+    expect(result.testCommands).toEqual([]);
+  });
+
+  it("ignores whitespace-only scripts.test", async () => {
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", scripts: { test: "   " } }));
+    await writeFile(tmpDir, "package-lock.json", "{}");
+
+    const result = await nodeDetector.detect(tmpDir);
+
+    expect(result.testCommands).toEqual([]);
+  });
+
+  it("ignores non-string scripts.test", async () => {
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", scripts: { test: 123 } }));
+    await writeFile(tmpDir, "package-lock.json", "{}");
+
+    const result = await nodeDetector.detect(tmpDir);
+
+    expect(result.testCommands).toEqual([]);
   });
 
   it("detects eslint from .eslintrc file", async () => {

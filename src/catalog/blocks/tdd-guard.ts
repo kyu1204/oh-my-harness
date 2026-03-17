@@ -62,6 +62,7 @@ BASENAME=$(basename "\$FILE_PATH" | sed -E 's/\\.(ts|tsx|js|jsx)$//')
 TEST_SUFFIX=".test."
 
 if [[ ! -f "\$HISTORY_FILE" ]]; then
+  _log_event "block" "oh-my-harness: TDD — \${BASENAME}\${TEST_SUFFIX}* 테스트 파일을 먼저 수정하세요"
   echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: TDD — \${BASENAME}\${TEST_SUFFIX}* 테스트 파일을 먼저 수정하세요\\"}"
   exit 0
 fi
@@ -76,6 +77,7 @@ if jq -e --arg b "\$BASENAME" '.edits[] | select(contains($b + ".test.") or cont
   exit 0
 fi
 
+_log_event "block" "oh-my-harness: TDD — \${BASENAME}\${TEST_SUFFIX}* 테스트 파일을 먼저 수정하세요"
 echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: TDD — \${BASENAME}\${TEST_SUFFIX}* 테스트 파일을 먼저 수정하세요\\"}"
 exit 0`,
   tags: ["tdd", "workflow", "quality"],

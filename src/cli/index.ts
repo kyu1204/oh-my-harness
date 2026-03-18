@@ -64,6 +64,14 @@ export function createCli(): Command {
       await syncCommand(options);
     });
 
+  program
+    .command("stats")
+    .description("TUI dashboard for harness analytics")
+    .action(async () => {
+      const { statsCommand } = await import("./stats/index.js");
+      await statsCommand();
+    });
+
   const catalogCmd = program
     .command("catalog")
     .description("Browse available building blocks");

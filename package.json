@@ -27,7 +27,15 @@
     "test:watch": "vitest",
     "lint": "tsc --noEmit"
   },
-  "keywords": ["claude", "ai", "harness", "claude-code", "tdd", "hooks", "cli"],
+  "keywords": [
+    "claude",
+    "ai",
+    "harness",
+    "claude-code",
+    "tdd",
+    "hooks",
+    "cli"
+  ],
   "author": "kyu1204",
   "license": "MIT",
   "repository": {
@@ -44,12 +52,16 @@
     "chalk": "^5.6.2",
     "commander": "^13.1.0",
     "handlebars": "^4.7.8",
+    "ink": "^6.8.0",
     "js-yaml": "^4.1.0",
+    "react": "^19.2.4",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
+    "@types/react": "^19.2.14",
+    "ink-testing-library": "^4.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"

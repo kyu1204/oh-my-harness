@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+// updated: hookSummary uses mergeEnforcementAndHooks
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";

@@ -176,7 +176,9 @@ async function initWithNL(
   const stackNames = harness.project.stacks.map((s) => `${s.name} (${s.framework})`).join(", ");
   console.log(`\nStacks: ${stackNames}`);
   console.log(`Rules: ${harness.rules.length}`);
-  const hookSummary = harness.hooks?.map((h) => h.block).join(", ") || "none";
+  const { mergeEnforcementAndHooks } = await import("../../core/harness-converter.js");
+  const allHooks = mergeEnforcementAndHooks(harness);
+  const hookSummary = allHooks.map((h) => h.block).join(", ") || "none";
   console.log(`Hooks: ${hookSummary}`);
 
   if (!options.yes) {

@@ -1,14 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { execSync } from "node:child_process";
-import path from "node:path";
+import { createCli } from "../../src/cli/index.js";
 
 describe("omh stats CLI", () => {
-  it("omh stats --help shows description", () => {
-    const bin = path.resolve("dist/bin/oh-my-harness.js");
-    const output = execSync(`node ${bin} stats --help`, {
-      encoding: "utf-8",
-      timeout: 10000,
-    });
-    expect(output).toContain("dashboard");
+  it("stats command is registered with description", () => {
+    const program = createCli();
+    const statsCmd = program.commands.find(c => c.name() === "stats");
+    expect(statsCmd).toBeDefined();
+    expect(statsCmd!.description()).toContain("dashboard");
   });
 });

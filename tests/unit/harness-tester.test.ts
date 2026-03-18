@@ -560,6 +560,21 @@ describe("generateBlockTestCases", () => {
     expect(cases[0].category).toBe("path-guard");
   });
 
+  it("uses registered hook path when provided", () => {
+    const entries = [{ block: "path-guard", params: { blockedPaths: ["dist/"] } }];
+    const registeredHooks = [
+      { event: "PreToolUse", matcher: "Edit|Write", command: "bash .claude/hooks/harness-file-guard.sh" },
+    ];
+    const cases = generateBlockTestCases(entries, builtinBlocks, undefined, registeredHooks);
+    expect(cases[0].hookScript).toBe(".claude/hooks/harness-file-guard.sh");
+  });
+
+  it("falls back to catalog- prefix when no registered hook matches", () => {
+    const entries = [{ block: "path-guard", params: { blockedPaths: ["dist/"] } }];
+    const cases = generateBlockTestCases(entries, builtinBlocks);
+    expect(cases[0].hookScript).toBe(".claude/hooks/catalog-path-guard.sh");
+  });
+
   it("generates block/allow cases for command-guard with patterns params", () => {
     const entries = [{ block: "command-guard", params: { patterns: ["rm -rf /", "sudo rm"] } }];
     const cases = generateBlockTestCases(entries, builtinBlocks);

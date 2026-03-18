@@ -270,6 +270,7 @@ export function generateBlockTestCases(
   hookEntries: HookEntry[],
   blocks: BuildingBlock[],
   currentBranch?: string,
+  registeredHooks?: { event: string; matcher: string; command: string }[],
 ): TestCase[] {
   const cases: TestCase[] = [];
 
@@ -279,7 +280,24 @@ export function generateBlockTestCases(
     if (!block.canBlock) continue;
 
     const params = applyDefaults(block, entry.params);
-    const hookScript = `.claude/hooks/catalog-${block.id}.sh`;
+    // Find actual script path from registered hooks, fallback to catalog- prefix
+    // Map block ids to enforcement script name patterns
+    const blockIdAliases: Record<string, string[]> = {
+      "path-guard": ["path-guard", "file-guard"],
+      "command-guard": ["command-guard"],
+      "branch-guard": ["branch-guard"],
+      "lockfile-guard": ["lockfile-guard"],
+      "secret-file-guard": ["secret-file-guard"],
+      "tdd-guard": ["tdd-guard"],
+    };
+    const aliases = blockIdAliases[block.id] ?? [block.id];
+    const matchedHook = registeredHooks?.find((h) => {
+      const scriptName = h.command.replace(/^bash\s+/, "");
+      return aliases.some((alias) => scriptName.includes(alias));
+    });
+    const hookScript = matchedHook
+      ? matchedHook.command.replace(/^bash\s+/, "")
+      : `.claude/hooks/catalog-${block.id}.sh`;
 
     switch (block.id) {
       case "path-guard": {

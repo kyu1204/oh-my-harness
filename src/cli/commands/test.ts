@@ -102,7 +102,7 @@ export async function testCommand(options: TestCommandOptions = {}): Promise<{
   }
 
   const enforcementCases = generateTestCases(hooks, enforcement, currentBranch);
-  const blockCases = generateBlockTestCases(hookEntries, builtinBlocks, currentBranch);
+  const blockCases = generateBlockTestCases(hookEntries, builtinBlocks, currentBranch, hooks);
   // Block cases take priority — only keep enforcement cases for categories not covered by blocks
   const blockCategories = new Set(blockCases.map((c) => c.category));
   const uniqueEnforcementCases = enforcementCases.filter((c) => !blockCategories.has(c.category));

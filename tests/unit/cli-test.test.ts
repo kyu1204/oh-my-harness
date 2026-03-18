@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import yaml from "js-yaml";
+// updated: generateBlockTestCases now receives registeredHooks
 // updated: block cases take priority over enforcement cases
 import { formatCategoryName, testCommand } from "../../src/cli/commands/test.js";
 

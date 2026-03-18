@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { harnessToMergedConfigV2 } from "../../src/core/harness-converter-v2.js";
 import { CatalogRegistry } from "../../src/catalog/registry.js";
+import { createDefaultRegistry } from "../../src/catalog/registry.js";
 import type { HarnessConfig } from "../../src/core/harness-schema.js";
 import type { BuildingBlock } from "../../src/catalog/types.js";
 
@@ -45,7 +46,7 @@ const baseHarness: HarnessConfig = {
     },
   ],
   enforcement: {
-    preCommit: ["test", "lint"],
+    preCommit: [],
     blockedPaths: [],
     blockedCommands: [],
     postSave: [],
@@ -58,16 +59,25 @@ const baseHarness: HarnessConfig = {
 };
 
 describe("harnessToMergedConfigV2", () => {
-  it("converts v1 enforcement-only config (backward compat)", async () => {
-    const registry = new CatalogRegistry();
-    const result = await harnessToMergedConfigV2(baseHarness, registry);
+  it("converts enforcement-only config via catalog pipeline (backward compat)", async () => {
+    const registry = await createDefaultRegistry();
+    const harness: HarnessConfig = {
+      ...baseHarness,
+      enforcement: {
+        preCommit: ["npm test"],
+        blockedPaths: [],
+        blockedCommands: [],
+        postSave: [],
+      },
+    };
+    const result = await harnessToMergedConfigV2(harness, registry);
 
     expect(result.presets).toEqual(["harness"]);
     expect(result.claudeMdSections).toHaveLength(1);
     expect(result.hooks).toBeDefined();
-    // v1 preCommit hook should still be present
-    const preCommitHook = result.hooks.preToolUse.find((h) => h.id === "harness-pre-commit");
-    expect(preCommitHook).toBeDefined();
+    // enforcement.preCommit → commit-test-gate catalog hook
+    const catalogHook = result.hooks.preToolUse.find((h) => h.id === "catalog-commit-test-gate");
+    expect(catalogHook).toBeDefined();
   });
 
   it("converts v2 hooks-only config", async () => {
@@ -92,44 +102,36 @@ describe("harnessToMergedConfigV2", () => {
 
     const result = await harnessToMergedConfigV2(hooksOnly, registry);
 
-    expect(result.errors).toBeUndefined();
+    expect(result.catalogErrors).toBeUndefined();
     // catalog hook should produce a preToolUse hook
     const catalogHook = result.hooks.preToolUse.find((h) => h.id === "catalog-my-block");
     expect(catalogHook).toBeDefined();
     expect(catalogHook!.matcher).toBe("Bash");
   });
 
-  it("converts mixed v1+v2 config and merges hooks", async () => {
-    const registry = new CatalogRegistry();
-    registry.register(
-      makeBlock({
-        id: "post-block",
-        event: "PostToolUse",
-        matcher: "Edit",
-        template: "#!/bin/bash\necho post",
-      }),
-    );
+  it("converts mixed enforcement+hooks config via catalog pipeline", async () => {
+    const registry = await createDefaultRegistry();
 
     const mixed: HarnessConfig = {
       ...baseHarness,
       enforcement: {
-        preCommit: ["test"],
+        preCommit: ["npm test"],
         blockedPaths: [],
         blockedCommands: [],
         postSave: [],
       },
-      hooks: [{ block: "post-block", params: {} }],
+      hooks: [{ block: "branch-guard", params: {} }],
     };
 
     const result = await harnessToMergedConfigV2(mixed, registry);
 
-    // v1 hook from enforcement
-    const preCommitHook = result.hooks.preToolUse.find((h) => h.id === "harness-pre-commit");
-    expect(preCommitHook).toBeDefined();
+    // enforcement.preCommit → commit-test-gate catalog hook
+    const testGate = result.hooks.preToolUse.find((h) => h.id === "catalog-commit-test-gate");
+    expect(testGate).toBeDefined();
 
-    // v2 catalog hook
-    const catalogHook = result.hooks.postToolUse.find((h) => h.id === "catalog-post-block");
-    expect(catalogHook).toBeDefined();
+    // explicit hooks → branch-guard catalog hook
+    const branchGuard = result.hooks.preToolUse.find((h) => h.id === "catalog-branch-guard");
+    expect(branchGuard).toBeDefined();
   });
 
   it("returns catalogErrors when unknown block id is used", async () => {
@@ -169,44 +171,28 @@ describe("harnessToMergedConfigV2", () => {
     expect(result.catalogErrors![0]).toContain("cmd");
   });
 
-  it("v2 catalog hooks take precedence over v1 hooks for same event", async () => {
-    const registry = new CatalogRegistry();
-    registry.register(
-      makeBlock({
-        id: "pre-block",
-        event: "PreToolUse",
-        matcher: "Bash",
-        template: "#!/bin/bash\necho catalog",
-      }),
-    );
+  it("explicit hooks take priority over enforcement for same block", async () => {
+    const registry = await createDefaultRegistry();
 
     const config: HarnessConfig = {
       ...baseHarness,
       enforcement: {
-        preCommit: ["test"],
-        blockedPaths: [],
+        preCommit: [],
+        blockedPaths: [".next/"],
         blockedCommands: [],
         postSave: [],
       },
-      hooks: [{ block: "pre-block", params: {} }],
+      hooks: [{ block: "path-guard", params: { blockedPaths: ["dist/", "build/"] } }],
     };
 
     const result = await harnessToMergedConfigV2(config, registry);
 
-    // Both v1 and v2 hooks are present (merged)
-    expect(result.hooks.preToolUse.length).toBeGreaterThanOrEqual(2);
-
-    // Verify catalog hook comes after v1 hooks (catalog takes precedence via ordering)
-    const hookIds = result.hooks.preToolUse.map((h) => h.id);
-    const v1Index = hookIds.indexOf("harness-pre-commit");
-    const catalogIndex = hookIds.indexOf("catalog-pre-block");
-    expect(v1Index).toBeGreaterThanOrEqual(0);
-    expect(catalogIndex).toBeGreaterThanOrEqual(0);
-    // catalog hooks are appended after v1 hooks
-    expect(catalogIndex).toBeGreaterThan(v1Index);
+    // Only one path-guard (explicit), not two
+    const pathGuards = result.hooks.preToolUse.filter((h) => h.id === "catalog-path-guard");
+    expect(pathGuards).toHaveLength(1);
   });
 
-  it("empty hooks array produces no catalog errors", async () => {
+  it("empty hooks array with empty enforcement produces no catalog errors", async () => {
     const registry = new CatalogRegistry();
 
     const config: HarnessConfig = {

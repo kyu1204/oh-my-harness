@@ -71,11 +71,16 @@ describe("formatConfigSummary", () => {
       },
       rules: [{ id: "r1", title: "TDD Mandatory", content: "content", priority: 10 }],
       enforcement: {
-        preCommit: ["npx vitest run"],
-        blockedPaths: ["dist/"],
+        preCommit: [],
+        blockedPaths: [],
         blockedCommands: [],
-        postSave: [{ pattern: "*.ts", command: "eslint --fix" }],
+        postSave: [],
       },
+      hooks: [
+        { block: "commit-test-gate", params: { testCommand: "npx vitest run" } },
+        { block: "path-guard", params: { blockedPaths: ["dist/"] } },
+        { block: "lint-on-save", params: { filePattern: "*.ts", command: "eslint --fix" } },
+      ],
       permissions: { allow: [], deny: [] },
     };
     const output = formatConfigSummary(config);
@@ -95,6 +100,7 @@ describe("formatConfigSummary", () => {
         { id: "r2", title: "TypeScript Rules", content: "content", priority: 20 },
       ],
       enforcement: { preCommit: [], blockedPaths: [], blockedCommands: [], postSave: [] },
+      hooks: [],
       permissions: { allow: [], deny: [] },
     };
     const output = formatConfigSummary(config);
@@ -102,7 +108,28 @@ describe("formatConfigSummary", () => {
     expect(output).toContain("TypeScript Rules");
   });
 
-  it("includes enforcement summary", () => {
+  it("includes hooks summary", () => {
+    const config: HarnessConfig = {
+      version: "1.0",
+      project: {
+        stacks: [{ name: "app", framework: "react", language: "typescript" }],
+      },
+      rules: [],
+      enforcement: { preCommit: [], blockedPaths: [], blockedCommands: [], postSave: [] },
+      hooks: [
+        { block: "commit-test-gate", params: { testCommand: "npx vitest run" } },
+        { block: "path-guard", params: { blockedPaths: ["dist/", "node_modules/"] } },
+        { block: "lint-on-save", params: { filePattern: "*.ts", command: "eslint --fix" } },
+      ],
+      permissions: { allow: [], deny: [] },
+    };
+    const output = formatConfigSummary(config);
+    expect(output).toContain("commit-test-gate");
+    expect(output).toContain("path-guard");
+    expect(output).toContain("lint-on-save");
+  });
+
+  it("shows enforcement-derived hooks when enforcement is present", () => {
     const config: HarnessConfig = {
       version: "1.0",
       project: {
@@ -115,15 +142,18 @@ describe("formatConfigSummary", () => {
         blockedCommands: [],
         postSave: [{ pattern: "*.ts", command: "eslint --fix" }],
       },
+      hooks: [],
       permissions: { allow: [], deny: [] },
     };
     const output = formatConfigSummary(config);
-    expect(output).toContain("npx vitest run");
-    expect(output).toContain("dist/");
-    expect(output).toContain("eslint --fix");
+    // enforcement is auto-converted to hooks for display
+    expect(output).toContain("commit-test-gate");
+    expect(output).toContain("commit-typecheck-gate");
+    expect(output).toContain("path-guard");
+    expect(output).toContain("lint-on-save");
   });
 
-  it("handles config with no enforcement", () => {
+  it("handles config with no hooks and no enforcement", () => {
     const config: HarnessConfig = {
       version: "1.0",
       project: {
@@ -131,6 +161,7 @@ describe("formatConfigSummary", () => {
       },
       rules: [],
       enforcement: { preCommit: [], blockedPaths: [], blockedCommands: [], postSave: [] },
+      hooks: [],
       permissions: { allow: [], deny: [] },
     };
     const output = formatConfigSummary(config);

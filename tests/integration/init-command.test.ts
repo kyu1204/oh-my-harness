@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import yaml from "js-yaml";
+// updated: enforcement summary replaced with hooks summary in NL flow
 import { initCommand } from "../../src/cli/commands/init.js";
 import { addCommand } from "../../src/cli/commands/add.js";
 import { removeCommand } from "../../src/cli/commands/remove.js";
@@ -119,6 +120,7 @@ describe("initCommand", () => {
         blockedCommands: [],
         postSave: [],
       },
+      hooks: [{ block: "branch-guard", params: {} }],
       permissions: { allow: ["Bash(pnpm test*)"], deny: [] },
     });
 

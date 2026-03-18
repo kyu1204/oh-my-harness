@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildHarnessGenerationPrompt } from "../../src/nl/prompt-templates.js";
 import type { ProjectFacts } from "../../src/detector/types.js";
-// prompt-templates test file updated for brace expansion fix
+// prompt-templates test file updated: enforcement removed, hooks-only
 
 const fullFacts: ProjectFacts = {
   languages: ["typescript", "python"],
@@ -133,26 +133,29 @@ describe("buildHarnessGenerationPrompt with projectFacts", () => {
     expect(prompt).toContain("Project facts (detected automatically):");
   });
 
-  it("examples use full executable commands, not bare script names", () => {
+  it("does not contain enforcement schema description", () => {
     const prompt = buildHarnessGenerationPrompt("my app");
-    // preCommit examples should NOT contain bare words like "test", "lint", "build"
-    // They should use full commands like "pnpm test", "npx eslint", etc.
-    expect(prompt).not.toMatch(/preCommit:\s*\[.*"test".*\]/);
-    expect(prompt).not.toMatch(/preCommit:\s*\[.*"lint".*\]/);
-    expect(prompt).not.toMatch(/preCommit:\s*\[.*"build".*\]/);
+    // enforcement field should not be described as a top-level schema field
+    expect(prompt).not.toMatch(/^- enforcement:/m);
+    expect(prompt).not.toContain("enforcement: object with");
+    expect(prompt).not.toContain("enforcement: fallback");
+    // preCommit as a schema field should not exist (it's now commit-test-gate params)
+    expect(prompt).not.toContain("preCommit");
+    expect(prompt).not.toContain("postSave");
   });
 
-  it("schema description mentions full executable commands", () => {
+  it("describes hooks as the primary enforcement mechanism", () => {
     const prompt = buildHarnessGenerationPrompt("my app");
-    expect(prompt).toContain("full executable shell commands");
+    expect(prompt).toContain("hooks");
+    expect(prompt).toContain("primary mechanism");
   });
 
-  it("instructs LLM to prefer hooks (catalog blocks) over enforcement", () => {
+  it("instructs LLM to use hooks (catalog blocks)", () => {
     const blocks = [
       { id: "branch-guard", description: "Blocks commits on merged branches", params: [] },
     ];
     const prompt = buildHarnessGenerationPrompt("my app", blocks);
-    expect(prompt).toMatch(/prefer.*hooks|hooks.*prefer|MUST.*hooks|hooks.*first/i);
+    expect(prompt).toMatch(/MUST.*hooks|hooks.*MUST/i);
   });
 
   it("examples include hooks field with catalog blocks when blocks are provided", () => {
@@ -166,14 +169,6 @@ describe("buildHarnessGenerationPrompt with projectFacts", () => {
     expect(prompt).toContain("another-unique-block-abc");
     expect(prompt).toContain("A unique test block for validation");
     expect(prompt).toContain("fooParam");
-  });
-
-  it("describes enforcement as fallback for commands without matching blocks", () => {
-    const blocks = [
-      { id: "unique-fallback-block", description: "Fallback test block", params: [] },
-    ];
-    const prompt = buildHarnessGenerationPrompt("my app", blocks);
-    expect(prompt).toMatch(/enforcement.*fallback|fallback.*enforcement|enforcement.*no matching block/i);
   });
 
   it("renders catalogSection with unique block details distinct from examples", () => {

@@ -8,9 +8,10 @@ vi.mock("../../src/core/generator.js", () => ({
   generate: vi.fn(),
 }));
 
-// Mock harnessToMergedConfig
+// Mock harnessToMergedConfig and mergeEnforcementAndHooks
 vi.mock("../../src/core/harness-converter.js", () => ({
   harnessToMergedConfig: vi.fn(),
+  mergeEnforcementAndHooks: vi.fn().mockReturnValue([]),
 }));
 
 describe("syncCommand", () => {

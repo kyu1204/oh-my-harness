@@ -320,11 +320,11 @@ describe("multi-block execution and event logging", () => {
 });
 
 // ---------------------------------------------------------------------------
-// enforcement + hooks 혼합
+// enforcement → catalog hooks 변환
 // ---------------------------------------------------------------------------
 
-describe("enforcement + hooks combined", () => {
-  it("8. harness with enforcement.preCommit + hooks → both present in MergedConfig", async () => {
+describe("enforcement auto-converted to catalog hooks", () => {
+  it("8. harness with enforcement.preCommit + hooks → all converted to catalog hooks in MergedConfig", async () => {
     const harness = makeBaseHarness({
       enforcement: {
         preCommit: ["npm test"],
@@ -339,20 +339,20 @@ describe("enforcement + hooks combined", () => {
 
     const result = await harnessToMergedConfigV2(harness);
 
-    // enforcement part → preToolUse entry from v1
-    const enforcementHooks = result.hooks.preToolUse.filter((h) =>
-      h.id === "harness-pre-commit",
+    // enforcement.preCommit converted to catalog commit-test-gate
+    const testGateHooks = result.hooks.preToolUse.filter((h) =>
+      h.id === "catalog-commit-test-gate",
     );
-    expect(enforcementHooks).toHaveLength(1);
+    expect(testGateHooks).toHaveLength(1);
 
-    // catalog part → preToolUse entry from v2
+    // explicit hooks → command-guard catalog hook
     const catalogHooks = result.hooks.preToolUse.filter((h) =>
-      h.id.startsWith("catalog-"),
+      h.id === "catalog-command-guard",
     );
-    expect(catalogHooks.length).toBeGreaterThanOrEqual(1);
+    expect(catalogHooks).toHaveLength(1);
   });
 
-  it("9. v1 and v2 produce identical enforcement portion", async () => {
+  it("9. v1 returns empty hooks, v2 converts enforcement to catalog hooks", async () => {
     const harness = makeBaseHarness({
       enforcement: {
         preCommit: ["npm test"],
@@ -365,20 +365,14 @@ describe("enforcement + hooks combined", () => {
     const v1 = harnessToMergedConfig(harness);
     const v2 = await harnessToMergedConfigV2(harness);
 
-    // Enforcement hooks (harness- prefixed) should be identical in both
-    const v1EnforcementHooks = v1.hooks.preToolUse.filter((h) =>
-      h.id.startsWith("harness-"),
-    );
-    const v2EnforcementHooks = v2.hooks.preToolUse.filter((h) =>
-      h.id.startsWith("harness-"),
-    );
+    // v1 no longer generates inline enforcement hooks
+    expect(v1.hooks.preToolUse).toHaveLength(0);
 
-    expect(v2EnforcementHooks).toHaveLength(v1EnforcementHooks.length);
-    for (let i = 0; i < v1EnforcementHooks.length; i++) {
-      expect(v2EnforcementHooks[i].id).toBe(v1EnforcementHooks[i].id);
-      expect(v2EnforcementHooks[i].matcher).toBe(v1EnforcementHooks[i].matcher);
-      expect(v2EnforcementHooks[i].inline).toBe(v1EnforcementHooks[i].inline);
-    }
+    // v2 converts enforcement to catalog hooks
+    const v2CatalogHooks = v2.hooks.preToolUse.filter((h) =>
+      h.id.startsWith("catalog-"),
+    );
+    expect(v2CatalogHooks.length).toBeGreaterThanOrEqual(1);
   });
 });
 

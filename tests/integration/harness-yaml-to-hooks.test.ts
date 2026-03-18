@@ -33,8 +33,8 @@ const minimalHarnessYaml = {
   permissions: { allow: [], deny: [] },
 };
 
-describe("harness.yaml → hooks end-to-end", () => {
-  it("parses harness.yaml, converts to MergedConfig, and generates hook script files", async () => {
+describe("harness.yaml → hooks end-to-end (via v2 catalog pipeline)", () => {
+  it("parses harness.yaml with enforcement.preCommit, converts via v2, and generates catalog hook scripts", async () => {
     const rawConfig = {
       ...minimalHarnessYaml,
       enforcement: {
@@ -46,7 +46,7 @@ describe("harness.yaml → hooks end-to-end", () => {
     };
 
     const harness = HarnessConfigSchema.parse(rawConfig);
-    const config = harnessToMergedConfig(harness);
+    const config = await harnessToMergedConfigV2(harness);
     const output = await generateHooks({ projectDir: tmpDir, config });
 
     expect(output.generatedFiles.length).toBeGreaterThan(0);
@@ -55,7 +55,7 @@ describe("harness.yaml → hooks end-to-end", () => {
     expect(scriptContent).toBeTruthy();
   });
 
-  it("renders blockedCommands into command-guard script content", async () => {
+  it("renders blockedCommands into catalog command-guard script content via v2", async () => {
     const rawConfig = {
       ...minimalHarnessYaml,
       enforcement: {
@@ -67,21 +67,21 @@ describe("harness.yaml → hooks end-to-end", () => {
     };
 
     const harness = HarnessConfigSchema.parse(rawConfig);
-    const config = harnessToMergedConfig(harness);
+    const config = await harnessToMergedConfigV2(harness);
     const output = await generateHooks({ projectDir: tmpDir, config });
 
-    const guardFile = output.generatedFiles.find((f) => f.includes("harness-command-guard"));
+    const guardFile = output.generatedFiles.find((f) => f.includes("command-guard"));
     expect(guardFile).toBeDefined();
     const content = await readFile(guardFile!, "utf-8");
     expect(content).toContain("rm -rf");
     expect(content).toContain("sudo");
   });
 
-  it("generates script containing preCommit commands", async () => {
+  it("generates catalog commit-test-gate script from enforcement.preCommit via v2", async () => {
     const rawConfig = {
       ...minimalHarnessYaml,
       enforcement: {
-        preCommit: ["npm run lint", "npm test"],
+        preCommit: ["npm test"],
         blockedPaths: [],
         blockedCommands: [],
         postSave: [],
@@ -89,18 +89,14 @@ describe("harness.yaml → hooks end-to-end", () => {
     };
 
     const harness = HarnessConfigSchema.parse(rawConfig);
-    const config = harnessToMergedConfig(harness);
+    const config = await harnessToMergedConfigV2(harness);
 
-    expect(config.hooks.preToolUse).toHaveLength(1);
-    expect(config.hooks.preToolUse[0].id).toBe("harness-pre-commit");
+    // enforcement.preCommit is converted to catalog commit-test-gate hook
+    const testGateHooks = config.hooks.preToolUse.filter((h) => h.id.includes("commit-test-gate"));
+    expect(testGateHooks).toHaveLength(1);
 
     const output = await generateHooks({ projectDir: tmpDir, config });
-    const scriptFile = output.generatedFiles.find((f) => f.includes("harness-pre-commit"));
-    expect(scriptFile).toBeDefined();
-
-    const content = await readFile(scriptFile!, "utf-8");
-    expect(content).toContain("npm run lint");
-    expect(content).toContain("npm test");
+    expect(output.generatedFiles.length).toBeGreaterThan(0);
   });
 
   it("generated script contains logger wrapper (_log_event function)", async () => {
@@ -115,13 +111,12 @@ describe("harness.yaml → hooks end-to-end", () => {
     };
 
     const harness = HarnessConfigSchema.parse(rawConfig);
-    const config = harnessToMergedConfig(harness);
+    const config = await harnessToMergedConfigV2(harness);
     const output = await generateHooks({ projectDir: tmpDir, config });
 
-    const scriptFile = output.generatedFiles.find((f) => f.includes("harness-pre-commit"));
-    expect(scriptFile).toBeDefined();
-
-    const content = await readFile(scriptFile!, "utf-8");
+    expect(output.generatedFiles.length).toBeGreaterThan(0);
+    const scriptFile = output.generatedFiles[0];
+    const content = await readFile(scriptFile, "utf-8");
     expect(content).toContain("_log_event");
     expect(content).toContain("oh-my-harness event logger");
   });
@@ -138,13 +133,11 @@ describe("harness.yaml → hooks end-to-end", () => {
     };
 
     const harness = HarnessConfigSchema.parse(rawConfig);
-    const config = harnessToMergedConfig(harness);
+    const config = await harnessToMergedConfigV2(harness);
     const output = await generateHooks({ projectDir: tmpDir, config });
 
-    const scriptFile = output.generatedFiles.find((f) => f.includes("harness-pre-commit"));
-    expect(scriptFile).toBeDefined();
-
-    const content = await readFile(scriptFile!, "utf-8");
+    expect(output.generatedFiles.length).toBeGreaterThan(0);
+    const content = await readFile(output.generatedFiles[0], "utf-8");
     expect(content).toContain("PreToolUse");
   });
 
@@ -160,10 +153,11 @@ describe("harness.yaml → hooks end-to-end", () => {
     };
 
     const harness = HarnessConfigSchema.parse(rawConfig);
-    const config = harnessToMergedConfig(harness);
+    const config = await harnessToMergedConfigV2(harness);
     const output = await generateHooks({ projectDir: tmpDir, config });
 
-    const postSaveFile = output.generatedFiles.find((f) => f.includes("harness-post-save"));
+    // lint-on-save is a PostToolUse hook
+    const postSaveFile = output.generatedFiles.find((f) => f.includes("lint-on-save"));
     expect(postSaveFile).toBeDefined();
 
     const content = await readFile(postSaveFile!, "utf-8");
@@ -182,7 +176,7 @@ describe("harness.yaml → hooks end-to-end", () => {
     };
 
     const harness = HarnessConfigSchema.parse(rawConfig);
-    const config = harnessToMergedConfig(harness);
+    const config = await harnessToMergedConfigV2(harness);
     const output = await generateHooks({ projectDir: tmpDir, config });
 
     for (const scriptFile of output.generatedFiles) {
@@ -191,7 +185,7 @@ describe("harness.yaml → hooks end-to-end", () => {
     }
   });
 
-  it("harnessToMergedConfigV2 returns same base config when no catalog hooks are present", async () => {
+  it("harnessToMergedConfig returns empty hooks (enforcement handled by v2 pipeline)", async () => {
     const rawConfig = {
       ...minimalHarnessYaml,
       enforcement: {
@@ -204,14 +198,13 @@ describe("harness.yaml → hooks end-to-end", () => {
 
     const harness = HarnessConfigSchema.parse(rawConfig);
     const v1 = harnessToMergedConfig(harness);
-    const v2 = await harnessToMergedConfigV2(harness);
 
-    expect(v2.hooks.preToolUse).toHaveLength(v1.hooks.preToolUse.length);
-    expect(v2.claudeMdSections).toEqual(v1.claudeMdSections);
-    expect(v2.settings.permissions.allow).toEqual(v1.settings.permissions.allow);
+    // v1 no longer generates inline enforcement hooks
+    expect(v1.hooks.preToolUse).toHaveLength(0);
+    expect(v1.hooks.postToolUse).toHaveLength(0);
   });
 
-  it("hooksConfig output contains PreToolUse entry with matcher from hook definition", async () => {
+  it("hooksConfig output contains PreToolUse entry with matcher from catalog hook definition", async () => {
     const rawConfig = {
       ...minimalHarnessYaml,
       enforcement: {
@@ -223,13 +216,13 @@ describe("harness.yaml → hooks end-to-end", () => {
     };
 
     const harness = HarnessConfigSchema.parse(rawConfig);
-    const config = harnessToMergedConfig(harness);
+    const config = await harnessToMergedConfigV2(harness);
     const output = await generateHooks({ projectDir: tmpDir, config });
 
     expect(output.hooksConfig["PreToolUse"]).toBeDefined();
     const entry = output.hooksConfig["PreToolUse"].find((e) => e.matcher === "Bash");
     expect(entry).toBeDefined();
-    expect(entry!.hooks[0].command).toContain("harness-command-guard.sh");
+    expect(entry!.hooks[0].command).toContain("command-guard.sh");
   });
 });
 

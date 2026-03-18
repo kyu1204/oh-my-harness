@@ -176,7 +176,8 @@ async function initWithNL(
   const stackNames = harness.project.stacks.map((s) => `${s.name} (${s.framework})`).join(", ");
   console.log(`\nStacks: ${stackNames}`);
   console.log(`Rules: ${harness.rules.length}`);
-  console.log(`Pre-commit checks: ${harness.enforcement.preCommit.join(", ") || "none"}`);
+  const hookSummary = harness.hooks?.map((h) => h.block).join(", ") || "none";
+  console.log(`Hooks: ${hookSummary}`);
 
   if (!options.yes) {
     const { confirm } = await import("@inquirer/prompts");

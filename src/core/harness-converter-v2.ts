@@ -1,6 +1,6 @@
 import type { HarnessConfig } from "./harness-schema.js";
 import type { MergedConfig, HookDefinition } from "./preset-types.js";
-import { harnessToMergedConfig } from "./harness-converter.js";
+import { harnessToMergedConfig, mergeEnforcementAndHooks } from "./harness-converter.js";
 import type { CatalogRegistry } from "../catalog/registry.js";
 import { createDefaultRegistry } from "../catalog/registry.js";
 import { convertHookEntries } from "../catalog/converter.js";
@@ -14,18 +14,21 @@ export async function harnessToMergedConfigV2(
   registry?: CatalogRegistry,
   projectDir?: string,
 ): Promise<MergedConfigV2> {
-  // Start with v1 conversion (handles enforcement field)
+  // Start with base conversion (rules, variables, permissions — no inline enforcement scripts)
   const base = harnessToMergedConfig(harness);
 
-  // If no hooks or empty, return base config unchanged
-  if (!harness.hooks || harness.hooks.length === 0) {
+  // Merge enforcement-derived hooks with explicit hooks (dedup by block id)
+  const allHookEntries = mergeEnforcementAndHooks(harness);
+
+  // If no hook entries at all, return base config unchanged
+  if (allHookEntries.length === 0) {
     return { ...base };
   }
 
   // Resolve registry — use provided one or create the default
   const resolvedRegistry = registry ?? (await createDefaultRegistry());
 
-  const catalogResult = await convertHookEntries(harness.hooks, resolvedRegistry, projectDir ?? ".");
+  const catalogResult = await convertHookEntries(allHookEntries, resolvedRegistry, projectDir ?? ".");
 
   // If there are errors, return base config with catalogErrors attached
   if (catalogResult.errors.length > 0) {
@@ -33,8 +36,6 @@ export async function harnessToMergedConfigV2(
   }
 
   // Convert hooksConfig entries from catalog into HookDefinition format.
-  // Catalog hooks are appended after v1 hooks so v2 catalog takes precedence
-  // (last writer wins in Claude settings; appended = higher effective priority).
   const additionalPreToolUse: HookDefinition[] = [];
   const additionalPostToolUse: HookDefinition[] = [];
 

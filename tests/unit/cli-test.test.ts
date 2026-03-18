@@ -3,8 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import yaml from "js-yaml";
-// updated: generateBlockTestCases now receives registeredHooks
-// updated: block cases take priority over enforcement cases
+// updated: enforcement removed, only block-based test cases
 import { formatCategoryName, testCommand } from "../../src/cli/commands/test.js";
 
 describe("formatCategoryName", () => {
@@ -87,7 +86,7 @@ if [[ "$FILE_PATH" == *"package-lock.json"* ]]; then
 fi
 `;
     await fs.writeFile(
-      path.join(hooksDir, "lockfile-guard.sh"),
+      path.join(hooksDir, "catalog-lockfile-guard.sh"),
       scriptContent,
       { mode: 0o755 },
     );
@@ -97,7 +96,7 @@ fi
         PreToolUse: [
           {
             matcher: "Edit",
-            hooks: [{ type: "command", command: "bash .claude/hooks/lockfile-guard.sh" }],
+            hooks: [{ type: "command", command: "bash .claude/hooks/catalog-lockfile-guard.sh" }],
           },
         ],
       },
@@ -106,6 +105,16 @@ fi
       path.join(tmpDir, ".claude", "settings.json"),
       JSON.stringify(settings),
     );
+
+    // harness.yaml with lockfile-guard hook entry
+    const harnessYaml = yaml.dump({
+      version: "1.0",
+      project: { name: "test-project", stacks: [] },
+      rules: [],
+      enforcement: {},
+      hooks: [{ block: "lockfile-guard", params: {} }],
+    });
+    await fs.writeFile(path.join(tmpDir, "harness.yaml"), harnessYaml);
 
     const result = await testCommand({ projectDir: tmpDir });
 
@@ -143,8 +152,7 @@ fi
     await fs.mkdir(hooksDir, { recursive: true });
     await fs.mkdir(stateDir, { recursive: true });
 
-    // tdd-guard script: blocks src/*.ts when no edit-history (matches "block" expectation for first case),
-    // allows .md files and test files (matches "allow" expectation for those cases)
+    // tdd-guard script
     const tddScript = `#!/bin/bash
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | grep -o '"file_path":"[^"]*"' | cut -d'"' -f4)

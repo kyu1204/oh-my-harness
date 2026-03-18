@@ -145,7 +145,7 @@ describe("buildHarnessGenerationPrompt", () => {
     expect(prompt).toContain("version");
     expect(prompt).toContain("project");
     expect(prompt).toContain("rules");
-    expect(prompt).toContain("enforcement");
+    expect(prompt).toContain("hooks");
     expect(prompt).toContain("permissions");
   });
 

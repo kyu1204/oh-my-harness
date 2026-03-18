@@ -55,7 +55,7 @@ export function buildHarnessGenerationPrompt(description: string, catalogBlocks?
   const factsSection = projectFacts ? buildProjectFactsSection(projectFacts) : "";
 
   const catalogSection = catalogBlocks && catalogBlocks.length > 0
-    ? `\nAvailable building blocks (MUST use in the hooks field — prefer hooks over enforcement):
+    ? `\nAvailable building blocks (MUST use in the hooks field):
 ${catalogBlocks
   .map((b) => {
     const paramDesc =
@@ -66,7 +66,7 @@ ${catalogBlocks
   })
   .join("\n")}
 
-IMPORTANT: Match the user's description to the most relevant blocks above. Use hooks for ALL enforcement that has a matching block. Only use enforcement as a fallback for commands with no matching block.
+IMPORTANT: Match the user's description to the most relevant blocks above. Use hooks for ALL needs.
 `
     : "";
 
@@ -76,9 +76,7 @@ The harness.yaml schema has these fields:
 - version: must be "1.0"
 - project: object with name (optional string), description (optional string), stacks (array of {name, framework, language, packageManager?, testRunner?, linter?})
 - rules: array of {id, title, content (markdown), priority (number, lower = higher in file)}
-- enforcement: object with preCommit (array of full executable shell commands like "pnpm test", "npx eslint", "npx tsc --noEmit"), blockedPaths (array of glob patterns), blockedCommands (array of dangerous commands), postSave (array of {pattern, command})
-- hooks: array of {block, params} — MUST use catalog building blocks here. This is the primary mechanism for enforcement. Match user requirements to available blocks.
-- enforcement: fallback for commands with no matching block. Only use enforcement.preCommit when no catalog block covers the use case.
+- hooks: array of {block, params} — MUST use catalog building blocks here. This is the primary mechanism for all guards and automation (pre-commit checks, path guards, command guards, lint-on-save, etc.).
 - permissions: object with allow (array of permission strings like "Bash(npm test*)") and deny (array)
 ${catalogSection}${factsSection}
 Example 1 - Next.js app:

@@ -12,7 +12,7 @@ import { loadAndMergePresets, writeHarnessState } from "../commands/init.js";
 import { mergePresets } from "../../core/config-merger.js";
 import { generate } from "../../core/generator.js";
 import { generateHarnessConfig } from "../../nl/parse-intent.js";
-import { harnessToMergedConfig } from "../../core/harness-converter.js";
+import { mergeEnforcementAndHooks } from "../../core/harness-converter.js";
 import type { HarnessConfig } from "../../core/harness-schema.js";
 import { HarnessConfigSchema } from "../../core/harness-schema.js";
 import { detectProject } from "../../detector/project-detector.js";
@@ -63,29 +63,16 @@ export function formatConfigSummary(config: HarnessConfig): string {
     }
   }
 
-  // Enforcement
-  const hasEnforcement =
-    config.enforcement.preCommit.length > 0 ||
-    config.enforcement.blockedPaths.length > 0 ||
-    config.enforcement.blockedCommands.length > 0 ||
-    config.enforcement.postSave.length > 0;
-
-  if (hasEnforcement) {
+  // Hooks (merged from enforcement + explicit hooks)
+  const allHooks = mergeEnforcementAndHooks(config);
+  if (allHooks.length > 0) {
     lines.push("");
-    lines.push("  Enforcement:");
-    if (config.enforcement.preCommit.length > 0) {
-      lines.push(`    Pre-commit: ${config.enforcement.preCommit.join(", ")}`);
-    }
-    if (config.enforcement.blockedPaths.length > 0) {
-      lines.push(`    Blocked paths: ${config.enforcement.blockedPaths.join(", ")}`);
-    }
-    if (config.enforcement.blockedCommands.length > 0) {
-      lines.push(`    Blocked commands: ${config.enforcement.blockedCommands.join(", ")}`);
-    }
-    if (config.enforcement.postSave.length > 0) {
-      for (const ps of config.enforcement.postSave) {
-        lines.push(`    Post-save: ${ps.command} on ${ps.pattern}`);
-      }
+    lines.push("  Hooks:");
+    for (const hook of allHooks) {
+      const paramSummary = Object.entries(hook.params)
+        .map(([k, v]) => `${k}=${Array.isArray(v) ? (v as string[]).join(",") : String(v)}`)
+        .join(", ");
+      lines.push(`    ${hook.block}${paramSummary ? ` (${paramSummary})` : ""}`);
     }
   }
 
@@ -405,8 +392,9 @@ export async function runInitTUI(options?: {
 
   try {
     if (harnessConfig) {
-      // NL or import mode: convert harness config to merged config
-      const config = harnessToMergedConfig(harnessConfig);
+      // NL or import mode: convert harness config to merged config via v2 (catalog pipeline)
+      const { harnessToMergedConfigV2 } = await import("../../core/harness-converter-v2.js");
+      const config = await harnessToMergedConfigV2(harnessConfig);
       const result = await generate({ projectDir, config });
       generatedFiles.push(...result.files);
 
@@ -454,19 +442,14 @@ export async function runInitTUI(options?: {
   summaryLines.push("");
 
   if (harnessConfig) {
-    summaryLines.push("Active enforcement:");
-    if (harnessConfig.enforcement.preCommit.length > 0) {
-      summaryLines.push(`  \u2022 Pre-commit: ${harnessConfig.enforcement.preCommit.join(", ")}`);
+    const activeHooks = mergeEnforcementAndHooks(harnessConfig);
+    if (activeHooks.length > 0) {
+      summaryLines.push("Active hooks:");
+      for (const hook of activeHooks) {
+        summaryLines.push(`  \u2022 ${hook.block}`);
+      }
+      summaryLines.push("");
     }
-    if (harnessConfig.enforcement.blockedPaths.length > 0) {
-      summaryLines.push(
-        `  \u2022 Protected paths: ${harnessConfig.enforcement.blockedPaths.join(", ")}`,
-      );
-    }
-    if (harnessConfig.enforcement.blockedCommands.length > 0) {
-      summaryLines.push("  \u2022 Dangerous commands blocked");
-    }
-    summaryLines.push("");
   }
 
   summaryLines.push("Next steps:");

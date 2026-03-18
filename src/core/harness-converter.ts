@@ -1,6 +1,65 @@
 import type { HarnessConfig } from "./harness-schema.js";
-import type { MergedConfig, ClaudeMdSection, HookDefinition, Variables } from "./preset-types.js";
+import type { MergedConfig, ClaudeMdSection, Variables } from "./preset-types.js";
+import type { HookEntry } from "../catalog/types.js";
 
+/**
+ * Converts legacy enforcement fields into catalog-based HookEntry[].
+ * This allows old harness.yaml configs with enforcement to be processed
+ * through the unified catalog pipeline.
+ */
+export function convertEnforcementToHooks(enforcement: HarnessConfig["enforcement"]): HookEntry[] {
+  const hooks: HookEntry[] = [];
+
+  // preCommit → commit-test-gate or commit-typecheck-gate
+  for (const cmd of enforcement.preCommit) {
+    if (/\btsc\b/.test(cmd)) {
+      hooks.push({ block: "commit-typecheck-gate", params: { typecheckCommand: cmd } });
+    } else {
+      hooks.push({ block: "commit-test-gate", params: { testCommand: cmd } });
+    }
+  }
+
+  // blockedPaths → path-guard
+  if (enforcement.blockedPaths.length > 0) {
+    hooks.push({ block: "path-guard", params: { blockedPaths: enforcement.blockedPaths } });
+  }
+
+  // blockedCommands → command-guard
+  if (enforcement.blockedCommands.length > 0) {
+    hooks.push({ block: "command-guard", params: { patterns: enforcement.blockedCommands } });
+  }
+
+  // postSave → lint-on-save (each entry)
+  for (const ps of enforcement.postSave) {
+    hooks.push({ block: "lint-on-save", params: { filePattern: ps.pattern, command: ps.command } });
+  }
+
+  return hooks;
+}
+
+/**
+ * Merges enforcement-derived hooks with explicit harness.hooks,
+ * deduplicating by block id (explicit hooks take priority).
+ */
+export function mergeEnforcementAndHooks(harness: HarnessConfig): HookEntry[] {
+  const enforcementHooks = convertEnforcementToHooks(harness.enforcement);
+  const explicitHooks = harness.hooks ?? [];
+
+  // Explicit hooks take priority — only keep enforcement hooks for blocks
+  // not already covered by explicit hooks
+  const explicitBlockIds = new Set(explicitHooks.map((h) => h.block));
+  const uniqueEnforcementHooks = enforcementHooks.filter(
+    (h) => !explicitBlockIds.has(h.block),
+  );
+
+  return [...uniqueEnforcementHooks, ...explicitHooks];
+}
+
+/**
+ * Converts HarnessConfig to MergedConfig.
+ * No longer generates inline enforcement scripts — enforcement is converted
+ * to catalog hook entries and processed through the v2 catalog pipeline.
+ */
 export function harnessToMergedConfig(harness: HarnessConfig): MergedConfig {
   // Build variables from first stack
   const variables: Variables = {};
@@ -23,122 +82,13 @@ export function harnessToMergedConfig(harness: HarnessConfig): MergedConfig {
     }))
     .sort((a, b) => (a.priority ?? 50) - (b.priority ?? 50));
 
-  // Build hooks
-  const preToolUse: HookDefinition[] = [];
-  const postToolUse: HookDefinition[] = [];
-
-  // preCommit hook
-  if (harness.enforcement.preCommit.length > 0) {
-    const commands = harness.enforcement.preCommit
-      .map((cmd) => {
-        const safeCmdJson = cmd.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-        return `    echo "oh-my-harness: Running ${cmd} before commit..." >&2\n    if ! ${cmd} >&2 2>&1; then\n      echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: ${safeCmdJson} failed, commit blocked\\"}"\n      exit 0\n    fi`;
-      })
-      .join("\n");
-
-    preToolUse.push({
-      id: "harness-pre-commit",
-      matcher: "Bash",
-      description: "Runs configured checks before git commit",
-      inline: `#!/bin/bash
-set -euo pipefail
-INPUT=$(cat)
-COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
-if echo "$COMMAND" | grep -qE "git commit"; then
-${commands}
-fi
-exit 0
-`,
-    });
-  }
-
-  // file-guard hook from blockedPaths
-  if (harness.enforcement.blockedPaths.length > 0) {
-    const patterns = harness.enforcement.blockedPaths
-      .map((p) => `"${p}"`)
-      .join(" ");
-
-    preToolUse.push({
-      id: "harness-file-guard",
-      matcher: "Edit|Write",
-      description: "Prevents writing to blocked paths",
-      inline: `#!/bin/bash
-set -euo pipefail
-INPUT=$(cat)
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null)
-[[ -z "$FILE_PATH" ]] && exit 0
-BLOCKED=(${patterns})
-for pattern in "\${BLOCKED[@]}"; do
-  if [[ "$pattern" == */ ]]; then
-    if [[ "$FILE_PATH" == *"/$pattern"* ]] || [[ "$FILE_PATH" == "$pattern"* ]]; then
-      echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: protected path $pattern\\"}"
-      exit 0
-    fi
-  elif [[ "$pattern" == \\** ]]; then
-    suffix="\${pattern#\\*}"
-    if [[ "$FILE_PATH" == *"\$suffix" ]]; then
-      echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: protected path $pattern\\"}"
-      exit 0
-    fi
-  fi
-done
-exit 0
-`,
-    });
-  }
-
-  // command-guard hook from blockedCommands
-  if (harness.enforcement.blockedCommands.length > 0) {
-    const patterns = harness.enforcement.blockedCommands
-      .map((c) => `"${c}"`)
-      .join(" ");
-
-    preToolUse.push({
-      id: "harness-command-guard",
-      matcher: "Bash",
-      description: "Blocks dangerous shell commands",
-      inline: `#!/bin/bash
-set -euo pipefail
-INPUT=$(cat)
-COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
-DANGEROUS_PATTERNS=(${patterns})
-for pattern in "\${DANGEROUS_PATTERNS[@]}"; do
-  if echo "$COMMAND" | grep -qF "$pattern"; then
-    echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: dangerous command blocked\\"}"
-    exit 0
-  fi
-done
-exit 0
-`,
-    });
-  }
-
-  // postSave hooks
-  for (let i = 0; i < harness.enforcement.postSave.length; i++) {
-    const ps = harness.enforcement.postSave[i];
-    postToolUse.push({
-      id: `harness-post-save-${i}`,
-      matcher: "Edit|Write",
-      description: `Runs ${ps.command} on ${ps.pattern} files after save`,
-      inline: `#!/bin/bash
-INPUT=$(cat)
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null)
-[[ -z "$FILE_PATH" ]] && exit 0
-if [[ "$FILE_PATH" == ${ps.pattern} ]]; then
-  ${ps.command} "$FILE_PATH" 2>/dev/null || true
-fi
-exit 0
-`,
-    });
-  }
-
   return {
     presets: ["harness"],
     variables,
     claudeMdSections,
     hooks: {
-      preToolUse,
-      postToolUse,
+      preToolUse: [],
+      postToolUse: [],
     },
     settings: {
       permissions: {

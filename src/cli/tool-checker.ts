@@ -82,25 +82,49 @@ function extractBinary(command: string): ExtractResult | undefined {
   return { name: parts[0], lookupCommand: parts[0] };
 }
 
+/**
+ * Extracts tool references from a HarnessConfig.
+ * Collects commands from:
+ * 1. enforcement.preCommit and enforcement.postSave (legacy)
+ * 2. hooks[] params (commit-test-gate, commit-typecheck-gate, lint-on-save)
+ */
 export function extractToolNames(config: HarnessConfig): ToolRef[] {
   const seen = new Set<string>();
   const tools: ToolRef[] = [];
 
-  for (const cmd of config.enforcement.preCommit) {
+  function addCommand(cmd: string, source: string): void {
     const result = extractBinary(cmd);
-    if (!result) continue;
+    if (!result) return;
     if (!seen.has(result.name)) {
       seen.add(result.name);
-      tools.push({ name: result.name, lookupCommand: result.lookupCommand, source: "pre-commit" });
+      tools.push({ name: result.name, lookupCommand: result.lookupCommand, source });
     }
   }
 
+  // Extract from enforcement fields (legacy)
+  for (const cmd of config.enforcement.preCommit) {
+    addCommand(cmd, "pre-commit");
+  }
+
   for (const ps of config.enforcement.postSave) {
-    const result = extractBinary(ps.command);
-    if (!result) continue;
-    if (!seen.has(result.name)) {
-      seen.add(result.name);
-      tools.push({ name: result.name, lookupCommand: result.lookupCommand, source: "post-save hook" });
+    addCommand(ps.command, "post-save hook");
+  }
+
+  // Extract from hooks[] params
+  const hookEntries = config.hooks ?? [];
+  for (const entry of hookEntries) {
+    const params = entry.params as Record<string, unknown>;
+    if (entry.block === "commit-test-gate" && typeof params.testCommand === "string") {
+      addCommand(params.testCommand, "commit-test-gate hook");
+    }
+    if (entry.block === "commit-typecheck-gate" && typeof params.typecheckCommand === "string") {
+      addCommand(params.typecheckCommand, "commit-typecheck-gate hook");
+    }
+    if (entry.block === "lint-on-save" && typeof params.command === "string") {
+      addCommand(params.command, "lint-on-save hook");
+    }
+    if (entry.block === "format-on-save" && typeof params.command === "string") {
+      addCommand(params.command, "format-on-save hook");
     }
   }
 

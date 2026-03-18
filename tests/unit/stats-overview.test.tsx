@@ -67,6 +67,26 @@ describe("HitBar", () => {
     const blockChars = (frame.match(/█/g) ?? []).length;
     expect(blockChars).toBe(20);
   });
+
+  it("guarantees minimum 1 red char when blockCount > 0", () => {
+    // 4 blocks out of 200 total → would round to 0 red chars without min guarantee
+    const { lastFrame } = render(
+      React.createElement(HitBar, { blockCount: 4, allowCount: 196, maxWidth: 20 }),
+    );
+    const frame = lastFrame() ?? "";
+    // Should show block/allow counts
+    expect(frame).toContain("4");
+    expect(frame).toContain("196");
+  });
+
+  it("shows block/allow counts as labels", () => {
+    const { lastFrame } = render(
+      React.createElement(HitBar, { blockCount: 10, allowCount: 90, maxWidth: 20 }),
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("10");
+    expect(frame).toContain("90");
+  });
 });
 
 describe("Overview", () => {

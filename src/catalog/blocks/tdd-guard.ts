@@ -73,7 +73,7 @@ if [[ ! -f "\$HISTORY_FILE" ]]; then
 fi
 
 # edit-history에서 테스트 파일 검색
-if jq -e --arg b "\$BASENAME" '.edits[] | select(contains($b + ".test.") or contains($b + ".spec."))' "\$HISTORY_FILE" >/dev/null 2>&1; then
+if jq -e --arg b "\$BASENAME" '.edits[] | select(contains($b) and (contains(".test.") or contains(".spec.") or contains("test_")))' "\$HISTORY_FILE" >/dev/null 2>&1; then
   # 테스트 먼저 수정됨 → 소스 기록 + 통과
   UPDATED=$(jq --arg f "\$FILE_PATH" '.edits += [$f] | .edits |= unique' "\$HISTORY_FILE" 2>/dev/null) || true
   if [[ -n "\$UPDATED" ]]; then

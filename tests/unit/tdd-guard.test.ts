@@ -28,6 +28,12 @@ describe("tddGuard block", () => {
     expect(tddGuard.template).toContain("INPUT=$(cat)");
   });
 
+  it("template matches test files by basename substring (e.g. node → node-detector.test.ts)", () => {
+    // The edit-history search should match test files that contain the basename
+    // not just exact basename.test. pattern
+    expect(tddGuard.template).toContain("contains($b)");
+  });
+
   it("template uses [[ =~ ]] instead of echo|grep for set -e pipefail safety", () => {
     // echo|grep with set -euo pipefail causes early exit on grep failure
     expect(tddGuard.template).not.toContain("echo | grep");

@@ -50,6 +50,41 @@ export const nodeDetector: Detector = {
       return {};
     }
 
+    // Check if this is a real JS/TS project or just tooling (husky, linter wrappers)
+    const pkgCheck = await readJsonFile(packageJsonPath);
+    const deps = pkgCheck && typeof pkgCheck.dependencies === "object" && pkgCheck.dependencies !== null
+      ? Object.keys(pkgCheck.dependencies as Record<string, unknown>)
+      : [];
+    const devDeps = pkgCheck && typeof pkgCheck.devDependencies === "object" && pkgCheck.devDependencies !== null
+      ? Object.keys(pkgCheck.devDependencies as Record<string, unknown>)
+      : [];
+    const pkgScriptsRaw = pkgCheck && typeof pkgCheck.scripts === "object" && pkgCheck.scripts !== null
+      ? Object.values(pkgCheck.scripts as Record<string, string>).join(" ")
+      : "";
+    const jsDevIndicators = /typescript|react|vue|angular|next|vite|webpack|eslint|jest|vitest|mocha|babel|svelte|nuxt/;
+    const jsScriptIndicators = /vitest|jest|mocha|tsc|eslint|webpack|vite|next|react-scripts/;
+    // Also check for JS ecosystem config files
+    const jsConfigFiles = [
+      "tsconfig.json", ".eslintrc", ".eslintrc.js", ".eslintrc.json",
+      "eslint.config.js", "eslint.config.ts", "eslint.config.mjs",
+      "biome.json", "next.config.js", "next.config.ts", "next.config.mjs",
+      "vite.config.ts", "vite.config.js", "webpack.config.js",
+    ];
+    let hasJsConfigFile = false;
+    for (const cf of jsConfigFiles) {
+      if (await fileExists(path.join(projectDir, cf))) {
+        hasJsConfigFile = true;
+        break;
+      }
+    }
+    const hasJsIndicator = deps.length > 0
+      || devDeps.some((d) => jsDevIndicators.test(d))
+      || jsScriptIndicators.test(pkgScriptsRaw)
+      || hasJsConfigFile;
+    if (!hasJsIndicator) {
+      return {};
+    }
+
     const detectedFiles: string[] = ["package.json"];
     const languages: string[] = [];
     const frameworks: string[] = [];

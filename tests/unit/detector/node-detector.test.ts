@@ -108,8 +108,36 @@ describe("nodeDetector", () => {
     expect(result.testCommands).toEqual(["npx mocha"]);
   });
 
+  it("skips tooling-only package.json (no JS dependencies)", async () => {
+    // Django project with package.json only for husky/pylint
+    await writeFile(tmpDir, "package.json", JSON.stringify({
+      name: "my-django-project",
+      devDependencies: { husky: "^7.0.4" },
+      scripts: { prepare: "husky install", pylint: "pylint --reports=y *" },
+    }));
+    await writeFile(tmpDir, "package-lock.json", "{}");
+
+    const result = await nodeDetector.detect(tmpDir);
+
+    expect(result.languages ?? []).not.toContain("javascript");
+    expect(result.languages ?? []).not.toContain("typescript");
+  });
+
+  it("detects JS project when dependencies have runtime packages", async () => {
+    await writeFile(tmpDir, "package.json", JSON.stringify({
+      name: "real-js-app",
+      dependencies: { express: "^4.0.0" },
+      scripts: { test: "jest" },
+    }));
+    await writeFile(tmpDir, "package-lock.json", "{}");
+
+    const result = await nodeDetector.detect(tmpDir);
+
+    expect(result.languages).toContain("javascript");
+  });
+
   it("does not add test command when scripts.test is missing", async () => {
-    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test" }));
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", dependencies: { express: "^4.0.0" } }));
     await writeFile(tmpDir, "package-lock.json", "{}");
 
     const result = await nodeDetector.detect(tmpDir);
@@ -118,7 +146,7 @@ describe("nodeDetector", () => {
   });
 
   it("ignores whitespace-only scripts.test", async () => {
-    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", scripts: { test: "   " } }));
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", dependencies: { express: "^4.0.0" }, scripts: { test: "   " } }));
     await writeFile(tmpDir, "package-lock.json", "{}");
 
     const result = await nodeDetector.detect(tmpDir);
@@ -127,7 +155,7 @@ describe("nodeDetector", () => {
   });
 
   it("ignores non-string scripts.test", async () => {
-    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", scripts: { test: 123 } }));
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", dependencies: { express: "^4.0.0" }, scripts: { test: 123 } }));
     await writeFile(tmpDir, "package-lock.json", "{}");
 
     const result = await nodeDetector.detect(tmpDir);
@@ -136,7 +164,7 @@ describe("nodeDetector", () => {
   });
 
   it("detects eslint from .eslintrc file", async () => {
-    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test" }));
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", dependencies: { express: "^4.0.0" } }));
     await writeFile(tmpDir, "pnpm-lock.yaml", "");
     await writeFile(tmpDir, ".eslintrc", "{}");
 
@@ -147,7 +175,7 @@ describe("nodeDetector", () => {
   });
 
   it("detects eslint from eslint.config.js file", async () => {
-    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test" }));
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", dependencies: { express: "^4.0.0" } }));
     await writeFile(tmpDir, "pnpm-lock.yaml", "");
     await writeFile(tmpDir, "eslint.config.js", "export default [];");
 
@@ -158,7 +186,7 @@ describe("nodeDetector", () => {
   });
 
   it("detects biome from biome.json", async () => {
-    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test" }));
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", dependencies: { express: "^4.0.0" } }));
     await writeFile(tmpDir, "pnpm-lock.yaml", "");
     await writeFile(tmpDir, "biome.json", "{}");
 
@@ -169,7 +197,7 @@ describe("nodeDetector", () => {
   });
 
   it("detects TypeScript from tsconfig.json", async () => {
-    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test" }));
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", dependencies: { express: "^4.0.0" } }));
     await writeFile(tmpDir, "pnpm-lock.yaml", "");
     await writeFile(tmpDir, "tsconfig.json", "{}");
 
@@ -181,7 +209,7 @@ describe("nodeDetector", () => {
   });
 
   it("detects javascript when no tsconfig.json", async () => {
-    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test" }));
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", dependencies: { express: "^4.0.0" } }));
     await writeFile(tmpDir, "pnpm-lock.yaml", "");
 
     const result = await nodeDetector.detect(tmpDir);
@@ -191,7 +219,7 @@ describe("nodeDetector", () => {
   });
 
   it("detects Next.js from next.config.js", async () => {
-    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test" }));
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", dependencies: { express: "^4.0.0" } }));
     await writeFile(tmpDir, "pnpm-lock.yaml", "");
     await writeFile(tmpDir, "next.config.js", "export default {};");
 
@@ -203,7 +231,7 @@ describe("nodeDetector", () => {
   });
 
   it("detects Next.js from next.config.ts", async () => {
-    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test" }));
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", dependencies: { express: "^4.0.0" } }));
     await writeFile(tmpDir, "pnpm-lock.yaml", "");
     await writeFile(tmpDir, "next.config.ts", "export default {};");
 
@@ -215,7 +243,7 @@ describe("nodeDetector", () => {
   });
 
   it("includes standard blocked paths for node projects", async () => {
-    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test" }));
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", dependencies: { express: "^4.0.0" } }));
     await writeFile(tmpDir, "pnpm-lock.yaml", "");
 
     const result = await nodeDetector.detect(tmpDir);
@@ -225,7 +253,7 @@ describe("nodeDetector", () => {
   });
 
   it("includes .next/ in blocked paths for Next.js projects", async () => {
-    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test" }));
+    await writeFile(tmpDir, "package.json", JSON.stringify({ name: "test", dependencies: { express: "^4.0.0" } }));
     await writeFile(tmpDir, "pnpm-lock.yaml", "");
     await writeFile(tmpDir, "next.config.js", "export default {};");
 

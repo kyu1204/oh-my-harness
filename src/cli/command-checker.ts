@@ -12,11 +12,15 @@ export interface CommandCheckResult {
 
 // 명령어에서 바이너리 추출 (첫 토큰, 래퍼 처리)
 export function extractExecutable(command: string): string {
-  const parts = command.trim().split(/\s+/);
+  let parts = command.trim().split(/\s+/);
+  // Skip environment variable prefixes (KEY=VALUE)
+  while (parts.length > 0 && /^[A-Za-z_][A-Za-z0-9_]*=/.test(parts[0])) {
+    parts = parts.slice(1);
+  }
   // npm run X → npm
   // npx X → npx
   // bash script.sh → bash
-  return parts[0];
+  return parts[0] ?? "";
 }
 
 // 명령어 실행 가능 여부 확인

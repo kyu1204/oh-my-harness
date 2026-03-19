@@ -26,6 +26,14 @@ describe("extractExecutable", () => {
   it("handles leading whitespace", () => {
     expect(extractExecutable("  bash script.sh")).toBe("bash");
   });
+
+  it("skips env var prefixes (KEY=VALUE)", () => {
+    expect(extractExecutable("SYSTEM_ENV=local python manage.py test")).toBe("python");
+  });
+
+  it("skips multiple env var prefixes", () => {
+    expect(extractExecutable("FOO=bar BAZ=qux ruff check .")).toBe("ruff");
+  });
 });
 
 describe("checkCommandExecutable", () => {

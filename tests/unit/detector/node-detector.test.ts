@@ -108,6 +108,32 @@ describe("nodeDetector", () => {
     expect(result.testCommands).toEqual(["npx mocha"]);
   });
 
+  it("detects monorepo root with workspaces field", async () => {
+    await writeFile(tmpDir, "package.json", JSON.stringify({
+      name: "my-monorepo",
+      private: true,
+      workspaces: ["packages/*"],
+    }));
+    await writeFile(tmpDir, "package-lock.json", "{}");
+
+    const result = await nodeDetector.detect(tmpDir);
+
+    expect(result.languages).toBeDefined();
+    expect((result.languages ?? []).length).toBeGreaterThan(0);
+  });
+
+  it("detects project with packageManager field", async () => {
+    await writeFile(tmpDir, "package.json", JSON.stringify({
+      name: "my-project",
+      packageManager: "pnpm@8.0.0",
+    }));
+    await writeFile(tmpDir, "pnpm-lock.yaml", "");
+
+    const result = await nodeDetector.detect(tmpDir);
+
+    expect(result.packageManagers).toContain("pnpm");
+  });
+
   it("skips tooling-only package.json (no JS dependencies)", async () => {
     // Django project with package.json only for husky/pylint
     await writeFile(tmpDir, "package.json", JSON.stringify({

@@ -77,10 +77,14 @@ export const nodeDetector: Detector = {
         break;
       }
     }
+    const hasWorkspaces = pkgCheck && (Array.isArray(pkgCheck.workspaces) || typeof pkgCheck.workspaces === "object");
+    const hasPackageManager = pkgCheck && typeof pkgCheck.packageManager === "string";
     const hasJsIndicator = deps.length > 0
       || devDeps.some((d) => jsDevIndicators.test(d))
       || jsScriptIndicators.test(pkgScriptsRaw)
-      || hasJsConfigFile;
+      || hasJsConfigFile
+      || hasWorkspaces
+      || hasPackageManager;
     if (!hasJsIndicator) {
       return {};
     }

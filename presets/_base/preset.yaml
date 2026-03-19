@@ -67,6 +67,14 @@ hooks:
           fi
         done
         exit 0
+    - id: "base-no-verify-guard"
+      matcher: "Bash"
+      description: "Blocks git hook bypass via --no-verify flags (uses block-no-verify)"
+      inline: |
+        #!/bin/bash
+        set -euo pipefail
+        INPUT=$(cat)
+        echo "$INPUT" | npx --yes block-no-verify@1.1.2
     - id: "base-test-before-commit"
       matcher: "Bash"
       description: "Ensures tests pass before git commit"

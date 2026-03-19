@@ -11,12 +11,14 @@ import { formatOnSave } from "./format-on-save.js";
 import { autoPr } from "./auto-pr.js";
 import { secretFileGuard } from "./secret-file-guard.js";
 import { tddGuard } from "./tdd-guard.js";
+import { noVerifyGuard } from "./no-verify-guard.js";
 
 export const builtinBlocks: BuildingBlock[] = [
   branchGuard,
   commitTestGate,
   commitTypecheckGate,
   commandGuard,
+  noVerifyGuard,
   pathGuard,
   lockfileGuard,
   lintOnSave,

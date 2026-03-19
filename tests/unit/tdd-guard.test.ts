@@ -28,6 +28,12 @@ describe("tddGuard block", () => {
     expect(tddGuard.template).toContain("INPUT=$(cat)");
   });
 
+  it("template uses [[ =~ ]] instead of echo|grep for set -e pipefail safety", () => {
+    // echo|grep with set -euo pipefail causes early exit on grep failure
+    expect(tddGuard.template).not.toContain("echo | grep");
+    expect(tddGuard.template).toContain("=~");
+  });
+
   it("template contains edit-history logic", () => {
     expect(tddGuard.template).toContain("edit-history");
   });

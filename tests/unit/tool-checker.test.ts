@@ -35,6 +35,28 @@ describe("extractToolNames", () => {
     expect(names.find((n) => n.name === "npx")).toBeUndefined();
   });
 
+  it("skips env var prefixes (KEY=VALUE) and extracts actual binary", () => {
+    const config = makeConfig({
+      hooks: [
+        { block: "commit-test-gate", params: { testCommand: "SYSTEM_ENV=local RUN_TYPE=unittest python manage.py test" } },
+      ],
+    });
+    const names = extractToolNames(config);
+    expect(names.find((n) => n.name === "SYSTEM_ENV=local")).toBeUndefined();
+    expect(names).toContainEqual(expect.objectContaining({ name: "python" }));
+  });
+
+  it("skips multiple env var prefixes", () => {
+    const config = makeConfig({
+      hooks: [
+        { block: "commit-test-gate", params: { testCommand: "FOO=bar BAZ=qux ruff check ." } },
+      ],
+    });
+    const names = extractToolNames(config);
+    expect(names.find((n) => n.name?.includes("="))).toBeUndefined();
+    expect(names).toContainEqual(expect.objectContaining({ name: "ruff" }));
+  });
+
   it("extracts tools from enforcement preCommit (backward compat)", () => {
     const config = makeConfig({
       enforcement: {

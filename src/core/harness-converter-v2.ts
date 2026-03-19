@@ -30,12 +30,8 @@ export async function harnessToMergedConfigV2(
 
   const catalogResult = await convertHookEntries(allHookEntries, resolvedRegistry, projectDir ?? ".");
 
-  // If there are errors, return base config with catalogErrors attached
-  if (catalogResult.errors.length > 0) {
-    return { ...base, catalogErrors: catalogResult.errors };
-  }
-
   // Convert hooksConfig entries from catalog into HookDefinition format.
+  // Errors are reported as warnings but don't block valid hooks.
   const additionalPreToolUse: HookDefinition[] = [];
   const additionalPostToolUse: HookDefinition[] = [];
 
@@ -65,5 +61,6 @@ export async function harnessToMergedConfigV2(
       preToolUse: [...base.hooks.preToolUse, ...additionalPreToolUse],
       postToolUse: [...base.hooks.postToolUse, ...additionalPostToolUse],
     },
+    ...(catalogResult.errors.length > 0 ? { catalogErrors: catalogResult.errors } : {}),
   };
 }

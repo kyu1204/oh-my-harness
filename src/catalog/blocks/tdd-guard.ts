@@ -40,7 +40,12 @@ STATE_DIR=".claude/hooks/.state"
 HISTORY_FILE="\$STATE_DIR/edit-history.json"
 mkdir -p "\$STATE_DIR" 2>/dev/null || true
 
-if echo "\$FILE_PATH" | grep -qE '{{testPattern}}'; then
+TEST_RE='{{{testPattern}}}'
+SRC_RE='{{{srcPattern}}}'
+# Normalize double backslashes to single for [[ =~ ]] compatibility
+TEST_RE="\${TEST_RE//\\\\\\\\/\\\\}"
+SRC_RE="\${SRC_RE//\\\\\\\\/\\\\}"
+if [[ "\$FILE_PATH" =~ \$TEST_RE ]]; then
   # 테스트 파일 수정 → 기록 + 통과
   if [[ ! -f "\$HISTORY_FILE" ]]; then
     echo '{"edits":[]}' > "\$HISTORY_FILE"
@@ -52,13 +57,13 @@ if echo "\$FILE_PATH" | grep -qE '{{testPattern}}'; then
   exit 0
 fi
 
-# 소스 파일 (.ts/.tsx/.js/.jsx) 이 아니면 통과
-if ! echo "\$FILE_PATH" | grep -qE '{{srcPattern}}'; then
+# 소스 파일이 아니면 통과
+if [[ ! "\$FILE_PATH" =~ \$SRC_RE ]]; then
   exit 0
 fi
 
-# 대응 테스트 파일 확인
-BASENAME=$(basename "\$FILE_PATH" | sed -E 's/\\.(ts|tsx|js|jsx)$//')
+# 대응 테스트 파일 확인 — 확장자 제거
+BASENAME=$(basename "\$FILE_PATH" | sed -E 's/\\.[^.]+$//')
 TEST_SUFFIX=".test."
 
 if [[ ! -f "\$HISTORY_FILE" ]]; then

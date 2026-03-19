@@ -40,7 +40,13 @@ function extractBinary(command: string): ExtractResult | undefined {
   const trimmed = command.trim();
   if (!trimmed) return undefined;
 
-  const parts = trimmed.split(/\s+/);
+  let parts = trimmed.split(/\s+/);
+
+  // Skip environment variable prefixes (KEY=VALUE)
+  while (parts.length > 0 && /^[A-Za-z_][A-Za-z0-9_]*=/.test(parts[0])) {
+    parts = parts.slice(1);
+  }
+  if (parts.length === 0) return undefined;
 
   // Skip gradle wrapper commands (managed by project)
   if (parts[0] === "./gradlew" || parts[0] === "gradlew") return undefined;

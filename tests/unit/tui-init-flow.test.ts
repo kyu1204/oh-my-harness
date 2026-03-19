@@ -3,6 +3,7 @@ import { formatDepResults, formatConfigSummary, formatProjectFacts } from "../..
 import type { DepCheck } from "../../src/cli/deps-checker.js";
 import type { HarnessConfig } from "../../src/core/harness-schema.js";
 import { emptyFacts } from "../../src/detector/types.js";
+// updated: TUI init now passes catalogBlocks to generateHarnessConfig
 
 describe("formatDepResults", () => {
   it("formats installed deps with checkmark and version", () => {

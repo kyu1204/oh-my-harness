@@ -231,7 +231,15 @@ export async function runInitTUI(options?: {
     genSpinner.start("Generating harness configuration...");
 
     try {
-      harnessConfig = await generateHarnessConfig(description as string, undefined, undefined, projectFacts);
+      // Load catalog blocks so LLM knows available building blocks + validation
+      const { createDefaultRegistry } = await import("../../catalog/registry.js");
+      const catalogRegistry = await createDefaultRegistry();
+      const catalogBlocks = catalogRegistry.list().map((b) => ({
+        id: b.id,
+        description: b.description,
+        params: b.params.map((pp) => ({ name: pp.name, required: pp.required, default: pp.default, description: pp.description })),
+      }));
+      harnessConfig = await generateHarnessConfig(description as string, undefined, catalogBlocks, projectFacts);
       genSpinner.stop("Configuration generated");
     } catch (err) {
       genSpinner.stop("Generation failed");

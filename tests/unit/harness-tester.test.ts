@@ -433,6 +433,20 @@ describe("generateBlockTestCases", () => {
     expect(blockCase?.setup).toBeDefined();
   });
 
+  it("generates tdd-guard cases with Python patterns when srcPattern is .py", () => {
+    const entries = [{ block: "tdd-guard", params: { srcPattern: "\\.py$", testPattern: "test_.*\\.py$" } }];
+    const cases = generateBlockTestCases(entries, builtinBlocks);
+    const blockCase = cases.find(c => c.expectation === "block");
+    expect(blockCase).toBeDefined();
+    // Should use .py file, not .ts
+    expect(blockCase!.input.tool_input.file_path).toMatch(/\.py$/);
+    expect(blockCase!.input.tool_input.file_path).not.toMatch(/\.ts$/);
+    // Test file should match testPattern
+    const testCase = cases.find(c => c.name.includes("test") && c.expectation === "allow");
+    expect(testCase).toBeDefined();
+    expect(testCase!.input.tool_input.file_path).toMatch(/test_.*\.py$/);
+  });
+
   it("generates lockfile-guard cases", () => {
     const entries = [{ block: "lockfile-guard", params: {} }];
     const cases = generateBlockTestCases(entries, builtinBlocks);

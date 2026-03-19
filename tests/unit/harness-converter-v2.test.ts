@@ -192,6 +192,26 @@ describe("harnessToMergedConfigV2", () => {
     expect(pathGuards).toHaveLength(1);
   });
 
+  it("keeps valid hooks when some blocks are invalid", async () => {
+    const registry = await createDefaultRegistry();
+    const config: HarnessConfig = {
+      ...baseHarness,
+      hooks: [
+        { block: "branch-guard", params: {} },
+        { block: "nonexistent-block", params: {} },
+        { block: "command-guard", params: { patterns: ["rm -rf /"] } },
+      ],
+    };
+    const result = await harnessToMergedConfigV2(config, registry);
+    // Valid hooks should be present
+    expect(result.hooks.preToolUse.length).toBeGreaterThanOrEqual(2);
+    expect(result.hooks.preToolUse.some(h => h.id.includes("branch-guard"))).toBe(true);
+    expect(result.hooks.preToolUse.some(h => h.id.includes("command-guard"))).toBe(true);
+    // Errors should be reported but not block valid hooks
+    expect(result.catalogErrors).toBeDefined();
+    expect(result.catalogErrors!.some(e => e.includes("nonexistent-block"))).toBe(true);
+  });
+
   it("empty hooks array with empty enforcement produces no catalog errors", async () => {
     const registry = new CatalogRegistry();
 

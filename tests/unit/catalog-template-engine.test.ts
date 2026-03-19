@@ -184,6 +184,16 @@ describe("applyDefaults", () => {
     expect(result.pattern).toBe("custom");
   });
 
+  it("wraps string into array for string[] type params", () => {
+    const block = makeBlock({
+      params: [
+        { name: "lockfiles", type: "string[]", description: "lockfiles", required: false, default: ["package-lock.json"] },
+      ],
+    });
+    const result = applyDefaults(block, { lockfiles: "Pipfile.lock" });
+    expect(result.lockfiles).toEqual(["Pipfile.lock"]);
+  });
+
   it("handles params without defaults", () => {
     const block = makeBlock({
       params: [

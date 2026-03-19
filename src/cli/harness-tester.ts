@@ -284,13 +284,19 @@ export function generateBlockTestCases(
 
       case "tdd-guard": {
         const stateFile = ".claude/hooks/.state/edit-history.json";
+        const srcPat = (params.srcPattern as string) ?? "\\.(ts|tsx|js|jsx)$";
+        const testPat = (params.testPattern as string) ?? "\\.(test|spec)\\.(ts|tsx|js|jsx)$";
+        // Derive sample file extensions from patterns
+        const srcExt = srcPat.includes(".py") ? ".py" : ".ts";
+        const testFile = testPat.includes("test_") ? `test_example${srcExt}` : `example.test${srcExt}`;
+        const srcFile = `src/example${srcExt}`;
 
         // block case: source file without prior test edit
         cases.push({
-          name: "src/event-logger.ts without test → BLOCKED",
+          name: `${srcFile} without test → BLOCKED`,
           category: "tdd-guard",
           hookScript,
-          input: { tool_name: "Edit", tool_input: { file_path: "src/event-logger.ts" } },
+          input: { tool_name: "Edit", tool_input: { file_path: srcFile } },
           expectation: "block",
           setup: async (projectDir: string) => {
             const historyPath = path.join(projectDir, stateFile);
@@ -312,10 +318,10 @@ export function generateBlockTestCases(
 
         // allow case: test file edit
         cases.push({
-          name: "tests/unit/event-logger.test.ts → ALLOWED",
+          name: `${testFile} → ALLOWED`,
           category: "tdd-guard",
           hookScript,
-          input: { tool_name: "Edit", tool_input: { file_path: "tests/unit/event-logger.test.ts" } },
+          input: { tool_name: "Edit", tool_input: { file_path: testFile } },
           expectation: "allow",
           setup: async (projectDir: string) => {
             const historyPath = path.join(projectDir, stateFile);

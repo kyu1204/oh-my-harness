@@ -15,6 +15,10 @@ export function applyDefaults(
     if (result[param.name] === undefined && param.default !== undefined) {
       result[param.name] = param.default;
     }
+    // Auto-wrap string into array for string[] params
+    if (param.type === "string[]" && typeof result[param.name] === "string") {
+      result[param.name] = [result[param.name]];
+    }
   }
   return result;
 }

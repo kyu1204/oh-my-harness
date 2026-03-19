@@ -106,13 +106,13 @@ fi
       JSON.stringify(settings),
     );
 
-    // harness.yaml with lockfile-guard hook entry
+    // harness.yaml with lockfile-guard hook entry — specify only package-lock.json to match script
     const harnessYaml = yaml.dump({
       version: "1.0",
       project: { name: "test-project", stacks: [] },
       rules: [],
       enforcement: {},
-      hooks: [{ block: "lockfile-guard", params: {} }],
+      hooks: [{ block: "lockfile-guard", params: { lockfiles: ["package-lock.json"] } }],
     });
     await fs.writeFile(path.join(tmpDir, "harness.yaml"), harnessYaml);
 

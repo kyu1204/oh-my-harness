@@ -184,6 +184,17 @@ describe("applyDefaults", () => {
     expect(result.pattern).toBe("custom");
   });
 
+  it("triple-stash renders without HTML escaping", () => {
+    const result = renderTemplate("cmd={{{value}}}", { value: "FOO=bar python test" });
+    expect(result).toBe("cmd=FOO=bar python test");
+    expect(result).not.toContain("&#x3D;");
+  });
+
+  it("double-stash HTML-escapes equals signs", () => {
+    const result = renderTemplate("cmd={{value}}", { value: "FOO=bar" });
+    expect(result).toContain("&#x3D;");
+  });
+
   it("wraps string into array for string[] type params", () => {
     const block = makeBlock({
       params: [

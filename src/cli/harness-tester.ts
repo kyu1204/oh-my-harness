@@ -247,13 +247,16 @@ export function generateBlockTestCases(
       }
 
       case "lockfile-guard": {
-        cases.push({
-          name: "package-lock.json → BLOCKED",
-          category: "lockfile-guard",
-          hookScript,
-          input: { tool_name: "Edit", tool_input: { file_path: "package-lock.json" } },
-          expectation: "block",
-        });
+        const lockfiles = (params.lockfiles as string[]) ?? ["package-lock.json"];
+        for (const lf of lockfiles) {
+          cases.push({
+            name: `${lf} → BLOCKED`,
+            category: "lockfile-guard",
+            hookScript,
+            input: { tool_name: "Edit", tool_input: { file_path: lf } },
+            expectation: "block",
+          });
+        }
         cases.push({
           name: "package.json → ALLOWED",
           category: "lockfile-guard",

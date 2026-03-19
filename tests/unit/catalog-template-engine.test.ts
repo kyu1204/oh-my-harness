@@ -205,6 +205,26 @@ describe("applyDefaults", () => {
     expect(result.lockfiles).toEqual(["Pipfile.lock"]);
   });
 
+  it("splits comma-separated string into array for string[] type params", () => {
+    const block = makeBlock({
+      params: [
+        { name: "patterns", type: "string[]", description: "patterns", required: false, default: [".env"] },
+      ],
+    });
+    const result = applyDefaults(block, { patterns: ".env,.env.*,credentials.json" });
+    expect(result.patterns).toEqual([".env", ".env.*", "credentials.json"]);
+  });
+
+  it("filters out empty strings from comma-separated split", () => {
+    const block = makeBlock({
+      params: [
+        { name: "patterns", type: "string[]", description: "patterns", required: false },
+      ],
+    });
+    const result = applyDefaults(block, { patterns: "a,,b, ,c," });
+    expect(result.patterns).toEqual(["a", "b", "c"]);
+  });
+
   it("handles params without defaults", () => {
     const block = makeBlock({
       params: [

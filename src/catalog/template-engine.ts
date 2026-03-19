@@ -17,7 +17,8 @@ export function applyDefaults(
     }
     // Auto-wrap string into array for string[] params
     if (param.type === "string[]" && typeof result[param.name] === "string") {
-      result[param.name] = [result[param.name]];
+      const str = result[param.name] as string;
+      result[param.name] = str.includes(",") ? str.split(",").map((s) => s.trim()).filter((s) => s.length > 0) : [str];
     }
   }
   return result;

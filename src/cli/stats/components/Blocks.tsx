@@ -59,7 +59,7 @@ export function Blocks({ data, selectedIndex }: BlocksProps): React.ReactElement
       <Box flexDirection="column" width={28}>
         {allBlocks.map((block, i) => (
           <Text
-            key={block.id}
+            key={i}
             inverse={i === clampedIndex}
             color={block.hits === 0 ? "gray" : undefined}
           >

@@ -11,6 +11,8 @@ import {
   getDateFilteredEvents,
   getBlockDetail,
   loadStatsData,
+  deduplicateBlocks,
+  type BlockStats,
 } from "../../src/cli/stats/data.js";
 
 // helpers
@@ -72,6 +74,31 @@ describe("getActiveBlocks", () => {
 });
 
 // ─── getDormantBlocks ─────────────────────────────────────────────────────────
+
+describe("deduplicateBlocks", () => {
+  it("merges duplicate block ids by summing hits", () => {
+    const blocks: BlockStats[] = [
+      { id: "commit-test-gate", name: "Test 1", category: "quality", description: "", canBlock: true, configured: true, hits: 5, blockCount: 1, allowCount: 4, params: { testCommand: "npm test" } },
+      { id: "commit-test-gate", name: "Test 2", category: "quality", description: "", canBlock: true, configured: true, hits: 3, blockCount: 0, allowCount: 3, params: { testCommand: "pytest" } },
+      { id: "branch-guard", name: "Branch", category: "git", description: "", canBlock: true, configured: true, hits: 2, blockCount: 1, allowCount: 1, params: {} },
+    ];
+    const result = deduplicateBlocks(blocks);
+    expect(result).toHaveLength(2);
+    const testGate = result.find((b: BlockStats) => b.id === "commit-test-gate");
+    expect(testGate!.hits).toBe(8);
+    expect(testGate!.blockCount).toBe(1);
+    expect(testGate!.allowCount).toBe(7);
+  });
+
+  it("keeps single blocks unchanged", () => {
+    const blocks: BlockStats[] = [
+      { id: "branch-guard", name: "Branch", category: "git", description: "", canBlock: true, configured: true, hits: 2, blockCount: 1, allowCount: 1, params: {} },
+    ];
+    const result = deduplicateBlocks(blocks);
+    expect(result).toHaveLength(1);
+    expect(result[0].hits).toBe(2);
+  });
+});
 
 describe("getDormantBlocks", () => {
   it("이벤트 없는 블록 = dormant", () => {

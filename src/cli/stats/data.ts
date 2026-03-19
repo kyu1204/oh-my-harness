@@ -43,6 +43,27 @@ export interface StatsData {
   dateRange: DateRange;
 }
 
+export function deduplicateBlocks(blocks: BlockStats[]): BlockStats[] {
+  const map = new Map<string, BlockStats>();
+  for (const b of blocks) {
+    const existing = map.get(b.id);
+    if (existing) {
+      existing.hits += b.hits;
+      existing.blockCount += b.blockCount;
+      existing.allowCount += b.allowCount;
+      if (b.lastHit && (!existing.lastHit || b.lastHit > existing.lastHit)) {
+        existing.lastHit = b.lastHit;
+      }
+      if (b.lastBlockReason) {
+        existing.lastBlockReason = b.lastBlockReason;
+      }
+    } else {
+      map.set(b.id, { ...b });
+    }
+  }
+  return [...map.values()];
+}
+
 export function getActiveBlocks(
   hookEntries: HookEntry[],
   allBlocks: BuildingBlock[],
@@ -158,12 +179,14 @@ export async function loadStatsData(
   const activeBlocksWithParams = getActiveBlocks(hookEntries, builtinBlocks);
   const dormantIds = getDormantBlocks(activeBlocksWithParams, events);
 
-  const blocks = activeBlocksWithParams.map(ab =>
-    getBlockDetail(ab.block.id, events, builtinBlocks, ab.params),
+  const blocks = deduplicateBlocks(
+    activeBlocksWithParams.map(ab =>
+      getBlockDetail(ab.block.id, events, builtinBlocks, ab.params),
+    ),
   );
 
-  const activeBlocks = blocks.filter(b => !dormantIds.includes(b.id));
-  const dormantBlocks = blocks.filter(b => dormantIds.includes(b.id));
+  const activeBlocks = deduplicateBlocks(blocks.filter(b => !dormantIds.includes(b.id)));
+  const dormantBlocks = deduplicateBlocks(blocks.filter(b => dormantIds.includes(b.id)));
 
   const hourlyDistribution = getHourlyDistribution(events);
 

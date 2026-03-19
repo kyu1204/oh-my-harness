@@ -24,7 +24,7 @@ INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null)
 [[ -z "$FILE_PATH" ]] && exit 0
 BASENAME=$(basename "$FILE_PATH")
-LOCKFILES=({{#each lockfiles}}"{{this}}" {{/each}})
+LOCKFILES=({{#each lockfiles}}"{{{this}}}" {{/each}})
 for LOCKFILE in "\${LOCKFILES[@]}"; do
   if [[ "$BASENAME" == "$LOCKFILE" ]]; then
     _log_event "block" "oh-my-harness: direct edits to lockfile $BASENAME are blocked. Use the package manager instead."

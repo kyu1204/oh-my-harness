@@ -122,7 +122,7 @@ oh-my-harness automatically detects your project type and injects accurate facts
 | Language | Detection | Commands |
 |----------|-----------|----------|
 | 🟦 TypeScript/JS | package.json, tsconfig | pnpm/npm/yarn test, eslint, tsc |
-| 🐍 Python | pyproject.toml, requirements.txt | pytest, ruff, mypy |
+| 🐍 Python | pyproject.toml, requirements.txt, Pipfile, manage.py, .python-version | pytest, ruff, black, isort, mypy |
 | 🍎 Swift | Package.swift, .xcodeproj | swift test, xcodebuild |
 | 🦀 Rust | Cargo.toml | cargo test, cargo clippy |
 | 🐹 Go | go.mod | go test, golangci-lint |
@@ -154,7 +154,7 @@ All enforcement is powered by **catalog blocks** — reusable, parameterized hoo
 | ✏️ `lint-on-save` | auto-fix | Auto-lint on file save |
 | 🎨 `format-on-save` | auto-fix | Auto-format on file save |
 | 🔀 `auto-pr` | automation | Auto-create PR after push |
-| 🧪 `tdd-guard` | quality | Blocks source edits unless test modified first (JS/TS) |
+| 🧪 `tdd-guard` | quality | Blocks source edits unless test modified first (JS/TS/Python) |
 
 ### Usage in `harness.yaml`
 
@@ -331,7 +331,7 @@ oh-my-harness/
 │       ├── parse-intent.ts     # claude -p integration
 │       └── prompt-templates.ts # LLM prompt construction
 ├── presets/                # Built-in preset definitions
-└── tests/                  # 712+ tests (unit + integration)
+└── tests/                  # 745+ tests (unit + integration)
 ```
 
 ---

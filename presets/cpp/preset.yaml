@@ -6,7 +6,7 @@ extends: ["_base"]
 tags: ["cpp", "c++", "c", "cmake", "systems"]
 variables:
   language: "cpp"
-  testRunner: "cmake --build . && ctest"
+  testRunner: "cmake --build . && ctest --output-on-failure"
   linter: "clang-tidy"
 claudeMd:
   sections:

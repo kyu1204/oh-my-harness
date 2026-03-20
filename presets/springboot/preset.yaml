@@ -6,7 +6,6 @@ extends: ["java"]
 tags: ["springboot", "java", "backend", "api", "spring"]
 variables:
   framework: "springboot"
-  testRunner: "./gradlew test"
 claudeMd:
   sections:
     - id: "springboot-rules"

@@ -7,7 +7,7 @@ tags: ["elixir", "erlang", "otp"]
 variables:
   language: "elixir"
   testRunner: "mix test"
-  linter: "credo"
+  linter: "mix credo"
 claudeMd:
   sections:
     - id: "elixir-rules"
@@ -37,6 +37,7 @@ settings:
   permissions:
     allow:
       - "Bash(mix *)"
+      - "Bash(mix credo*)"
       - "Bash(elixir *)"
       - "Bash(iex *)"
     deny:

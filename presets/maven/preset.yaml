@@ -5,6 +5,7 @@ version: "1.0.0"
 tags: ["java", "maven", "package-manager"]
 variables:
   packageManager: "maven"
+  testRunner: "mvn test"
 settings:
   permissions:
     allow:

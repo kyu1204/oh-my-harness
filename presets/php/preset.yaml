@@ -39,7 +39,8 @@ settings:
       - "Bash(composer *)"
       - "Bash(php *)"
       - "Bash(phpunit *)"
-      - "Bash(./vendor/bin/*)"
+      - "Bash(./vendor/bin/phpunit *)"
+      - "Bash(./vendor/bin/phpstan *)"
     deny:
       - "Bash(sudo *)"
       - "Bash(rm -rf *)"

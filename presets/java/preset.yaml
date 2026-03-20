@@ -37,9 +37,12 @@ settings:
   permissions:
     allow:
       - "Bash(mvn *)"
+      - "Bash(./mvnw *)"
       - "Bash(gradle *)"
+      - "Bash(./gradlew *)"
       - "Bash(java *)"
       - "Bash(javac *)"
+      - "Bash(checkstyle *)"
     deny:
       - "Bash(sudo *)"
       - "Bash(rm -rf *)"

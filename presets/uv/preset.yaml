@@ -1,0 +1,12 @@
+name: uv
+displayName: "uv"
+description: "uv package manager for Python"
+version: "1.0.0"
+tags: ["python", "uv", "package-manager"]
+variables:
+  packageManager: "uv"
+settings:
+  permissions:
+    allow:
+      - "Bash(uv *)"
+      - "Bash(uv run *)"

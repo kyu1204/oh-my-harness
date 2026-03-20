@@ -1,0 +1,44 @@
+name: swift
+displayName: "Swift"
+description: "Swift project with Swift Package Manager and SwiftLint"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["swift", "apple", "ios", "macos"]
+variables:
+  language: "swift"
+  testRunner: "swift test"
+  linter: "swiftlint"
+claudeMd:
+  sections:
+    - id: "swift-rules"
+      title: "Swift Rules"
+      content: |
+        ## Swift Development Rules
+
+        - Follow Swift API Design Guidelines for naming and conventions
+        - Use SwiftLint to enforce style; fix all warnings before committing
+        - Prefer value types (struct, enum) over reference types (class) when possible
+        - Use Swift's Result type or async/await for error handling; avoid Objective-C patterns
+        - Mark classes as `final` unless designed for inheritance
+        - Use access control explicitly: mark types and members as private/internal/public
+        - Avoid force unwrapping (!); use guard let or if let for optionals
+      priority: 20
+    - id: "swift-testing"
+      title: "Swift Testing"
+      content: |
+        ## Swift Testing Rules
+
+        - Use XCTest or Swift Testing framework for all tests
+        - Every module MUST have corresponding test targets
+        - Run `swift test` before every commit
+        - Use XCTestExpectation or async test methods for asynchronous tests
+      priority: 21
+settings:
+  permissions:
+    allow:
+      - "Bash(swift *)"
+      - "Bash(xcodebuild *)"
+      - "Bash(swiftlint *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

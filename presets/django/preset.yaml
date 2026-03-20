@@ -1,0 +1,72 @@
+name: django
+displayName: "Django (Python)"
+description: "Django web framework with DRF, TDD enforcement"
+version: "1.0.0"
+extends: ["python"]
+tags: ["django", "python", "backend", "web", "drf"]
+variables:
+  framework: "django"
+  testRunner: "python manage.py test"
+claudeMd:
+  sections:
+    - id: "django-rules"
+      title: "Django Rules"
+      content: |
+        ## Django Development Rules
+
+        - Use Django REST Framework (DRF) ViewSets for API endpoints
+        - Use `managed = False` for models mapped to existing database tables
+        - Always use `timezone.now()` instead of `datetime.now()` for timestamps
+        - Define `verbose_name` and `verbose_name_plural` on all models
+        - Use `select_related` and `prefetch_related` to avoid N+1 queries
+        - Never put business logic in views; use service layer or model methods
+        - Use Django's ORM; never write raw SQL unless absolutely necessary
+        - Migrations: run `python manage.py makemigrations` after model changes
+      priority: 20
+    - id: "django-testing"
+      title: "Django Testing"
+      content: |
+        ## Django Testing Rules
+
+        - Use `pytest-django` with `django.test.TestCase` or plain pytest fixtures
+        - Every view and serializer MUST have tests
+        - Use `APIClient` from DRF for endpoint tests
+        - Run `python manage.py test` before every commit
+      priority: 21
+    - id: "django-structure"
+      title: "Django Structure"
+      content: |
+        ## Django Project Structure
+
+        ```
+        project/
+          manage.py
+          config/
+            settings/
+              base.py
+              local.py
+              production.py
+            urls.py
+            wsgi.py
+          apps/
+            <app_name>/
+              models.py
+              views.py
+              serializers.py
+              urls.py
+              tests/
+          requirements/
+        ```
+      priority: 22
+settings:
+  permissions:
+    allow:
+      - "Bash(python manage.py *)"
+      - "Bash(pytest*)"
+      - "Bash(ruff *)"
+      - "Bash(mypy *)"
+    deny:
+      - "Bash(python manage.py migrate*)"
+      - "Bash(python manage.py makemigrations*)"
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

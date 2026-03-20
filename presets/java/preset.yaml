@@ -1,0 +1,45 @@
+name: java
+displayName: "Java"
+description: "Java project with Maven/Gradle and JUnit testing"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["java", "jvm"]
+variables:
+  language: "java"
+  testRunner: "mvn test"
+  linter: "checkstyle"
+claudeMd:
+  sections:
+    - id: "java-rules"
+      title: "Java Rules"
+      content: |
+        ## Java Development Rules
+
+        - Follow Java naming conventions: classes PascalCase, methods/variables camelCase, constants UPPER_SNAKE_CASE
+        - Use Spring dependency injection; avoid static utility classes for business logic
+        - Declare fields with the most restrictive access modifier possible
+        - Use Optional<T> for nullable return values; never return null from public methods
+        - Prefer constructor injection over field injection in Spring components
+        - Use SLF4J for logging; never use System.out.println in production code
+        - Run `mvn verify` or `gradle check` before every push
+      priority: 20
+    - id: "java-testing"
+      title: "Java Testing"
+      content: |
+        ## Java Testing Rules
+
+        - Use JUnit 5 for all tests; Mockito for mocking dependencies
+        - Every class MUST have a corresponding test class
+        - Run `mvn test` or `gradle test` before every commit
+        - Use AssertJ for fluent assertions
+      priority: 21
+settings:
+  permissions:
+    allow:
+      - "Bash(mvn *)"
+      - "Bash(gradle *)"
+      - "Bash(java *)"
+      - "Bash(javac *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

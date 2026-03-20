@@ -1,0 +1,42 @@
+name: csharp
+displayName: "C#"
+description: "C# project with .NET, xUnit, and Roslyn analyzers"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["csharp", "dotnet", "cs"]
+variables:
+  language: "csharp"
+  testRunner: "dotnet test"
+  linter: "dotnet build"
+claudeMd:
+  sections:
+    - id: "csharp-rules"
+      title: "C# Rules"
+      content: |
+        ## C# Development Rules
+
+        - Follow Microsoft C# coding conventions and .NET design guidelines
+        - Enable nullable reference types (<Nullable>enable</Nullable>) in all projects
+        - Use async/await throughout; never block async code with .Result or .Wait()
+        - Prefer records for immutable data transfer objects
+        - Use dependency injection via Microsoft.Extensions.DependencyInjection
+        - Enable and address all Roslyn analyzer warnings before pushing
+        - Use file-scoped namespaces and top-level statements where appropriate
+      priority: 20
+    - id: "csharp-testing"
+      title: "C# Testing"
+      content: |
+        ## C# Testing Rules
+
+        - Use xUnit for all tests; Moq or NSubstitute for mocking
+        - Every class MUST have a corresponding test class
+        - Run `dotnet test` before every commit
+        - Use FluentAssertions for readable assertions
+      priority: 21
+settings:
+  permissions:
+    allow:
+      - "Bash(dotnet *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

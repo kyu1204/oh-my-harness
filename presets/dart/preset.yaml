@@ -1,0 +1,43 @@
+name: dart
+displayName: "Dart / Flutter"
+description: "Dart and Flutter project with dart test and analysis"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["dart", "flutter"]
+variables:
+  language: "dart"
+  testRunner: "dart test"
+  linter: "dart analyze"
+claudeMd:
+  sections:
+    - id: "dart-rules"
+      title: "Dart / Flutter Rules"
+      content: |
+        ## Dart / Flutter Development Rules
+
+        - Follow Effective Dart guidelines for style, documentation, and usage
+        - Use `dart format` to format all Dart files before committing
+        - Run `dart analyze` and fix all issues before pushing
+        - Prefer const constructors wherever possible for performance
+        - Use named parameters for functions with more than two parameters
+        - Separate business logic from UI; use BLoC, Riverpod, or Provider patterns
+        - Write documentation comments (///) for all public APIs
+      priority: 20
+    - id: "dart-testing"
+      title: "Dart Testing"
+      content: |
+        ## Dart / Flutter Testing Rules
+
+        - Use `dart test` for Dart packages; `flutter test` for Flutter projects
+        - Every public class MUST have corresponding test coverage
+        - Run `dart test` before every commit
+        - Use mockito or mocktail for mocking dependencies
+      priority: 21
+settings:
+  permissions:
+    allow:
+      - "Bash(dart *)"
+      - "Bash(flutter *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

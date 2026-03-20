@@ -1,0 +1,45 @@
+name: ruby
+displayName: "Ruby"
+description: "Ruby project with RSpec and RuboCop"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["ruby"]
+variables:
+  language: "ruby"
+  testRunner: "bundle exec rspec"
+  linter: "rubocop"
+claudeMd:
+  sections:
+    - id: "ruby-rules"
+      title: "Ruby Rules"
+      content: |
+        ## Ruby Development Rules
+
+        - Follow the Ruby Style Guide; use RuboCop to enforce it
+        - Prefer symbols over strings for hash keys
+        - Use frozen_string_literal: true at the top of every file
+        - Avoid monkey-patching core classes; use refinements if necessary
+        - Use Bundler for dependency management; always commit Gemfile.lock
+        - Prefer explicit over implicit returns in non-trivial methods
+        - Run `rubocop --autocorrect` before every commit
+      priority: 20
+    - id: "ruby-testing"
+      title: "Ruby Testing"
+      content: |
+        ## Ruby Testing Rules
+
+        - Use RSpec for all tests with descriptive `describe` and `it` blocks
+        - Every class MUST have a corresponding _spec.rb file
+        - Run `bundle exec rspec` before every commit
+        - Use FactoryBot for test data; avoid fixtures
+      priority: 21
+settings:
+  permissions:
+    allow:
+      - "Bash(bundle *)"
+      - "Bash(ruby *)"
+      - "Bash(rake *)"
+      - "Bash(rubocop *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

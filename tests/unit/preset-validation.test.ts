@@ -4,7 +4,14 @@ import { loadPreset } from "../../src/core/preset-loader.js";
 
 const PRESETS_DIR = path.resolve(import.meta.dirname, "../../presets");
 
-const BUILTIN_PRESETS = ["_base", "nextjs", "fastapi", "nextjs-fastapi"];
+const BUILTIN_PRESETS = [
+  "_base",
+  "nextjs",
+  "fastapi",
+  "nextjs-fastapi",
+  "python",
+  "typescript",
+];
 
 describe("built-in preset validation", () => {
   it.each(BUILTIN_PRESETS)("parses %s preset without errors", async (name) => {
@@ -25,19 +32,18 @@ describe("built-in preset validation", () => {
     expect(preset.extends).toBeUndefined();
   });
 
-  it("nextjs extends _base", async () => {
+  it("nextjs extends typescript", async () => {
     const preset = await loadPreset(path.join(PRESETS_DIR, "nextjs"));
-    expect(preset.extends).toContain("_base");
+    expect(preset.extends).toContain("typescript");
   });
 
-  it("fastapi extends _base", async () => {
+  it("fastapi extends python", async () => {
     const preset = await loadPreset(path.join(PRESETS_DIR, "fastapi"));
-    expect(preset.extends).toContain("_base");
+    expect(preset.extends).toContain("python");
   });
 
-  it("nextjs-fastapi extends _base, nextjs, and fastapi", async () => {
+  it("nextjs-fastapi extends nextjs and fastapi", async () => {
     const preset = await loadPreset(path.join(PRESETS_DIR, "nextjs-fastapi"));
-    expect(preset.extends).toContain("_base");
     expect(preset.extends).toContain("nextjs");
     expect(preset.extends).toContain("fastapi");
   });

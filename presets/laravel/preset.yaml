@@ -1,0 +1,70 @@
+name: laravel
+displayName: "Laravel (PHP)"
+description: "Laravel with Eloquent ORM and artisan, TDD enforcement"
+version: "1.0.0"
+extends: ["php"]
+tags: ["laravel", "php", "backend", "web", "eloquent"]
+variables:
+  framework: "laravel"
+  testRunner: "php artisan test"
+claudeMd:
+  sections:
+    - id: "laravel-rules"
+      title: "Laravel Rules"
+      content: |
+        ## Laravel Development Rules
+
+        - Use Eloquent ORM for all database access; avoid raw queries
+        - Define relationships (`hasMany`, `belongsTo`, etc.) on all Eloquent models
+        - Use Form Requests for input validation; never validate in controllers directly
+        - Use Laravel migrations for schema changes; never edit the database manually
+        - Use artisan commands for maintenance tasks; avoid ad-hoc PHP scripts
+        - Use Laravel's service container and dependency injection
+        - Store config in `.env`; access via `config()` helpers, never `$_ENV` directly
+      priority: 20
+    - id: "laravel-testing"
+      title: "Laravel Testing"
+      content: |
+        ## Laravel Testing Rules
+
+        - Use PHPUnit via `php artisan test` or `./vendor/bin/phpunit`
+        - Use `RefreshDatabase` trait for database tests
+        - Every controller action MUST have a feature test
+        - Use model factories for test data
+        - Run `php artisan test` before every commit
+      priority: 21
+    - id: "laravel-structure"
+      title: "Laravel Structure"
+      content: |
+        ## Laravel Project Structure
+
+        ```
+        app/
+          Http/
+            Controllers/
+            Requests/       # Form Request validation classes
+            Resources/      # API Resources (transformers)
+          Models/
+          Services/
+          Providers/
+        database/
+          migrations/
+          factories/
+          seeders/
+        routes/
+          api.php
+          web.php
+        tests/
+          Feature/
+          Unit/
+        ```
+      priority: 22
+settings:
+  permissions:
+    allow:
+      - "Bash(php artisan *)"
+      - "Bash(composer *)"
+      - "Bash(./vendor/bin/phpunit*)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

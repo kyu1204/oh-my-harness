@@ -1,0 +1,62 @@
+name: springboot
+displayName: "Spring Boot (Java)"
+description: "Spring Boot with JUnit 5, TDD enforcement"
+version: "1.0.0"
+extends: ["java"]
+tags: ["springboot", "java", "backend", "api", "spring"]
+variables:
+  framework: "springboot"
+  testRunner: "./gradlew test"
+claudeMd:
+  sections:
+    - id: "springboot-rules"
+      title: "Spring Boot Rules"
+      content: |
+        ## Spring Boot Development Rules
+
+        - Use `@Service` for business logic, `@Repository` for data access, `@RestController` for HTTP
+        - Never inject dependencies via field injection; always use constructor injection
+        - Use Spring Data JPA repositories; avoid raw EntityManager unless necessary
+        - Validate request bodies with `@Valid` and Bean Validation annotations
+        - Use `application.yml` (not `.properties`) for configuration
+        - Use `@Transactional` at the service layer, never in controllers
+        - Return `ResponseEntity<T>` from controllers for explicit HTTP status control
+      priority: 20
+    - id: "springboot-testing"
+      title: "Spring Boot Testing"
+      content: |
+        ## Spring Boot Testing Rules
+
+        - Use JUnit 5 (`@ExtendWith(SpringExtension.class)`) for all tests
+        - Use `@WebMvcTest` for controller layer tests with MockMvc
+        - Use `@DataJpaTest` for repository tests with an in-memory DB
+        - Use `@SpringBootTest` only for full integration tests
+        - Run `./gradlew test` before every commit
+      priority: 21
+    - id: "springboot-structure"
+      title: "Spring Boot Structure"
+      content: |
+        ## Spring Boot Project Structure
+
+        ```
+        src/
+          main/java/com/example/
+            controller/
+            service/
+            repository/
+            domain/         # JPA entities
+            dto/            # Request/Response DTOs
+            config/
+          main/resources/
+            application.yml
+          test/java/com/example/
+        ```
+      priority: 22
+settings:
+  permissions:
+    allow:
+      - "Bash(./gradlew *)"
+      - "Bash(mvn *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

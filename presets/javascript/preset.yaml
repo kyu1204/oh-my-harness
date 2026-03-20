@@ -1,0 +1,44 @@
+name: javascript
+displayName: "JavaScript"
+description: "JavaScript project with ESM and modern tooling"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["javascript", "js", "node"]
+variables:
+  language: "javascript"
+  testRunner: "vitest"
+  linter: "eslint"
+claudeMd:
+  sections:
+    - id: "javascript-rules"
+      title: "JavaScript Rules"
+      content: |
+        ## JavaScript Development Rules
+
+        - Prefer ESM (import/export) over CommonJS (require/module.exports)
+        - Write JSDoc comments for all public APIs and exported functions
+        - Use const by default; use let only when reassignment is needed; never use var
+        - Use async/await over raw Promise chains for readability
+        - Validate all external input at boundaries; never trust user data
+        - Use strict equality (===) always; never use ==
+        - Prefer named exports over default exports for better refactoring support
+      priority: 20
+    - id: "javascript-testing"
+      title: "JavaScript Testing"
+      content: |
+        ## JavaScript Testing Rules
+
+        - Use vitest for all unit and integration tests
+        - Every module MUST have a corresponding .test.js file
+        - Run `npm test` before every commit
+        - Mock external services and I/O in unit tests
+      priority: 21
+settings:
+  permissions:
+    allow:
+      - "Bash(npm *)"
+      - "Bash(npx *)"
+      - "Bash(node *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

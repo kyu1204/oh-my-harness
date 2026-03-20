@@ -1,0 +1,65 @@
+name: flask
+displayName: "Flask (Python)"
+description: "Flask web framework with app factory pattern, TDD enforcement"
+version: "1.0.0"
+extends: ["python"]
+tags: ["flask", "python", "backend", "web", "api"]
+variables:
+  framework: "flask"
+  testRunner: "pytest"
+claudeMd:
+  sections:
+    - id: "flask-rules"
+      title: "Flask Rules"
+      content: |
+        ## Flask Development Rules
+
+        - Use the app factory pattern (`create_app()`) for application initialization
+        - Organize routes using Blueprints; never define routes on the app object directly
+        - Use Flask-SQLAlchemy for database access; define models in `models/`
+        - Use Flask-Migrate (Alembic) for database migrations
+        - Use environment variables for config; never hardcode secrets
+        - Use `g` and `before_request` for request-scoped state, not globals
+        - Return JSON responses with appropriate HTTP status codes
+      priority: 20
+    - id: "flask-testing"
+      title: "Flask Testing"
+      content: |
+        ## Flask Testing Rules
+
+        - Use pytest with a `app` fixture from the app factory
+        - Use `app.test_client()` for endpoint tests
+        - Every blueprint and route MUST have tests
+        - Run `pytest` before every commit
+      priority: 21
+    - id: "flask-structure"
+      title: "Flask Structure"
+      content: |
+        ## Flask Project Structure
+
+        ```
+        app/
+          __init__.py       # create_app() factory
+          blueprints/
+            api/
+              __init__.py
+              routes.py
+          models/
+          schemas/          # marshmallow or pydantic schemas
+          services/
+          config.py
+        tests/
+          conftest.py
+        ```
+      priority: 22
+settings:
+  permissions:
+    allow:
+      - "Bash(flask *)"
+      - "Bash(pytest*)"
+      - "Bash(ruff *)"
+      - "Bash(mypy *)"
+      - "Bash(uv *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

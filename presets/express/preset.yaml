@@ -1,0 +1,61 @@
+name: express
+displayName: "Express (TypeScript)"
+description: "Express.js with TypeScript, middleware pattern, TDD enforcement"
+version: "1.0.0"
+extends: ["typescript"]
+tags: ["express", "typescript", "backend", "nodejs", "api"]
+variables:
+  framework: "express"
+  testRunner: "jest"
+claudeMd:
+  sections:
+    - id: "express-rules"
+      title: "Express Rules"
+      content: |
+        ## Express Development Rules
+
+        - Use Express Router to separate routes by resource; never define all routes in app.ts
+        - Middleware must be typed with `Request`, `Response`, `NextFunction` from express
+        - Use a centralized error-handling middleware as the last `app.use()`
+        - All async route handlers MUST be wrapped to forward errors to `next(err)`
+        - Use environment variables for config; load with `dotenv` at startup
+        - Never trust user input; validate with zod or class-validator before processing
+        - Separate controller logic from route definitions
+      priority: 20
+    - id: "express-testing"
+      title: "Express Testing"
+      content: |
+        ## Express Testing Rules
+
+        - Use jest + supertest for endpoint integration tests
+        - Every route MUST have tests covering success and error cases
+        - Use dependency injection to make services mockable in tests
+        - Run `jest` before every commit
+      priority: 21
+    - id: "express-structure"
+      title: "Express Structure"
+      content: |
+        ## Express Project Structure
+
+        ```
+        src/
+          app.ts            # Express app setup, middleware registration
+          server.ts         # HTTP server entry point
+          routes/           # Router modules per resource
+          controllers/      # Request handlers
+          services/         # Business logic
+          middleware/       # Custom middleware
+          types/            # TypeScript type definitions
+        tests/
+        ```
+      priority: 22
+settings:
+  permissions:
+    allow:
+      - "Bash(npx jest*)"
+      - "Bash(npm run *)"
+      - "Bash(pnpm *)"
+      - "Bash(node *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

@@ -2,7 +2,7 @@ name: nextjs-fastapi
 displayName: "Next.js + FastAPI (Full Stack)"
 description: "Full stack with Next.js frontend and FastAPI backend, TDD enforcement"
 version: "1.0.0"
-extends: ["_base", "nextjs", "fastapi"]
+extends: ["nextjs", "fastapi"]
 tags: ["nextjs", "fastapi", "fullstack", "typescript", "python", "react"]
 variables:
   framework: "nextjs-fastapi"

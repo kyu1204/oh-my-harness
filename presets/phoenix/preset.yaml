@@ -1,0 +1,64 @@
+name: phoenix
+displayName: "Phoenix (Elixir)"
+description: "Phoenix framework with LiveView, Ecto, TDD enforcement"
+version: "1.0.0"
+extends: ["elixir"]
+tags: ["phoenix", "elixir", "backend", "web", "liveview", "ecto"]
+variables:
+  framework: "phoenix"
+  testRunner: "mix test"
+claudeMd:
+  sections:
+    - id: "phoenix-rules"
+      title: "Phoenix Rules"
+      content: |
+        ## Phoenix Development Rules
+
+        - Organize business logic into contexts; never put domain logic in controllers or LiveViews
+        - Use Ecto schemas and changesets for all data validation and persistence
+        - Use Phoenix LiveView for interactive UIs; avoid writing custom JS where LiveView suffices
+        - Use `Phoenix.PubSub` for real-time broadcasts between processes
+        - Define pipelines in `router.ex` for shared plug logic (`:browser`, `:api`)
+        - Use pattern matching and guard clauses; avoid deeply nested conditionals
+        - Never put Ecto queries directly in controllers; delegate to context modules
+      priority: 20
+    - id: "phoenix-testing"
+      title: "Phoenix Testing"
+      content: |
+        ## Phoenix Testing Rules
+
+        - Use `ExUnit` for all tests; use `Phoenix.ConnTest` for controller/route tests
+        - Use `LiveViewTest` helpers for Phoenix LiveView tests
+        - Every context function MUST have unit tests
+        - Run `mix test` before every commit
+      priority: 21
+    - id: "phoenix-structure"
+      title: "Phoenix Structure"
+      content: |
+        ## Phoenix Project Structure
+
+        ```
+        lib/
+          <app>/            # Business logic contexts
+            accounts.ex
+            accounts/
+              user.ex       # Ecto schema
+          <app>_web/
+            controllers/
+            live/           # LiveView modules
+            components/
+            router.ex
+        test/
+          <app>/
+          <app>_web/
+        priv/
+          repo/migrations/
+        ```
+      priority: 22
+settings:
+  permissions:
+    allow:
+      - "Bash(mix *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

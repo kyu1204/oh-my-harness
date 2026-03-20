@@ -1,0 +1,55 @@
+name: actix
+displayName: "Actix-web (Rust)"
+description: "Actix-web with Rust, extractors, TDD enforcement"
+version: "1.0.0"
+extends: ["rust"]
+tags: ["actix", "rust", "backend", "api", "web"]
+variables:
+  framework: "actix"
+claudeMd:
+  sections:
+    - id: "actix-rules"
+      title: "Actix-web Rules"
+      content: |
+        ## Actix-web Development Rules
+
+        - Use extractors (`Path<T>`, `Query<T>`, `Json<T>`) for all request data; never parse manually
+        - Register shared state with `web::Data<T>`; use `Arc<Mutex<T>>` for mutable shared state
+        - Define routes using `web::scope()` for versioning and grouping
+        - Return `impl Responder` or `Result<impl Responder, Error>` from all handlers
+        - Use `actix_web::middleware::Logger` for request logging
+        - Keep handlers thin; delegate business logic to service structs
+        - Use `actix-web`'s `HttpResponse` builders for explicit status codes
+      priority: 20
+    - id: "actix-testing"
+      title: "Actix-web Testing"
+      content: |
+        ## Actix-web Testing Rules
+
+        - Use `actix_web::test::init_service()` and `test::call_service()` for integration tests
+        - Every handler MUST have integration tests
+        - Run `cargo test` before every commit
+      priority: 21
+    - id: "actix-structure"
+      title: "Actix-web Structure"
+      content: |
+        ## Actix-web Project Structure
+
+        ```
+        src/
+          main.rs           # Server startup, app factory
+          routes/           # Route configuration
+          handlers/         # Request handler functions
+          services/         # Business logic
+          models/           # Domain models and DB structs
+          errors.rs         # Centralized error types
+        tests/
+        ```
+      priority: 22
+settings:
+  permissions:
+    allow:
+      - "Bash(cargo *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

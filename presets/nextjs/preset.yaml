@@ -2,7 +2,7 @@ name: nextjs
 displayName: "Next.js (TypeScript)"
 description: "Next.js App Router with TypeScript, TDD enforcement"
 version: "1.0.0"
-extends: ["_base"]
+extends: ["typescript"]
 tags: ["nextjs", "react", "typescript", "frontend", "tailwind"]
 variables:
   framework: "nextjs"

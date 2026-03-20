@@ -1,0 +1,41 @@
+name: zig
+displayName: "Zig"
+description: "Zig project with zig build and built-in testing"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["zig", "systems"]
+variables:
+  language: "zig"
+  testRunner: "zig build test"
+  linter: "zig fmt"
+claudeMd:
+  sections:
+    - id: "zig-rules"
+      title: "Zig Rules"
+      content: |
+        ## Zig Development Rules
+
+        - Run `zig fmt` on all files before committing
+        - Handle all error unions explicitly; never use catch unreachable in production code
+        - Use comptime for generic programming instead of runtime polymorphism where possible
+        - Prefer explicit memory allocators; pass allocators as parameters rather than using globals
+        - Use Zig's built-in test blocks (test "...") for unit tests in source files
+        - Avoid undefined behavior; use safety-checked builds during development
+        - Document public declarations with doc comments (///)
+      priority: 20
+    - id: "zig-testing"
+      title: "Zig Testing"
+      content: |
+        ## Zig Testing Rules
+
+        - Write tests in `test` blocks within source files
+        - Run `zig build test` before every commit
+        - Test edge cases including allocator failures with std.testing.failingAllocator
+      priority: 21
+settings:
+  permissions:
+    allow:
+      - "Bash(zig *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

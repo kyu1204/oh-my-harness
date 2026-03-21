@@ -20,7 +20,8 @@ export type HookEvent =
   | "SessionEnd"
   | "PreToolResult"
   | "PostToolResult"
-  | "UserPromptSubmit";
+  | "UserPromptSubmit"
+  | "ConfigChange";
 
 export type BuildingBlockCategory =
   | "git"
@@ -31,7 +32,8 @@ export type BuildingBlockCategory =
   | "custom"
   | "auto-fix"
   | "automation"
-  | "file-protection";
+  | "file-protection"
+  | "audit";
 
 export interface ParamDefinition {
   name: string;

@@ -11,6 +11,11 @@ import { formatOnSave } from "./format-on-save.js";
 import { autoPr } from "./auto-pr.js";
 import { secretFileGuard } from "./secret-file-guard.js";
 import { tddGuard } from "./tdd-guard.js";
+import { sqlGuard } from "./sql-guard.js";
+import { desktopNotify } from "./desktop-notify.js";
+import { testOnSave } from "./test-on-save.js";
+import { configAudit } from "./config-audit.js";
+import { compactContext } from "./compact-context.js";
 
 export const builtinBlocks: BuildingBlock[] = [
   branchGuard,
@@ -24,4 +29,9 @@ export const builtinBlocks: BuildingBlock[] = [
   autoPr,
   secretFileGuard,
   tddGuard,
+  sqlGuard,
+  desktopNotify,
+  testOnSave,
+  configAudit,
+  compactContext,
 ];

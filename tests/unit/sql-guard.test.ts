@@ -19,7 +19,8 @@ describe("sqlGuard block", () => {
       "DROP DATABASE",
       "TRUNCATE TABLE",
       "DELETE FROM",
-      "ALTER TABLE.*DROP",
+      "DROP COLUMN",
+      "DROP INDEX",
     ]);
   });
 

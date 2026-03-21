@@ -13,7 +13,7 @@ export const sqlGuard: BuildingBlock = {
       name: "patterns",
       type: "string[]",
       description: "Dangerous SQL patterns to block",
-      default: ["DROP TABLE", "DROP DATABASE", "TRUNCATE TABLE", "DELETE FROM", "ALTER TABLE.*DROP"],
+      default: ["DROP TABLE", "DROP DATABASE", "TRUNCATE TABLE", "DELETE FROM", "DROP COLUMN", "DROP INDEX"],
       required: true,
     },
   ],

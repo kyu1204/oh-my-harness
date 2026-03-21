@@ -1,0 +1,62 @@
+name: vue
+displayName: "Vue (TypeScript)"
+description: "Vue 3 with Composition API, TypeScript, and Vitest"
+version: "1.0.0"
+extends: ["typescript"]
+tags: ["vue", "typescript", "frontend", "vite", "vitest", "pinia"]
+variables:
+  framework: "vue"
+  testRunner: "vitest"
+claudeMd:
+  sections:
+    - id: "vue-rules"
+      title: "Vue Rules"
+      content: |
+        ## Vue Development Rules
+
+        - Use Composition API exclusively; never use Options API
+        - Use `<script setup>` syntax for all Single File Components
+        - Use Pinia for global state management; never use Vuex
+        - Props and emits MUST be typed with TypeScript interfaces
+        - Use `defineProps<{...}>()` and `defineEmits<{...}>()` for type-safe SFCs
+        - Keep components in PascalCase; use kebab-case in templates
+        - Use Vue Router for navigation; define routes in `src/router/index.ts`
+      priority: 20
+    - id: "vue-testing"
+      title: "Vue Testing"
+      content: |
+        ## Vue Testing Rules
+
+        - Use vitest + @vue/test-utils for component tests
+        - Every component MUST have a corresponding .test.ts file
+        - Test component behavior, not internal state
+        - Run `npx vitest` before every commit
+      priority: 21
+    - id: "vue-structure"
+      title: "Vue Structure"
+      content: |
+        ## Vue Project Structure
+
+        ```
+        src/
+          components/       # Shared Vue components
+          composables/      # Composition API composables (use* prefix)
+          stores/           # Pinia stores
+          views/            # Route-level components
+          router/
+            index.ts
+          types/
+          App.vue
+          main.ts
+        ```
+      priority: 22
+settings:
+  permissions:
+    allow:
+      - "Bash(npx vite*)"
+      - "Bash(npx vitest*)"
+      - "Bash(npm run *)"
+      - "Bash(pnpm *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

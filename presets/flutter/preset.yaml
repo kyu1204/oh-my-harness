@@ -1,0 +1,64 @@
+name: flutter
+displayName: "Flutter (Dart)"
+description: "Flutter with BLoC/Riverpod, Material Design, TDD enforcement"
+version: "1.0.0"
+extends: ["dart"]
+tags: ["flutter", "dart", "mobile", "cross-platform", "ui"]
+variables:
+  framework: "flutter"
+  testRunner: "flutter test"
+claudeMd:
+  sections:
+    - id: "flutter-rules"
+      title: "Flutter Rules"
+      content: |
+        ## Flutter Development Rules
+
+        - Use Widget composition over inheritance; keep widgets small and focused
+        - Use BLoC or Riverpod for state management; never use `setState` for non-local state
+        - Follow Material Design guidelines for UI components
+        - Extract `Theme` colors and text styles; never hardcode colors or font sizes
+        - Use `const` constructors wherever possible for performance
+        - Separate business logic from UI; widgets must only handle presentation
+        - Use `go_router` for navigation; never use `Navigator.push` directly in large apps
+      priority: 20
+    - id: "flutter-testing"
+      title: "Flutter Testing"
+      content: |
+        ## Flutter Testing Rules
+
+        - Use `flutter_test` for widget tests and unit tests
+        - Every widget MUST have a widget test
+        - Use `mockito` or `mocktail` for mocking dependencies
+        - Run `flutter test` before every commit
+      priority: 21
+    - id: "flutter-structure"
+      title: "Flutter Structure"
+      content: |
+        ## Flutter Project Structure
+
+        ```
+        lib/
+          main.dart
+          app/
+            router.dart
+          features/
+            <feature>/
+              bloc/         # BLoC files (or providers/ for Riverpod)
+              view/         # Widget files
+              model/
+          core/
+            theme/
+            utils/
+            widgets/        # Shared widgets
+        test/
+        ```
+      priority: 22
+settings:
+  permissions:
+    allow:
+      - "Bash(flutter *)"
+      - "Bash(dart *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

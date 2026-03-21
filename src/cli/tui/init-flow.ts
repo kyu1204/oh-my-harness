@@ -101,6 +101,21 @@ export function formatProjectFacts(facts: ProjectFacts): string {
   return lines.length > 0 ? lines.join("\n") : `  ${chalk.dim("No project signals detected")}`;
 }
 
+export function buildPresetExtends(
+  language: string,
+  framework: string | undefined,
+  packageManager: string | undefined,
+): string[] {
+  const result: string[] = ["_base", language];
+  if (framework && framework !== "none") {
+    result.push(framework);
+  }
+  if (packageManager) {
+    result.push(packageManager);
+  }
+  return result;
+}
+
 function handleCancel(value: unknown): void {
   if (p.isCancel(value)) {
     p.cancel("Operation cancelled.");
@@ -262,30 +277,134 @@ export async function runInitTUI(options?: {
       process.exit(0);
     }
   } else if (mode === "preset") {
-    // Step 4b: Preset Mode
-    const registry = new PresetRegistry();
-    await registry.discover(presetsDir);
+    // Step 4b: Preset Mode — 3-step interactive language/framework/PM selection
+    p.log.info(`${chalk.dim("_base preset is always included automatically.")}`);
 
-    const allPresets = registry.list().filter((e) => e.name !== "_base");
+    // Step 4b-1: Language
+    const language = await p.select({
+      message: "Choose your language",
+      options: [
+        { value: "python", label: "Python" },
+        { value: "typescript", label: "TypeScript" },
+        { value: "javascript", label: "JavaScript" },
+        { value: "rust", label: "Rust" },
+        { value: "go", label: "Go" },
+        { value: "java", label: "Java" },
+        { value: "ruby", label: "Ruby" },
+        { value: "php", label: "PHP" },
+        { value: "swift", label: "Swift" },
+        { value: "dart", label: "Dart" },
+        { value: "csharp", label: "C#" },
+        { value: "elixir", label: "Elixir" },
+        { value: "scala", label: "Scala" },
+        { value: "zig", label: "Zig" },
+        { value: "cpp", label: "C/C++" },
+      ],
+    });
+    handleCancel(language);
 
-    if (allPresets.length === 0) {
-      p.log.warn("No presets found (besides _base).");
-      presetNames = ["_base"];
-    } else {
-      p.log.info(`${chalk.dim("_base preset is always included automatically.")}`);
+    // Framework options per language
+    type FrameworkOption = { value: string; label: string };
+    const frameworkOptions: Record<string, FrameworkOption[]> = {
+      python: [
+        { value: "django", label: "Django" },
+        { value: "fastapi", label: "FastAPI" },
+        { value: "flask", label: "Flask" },
+        { value: "none", label: "None" },
+      ],
+      typescript: [
+        { value: "nextjs", label: "Next.js" },
+        { value: "react", label: "React" },
+        { value: "vue", label: "Vue" },
+        { value: "express", label: "Express" },
+        { value: "none", label: "None" },
+      ],
+      javascript: [
+        { value: "nextjs", label: "Next.js" },
+        { value: "react", label: "React" },
+        { value: "vue", label: "Vue" },
+        { value: "express", label: "Express" },
+        { value: "none", label: "None" },
+      ],
+      java: [
+        { value: "springboot", label: "Spring Boot" },
+        { value: "none", label: "None" },
+      ],
+      ruby: [
+        { value: "rails", label: "Rails" },
+        { value: "none", label: "None" },
+      ],
+      php: [
+        { value: "laravel", label: "Laravel" },
+        { value: "none", label: "None" },
+      ],
+      go: [
+        { value: "gin", label: "Gin" },
+        { value: "none", label: "None" },
+      ],
+      rust: [
+        { value: "actix", label: "Actix" },
+        { value: "none", label: "None" },
+      ],
+      dart: [
+        { value: "flutter", label: "Flutter" },
+        { value: "none", label: "None" },
+      ],
+      elixir: [
+        { value: "phoenix", label: "Phoenix" },
+        { value: "none", label: "None" },
+      ],
+    };
 
-      const selected = await p.multiselect({
-        message: "Select presets to apply:",
-        options: allPresets.map((entry) => ({
-          value: entry.name,
-          label: entry.config.displayName,
-          hint: entry.config.description,
-        })),
-        required: true,
+    // Step 4b-2: Framework (only for languages with options)
+    let framework: string | undefined;
+    const fwOptions = frameworkOptions[language as string];
+    if (fwOptions && fwOptions.length > 1) {
+      const fw = await p.select({
+        message: "Choose your framework",
+        options: fwOptions,
       });
-      handleCancel(selected);
-      presetNames = ["_base", ...(selected as string[])];
+      handleCancel(fw);
+      framework = fw as string;
     }
+
+    // Package manager options per language
+    type PmOption = { value: string; label: string };
+    const pmOptions: Record<string, PmOption[]> = {
+      python: [
+        { value: "uv", label: "uv" },
+        { value: "pipenv", label: "pipenv" },
+        { value: "pip", label: "pip" },
+      ],
+      typescript: [
+        { value: "pnpm", label: "pnpm" },
+        { value: "npm", label: "npm" },
+        { value: "yarn", label: "yarn" },
+      ],
+      javascript: [
+        { value: "pnpm", label: "pnpm" },
+        { value: "npm", label: "npm" },
+        { value: "yarn", label: "yarn" },
+      ],
+      java: [
+        { value: "gradle", label: "gradle" },
+        { value: "maven", label: "maven" },
+      ],
+    };
+
+    // Step 4b-3: Package Manager (only for languages with multiple options)
+    let packageManager: string | undefined;
+    const pmOpts = pmOptions[language as string];
+    if (pmOpts && pmOpts.length > 1) {
+      const pm = await p.select({
+        message: "Choose your package manager",
+        options: pmOpts,
+      });
+      handleCancel(pm);
+      packageManager = pm as string;
+    }
+
+    presetNames = buildPresetExtends(language as string, framework, packageManager);
   } else if (mode === "import") {
     // Step 4c: Import Mode
     const importPath = await p.text({

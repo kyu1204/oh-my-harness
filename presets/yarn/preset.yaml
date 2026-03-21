@@ -1,0 +1,12 @@
+name: yarn
+displayName: "yarn"
+description: "yarn package manager for JavaScript/TypeScript"
+version: "1.0.0"
+tags: ["javascript", "typescript", "yarn", "package-manager"]
+variables:
+  packageManager: "yarn"
+settings:
+  permissions:
+    allow:
+      - "Bash(yarn *)"
+      - "Bash(yarn run *)"

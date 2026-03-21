@@ -1,0 +1,12 @@
+name: pnpm
+displayName: "pnpm"
+description: "pnpm package manager for JavaScript/TypeScript"
+version: "1.0.0"
+tags: ["javascript", "typescript", "pnpm", "package-manager"]
+variables:
+  packageManager: "pnpm"
+settings:
+  permissions:
+    allow:
+      - "Bash(pnpm *)"
+      - "Bash(pnpm run *)"

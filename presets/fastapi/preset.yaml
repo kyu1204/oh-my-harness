@@ -2,7 +2,7 @@ name: fastapi
 displayName: "FastAPI (Python)"
 description: "FastAPI with Python, async, Pydantic v2, TDD enforcement"
 version: "1.0.0"
-extends: ["_base"]
+extends: ["python"]
 tags: ["fastapi", "python", "backend", "api", "async", "pydantic"]
 variables:
   framework: "fastapi"

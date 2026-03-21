@@ -1,0 +1,12 @@
+name: pipenv
+displayName: "pipenv"
+description: "pipenv package manager for Python"
+version: "1.0.0"
+tags: ["python", "pipenv", "package-manager"]
+variables:
+  packageManager: "pipenv"
+settings:
+  permissions:
+    allow:
+      - "Bash(pipenv *)"
+      - "Bash(pipenv run *)"

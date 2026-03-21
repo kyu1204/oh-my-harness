@@ -1,0 +1,57 @@
+name: gin
+displayName: "Gin (Go)"
+description: "Gin web framework with Go, TDD enforcement"
+version: "1.0.0"
+extends: ["go"]
+tags: ["gin", "go", "backend", "api", "web"]
+variables:
+  framework: "gin"
+claudeMd:
+  sections:
+    - id: "gin-rules"
+      title: "Gin Rules"
+      content: |
+        ## Gin Development Rules
+
+        - Use `gin.New()` with explicit middleware rather than `gin.Default()`
+        - Define handlers as functions receiving `*gin.Context`; keep them thin
+        - Group related routes with `router.Group()` for shared middleware and path prefixes
+        - Use `c.ShouldBindJSON()` for request binding; always check the returned error
+        - Return consistent JSON error responses using a shared error handler middleware
+        - Use dependency injection to pass services into handlers; avoid package-level globals
+        - Use `gin.RouterGroup` to version APIs (e.g., `/api/v1`)
+      priority: 20
+    - id: "gin-testing"
+      title: "Gin Testing"
+      content: |
+        ## Gin Testing Rules
+
+        - Use `httptest.NewRecorder()` and `gin.New()` for handler unit tests
+        - Every handler MUST have tests for success and error paths
+        - Run `go test ./...` before every commit
+      priority: 21
+    - id: "gin-structure"
+      title: "Gin Structure"
+      content: |
+        ## Gin Project Structure
+
+        ```
+        cmd/
+          server/
+            main.go
+        internal/
+          handler/          # Gin handler functions
+          service/          # Business logic
+          repository/       # Data access
+          middleware/       # Custom Gin middleware
+          model/            # Domain models
+        pkg/
+        ```
+      priority: 22
+settings:
+  permissions:
+    allow:
+      - "Bash(go *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

@@ -1,0 +1,46 @@
+name: php
+displayName: "PHP"
+description: "PHP project with Composer, PHPUnit, and PHPStan"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["php"]
+variables:
+  language: "php"
+  testRunner: "phpunit"
+  linter: "phpstan"
+claudeMd:
+  sections:
+    - id: "php-rules"
+      title: "PHP Rules"
+      content: |
+        ## PHP Development Rules
+
+        - Follow PSR-12 coding standard for all PHP code
+        - Use Composer for dependency management; always commit composer.lock
+        - Declare strict_types=1 at the top of every PHP file
+        - Use type declarations for all function parameters and return types
+        - Follow PSR-4 autoloading conventions for namespace and directory structure
+        - Use PHPStan at level 8 or higher; fix all reported issues
+        - Avoid global state and static methods except for factory patterns
+      priority: 20
+    - id: "php-testing"
+      title: "PHP Testing"
+      content: |
+        ## PHP Testing Rules
+
+        - Use PHPUnit for all tests; test files end with Test.php
+        - Every class MUST have a corresponding Test class
+        - Run `./vendor/bin/phpunit` before every commit
+        - Run `./vendor/bin/phpstan analyse` before every push
+      priority: 21
+settings:
+  permissions:
+    allow:
+      - "Bash(composer *)"
+      - "Bash(php *)"
+      - "Bash(phpunit *)"
+      - "Bash(./vendor/bin/phpunit *)"
+      - "Bash(./vendor/bin/phpstan *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

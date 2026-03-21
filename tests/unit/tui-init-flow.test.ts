@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatDepResults, formatConfigSummary, formatProjectFacts } from "../../src/cli/tui/init-flow.js";
+import { formatDepResults, formatConfigSummary, formatProjectFacts, buildPresetExtends } from "../../src/cli/tui/init-flow.js";
 import type { DepCheck } from "../../src/cli/deps-checker.js";
 import type { HarnessConfig } from "../../src/core/harness-schema.js";
 import { emptyFacts } from "../../src/detector/types.js";
@@ -167,6 +167,33 @@ describe("formatConfigSummary", () => {
     };
     const output = formatConfigSummary(config);
     expect(typeof output).toBe("string");
+  });
+});
+
+describe("buildPresetExtends", () => {
+  it("returns language-only preset when no framework and no PM", () => {
+    const result = buildPresetExtends("rust", undefined, undefined);
+    expect(result).toEqual(["_base", "rust"]);
+  });
+
+  it("includes framework when not 'none'", () => {
+    const result = buildPresetExtends("python", "django", undefined);
+    expect(result).toEqual(["_base", "python", "django"]);
+  });
+
+  it("excludes framework when value is 'none'", () => {
+    const result = buildPresetExtends("python", "none", "uv");
+    expect(result).toEqual(["_base", "python", "uv"]);
+  });
+
+  it("includes package manager when provided", () => {
+    const result = buildPresetExtends("typescript", "nextjs", "pnpm");
+    expect(result).toEqual(["_base", "typescript", "nextjs", "pnpm"]);
+  });
+
+  it("handles language with no framework and a PM", () => {
+    const result = buildPresetExtends("java", undefined, "gradle");
+    expect(result).toEqual(["_base", "java", "gradle"]);
   });
 });
 

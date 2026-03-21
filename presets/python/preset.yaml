@@ -1,0 +1,48 @@
+name: python
+displayName: "Python"
+description: "Python project with testing and linting"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["python"]
+variables:
+  language: "python"
+  testRunner: "pytest"
+  linter: "ruff"
+claudeMd:
+  sections:
+    - id: "python-rules"
+      title: "Python Rules"
+      content: |
+        ## Python Development Rules
+
+        - Follow PEP 8 style guide for all Python code
+        - Use type hints for all function signatures and variables
+        - Write docstrings in reStructuredText format for all public functions and classes
+        - Prefer dataclasses or Pydantic models over plain dicts for structured data
+        - Use pathlib.Path over os.path for file operations
+        - Avoid mutable default arguments; use None and set defaults in the body
+        - Use f-strings for string formatting, not % or .format()
+      priority: 20
+    - id: "python-testing"
+      title: "Python Testing"
+      content: |
+        ## Python Testing Rules
+
+        - Use pytest for all tests; organize under tests/ directory
+        - Every module MUST have a corresponding test file
+        - Use pytest fixtures for shared setup; avoid setUp/tearDown patterns
+        - Run `pytest` before every commit
+        - Run `ruff check` and `mypy` before every push
+      priority: 21
+settings:
+  permissions:
+    allow:
+      - "Bash(pytest*)"
+      - "Bash(ruff *)"
+      - "Bash(mypy *)"
+      - "Bash(python *)"
+      - "Bash(python3 *)"
+      - "Bash(uv *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

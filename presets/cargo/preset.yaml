@@ -1,0 +1,11 @@
+name: cargo
+displayName: "cargo"
+description: "cargo build system and package manager for Rust"
+version: "1.0.0"
+tags: ["rust", "cargo", "package-manager"]
+variables:
+  packageManager: "cargo"
+settings:
+  permissions:
+    allow:
+      - "Bash(cargo *)"

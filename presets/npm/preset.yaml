@@ -1,0 +1,12 @@
+name: npm
+displayName: "npm"
+description: "npm package manager for JavaScript/TypeScript"
+version: "1.0.0"
+tags: ["javascript", "typescript", "npm", "package-manager"]
+variables:
+  packageManager: "npm"
+settings:
+  permissions:
+    allow:
+      - "Bash(npm *)"
+      - "Bash(npx *)"

@@ -1,0 +1,43 @@
+name: go
+displayName: "Go"
+description: "Go project with standard testing and golangci-lint"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["go", "golang"]
+variables:
+  language: "go"
+  testRunner: "go test"
+  linter: "golangci-lint"
+claudeMd:
+  sections:
+    - id: "go-rules"
+      title: "Go Rules"
+      content: |
+        ## Go Development Rules
+
+        - Follow Go conventions: package names lowercase, exported names PascalCase
+        - Always handle errors explicitly; never ignore returned error values
+        - Run `go fmt ./...` before every commit
+        - Run `golangci-lint run` before every push
+        - Use `errors.Is` and `errors.As` for error inspection; never compare error strings
+        - Prefer table-driven tests for testing multiple cases
+        - Keep interfaces small; define them where they are used, not where they are implemented
+      priority: 20
+    - id: "go-testing"
+      title: "Go Testing"
+      content: |
+        ## Go Testing Rules
+
+        - Use the standard `testing` package; test files end with `_test.go`
+        - Every package MUST have corresponding test files
+        - Run `go test ./...` before every commit
+        - Use `go vet ./...` to catch common mistakes
+      priority: 21
+settings:
+  permissions:
+    allow:
+      - "Bash(go *)"
+      - "Bash(golangci-lint *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

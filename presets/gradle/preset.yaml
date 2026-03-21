@@ -1,0 +1,13 @@
+name: gradle
+displayName: "gradle"
+description: "Gradle build system for Java/Kotlin"
+version: "1.0.0"
+tags: ["java", "kotlin", "gradle", "package-manager"]
+variables:
+  packageManager: "gradle"
+  testRunner: "./gradlew test"
+settings:
+  permissions:
+    allow:
+      - "Bash(./gradlew *)"
+      - "Bash(gradle *)"

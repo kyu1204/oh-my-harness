@@ -1,0 +1,46 @@
+name: typescript
+displayName: "TypeScript"
+description: "TypeScript project with strict mode and vitest"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["typescript", "ts", "node"]
+variables:
+  language: "typescript"
+  testRunner: "vitest"
+  linter: "eslint"
+claudeMd:
+  sections:
+    - id: "typescript-rules"
+      title: "TypeScript Rules"
+      content: |
+        ## TypeScript Development Rules
+
+        - Enable strict mode in tsconfig.json; never disable strict checks
+        - Never use `any` type; use `unknown` and narrow with type guards instead
+        - Always specify explicit return types on exported functions
+        - Prefer `interface` over `type` for object shapes; use `type` for unions/intersections
+        - Use `const assertions` (as const) for literal types
+        - Avoid type assertions (`as T`) except at validated boundaries
+        - Use `satisfies` operator to validate object literals against a type
+      priority: 20
+    - id: "typescript-testing"
+      title: "TypeScript Testing"
+      content: |
+        ## TypeScript Testing Rules
+
+        - Use vitest for all tests with TypeScript support
+        - Every module MUST have a corresponding .test.ts file
+        - Run `npx tsc --noEmit` before every commit to catch type errors
+        - Run `npx eslint .` before every push
+      priority: 21
+settings:
+  permissions:
+    allow:
+      - "Bash(npx *)"
+      - "Bash(npx tsc*)"
+      - "Bash(npx eslint*)"
+      - "Bash(npm *)"
+      - "Bash(node *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

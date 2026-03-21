@@ -1,0 +1,65 @@
+name: rails
+displayName: "Ruby on Rails"
+description: "Ruby on Rails with RSpec, TDD enforcement"
+version: "1.0.0"
+extends: ["ruby"]
+tags: ["rails", "ruby", "backend", "web", "mvc"]
+variables:
+  framework: "rails"
+  testRunner: "bundle exec rspec"
+claudeMd:
+  sections:
+    - id: "rails-rules"
+      title: "Rails Rules"
+      content: |
+        ## Ruby on Rails Development Rules
+
+        - Follow Rails conventions: fat model, skinny controller
+        - Use Active Record for all database interactions; avoid raw SQL
+        - Use strong parameters in controllers for mass-assignment protection
+        - Define named scopes on models for reusable query logic
+        - Use Rails migrations for all schema changes; never modify schema.rb directly
+        - Use `before_action` for shared controller logic (authentication, authorization)
+        - Prefer service objects for complex business logic that spans multiple models
+      priority: 20
+    - id: "rails-testing"
+      title: "Rails Testing"
+      content: |
+        ## Rails Testing Rules
+
+        - Use RSpec with FactoryBot for fixtures
+        - Write request specs for API endpoints, feature specs for UI flows
+        - Every model MUST have model specs; every controller MUST have request specs
+        - Run `bundle exec rspec` before every commit
+      priority: 21
+    - id: "rails-structure"
+      title: "Rails Structure"
+      content: |
+        ## Rails Project Structure
+
+        ```
+        app/
+          controllers/
+          models/
+          views/
+          services/         # Service objects for complex business logic
+          serializers/      # Active Model Serializers or similar
+        config/
+          routes.rb
+        db/
+          migrate/
+        spec/
+          models/
+          requests/
+          factories/
+        ```
+      priority: 22
+settings:
+  permissions:
+    allow:
+      - "Bash(bundle exec *)"
+      - "Bash(rails *)"
+      - "Bash(bin/rails *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

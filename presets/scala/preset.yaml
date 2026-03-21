@@ -1,0 +1,44 @@
+name: scala
+displayName: "Scala"
+description: "Scala project with sbt and ScalaTest"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["scala", "jvm", "functional"]
+variables:
+  language: "scala"
+  testRunner: "sbt test"
+  linter: "scalafix"
+  formatter: "scalafmt"
+claudeMd:
+  sections:
+    - id: "scala-rules"
+      title: "Scala Rules"
+      content: |
+        ## Scala Development Rules
+
+        - Follow Scala style guide; use scalafmt for automatic formatting
+        - Prefer immutable data structures (val, List, Map) over mutable equivalents
+        - Use Option, Either, and Try for error handling; avoid null and exceptions in business logic
+        - Run `sbt scalafmtCheck` and `sbt scalafix` before pushing
+        - Prefer pure functions and minimize side effects; isolate I/O at boundaries
+        - Use case classes for data modeling; companion objects for factory methods
+        - Enable `-Xfatal-warnings` in sbt to treat all warnings as errors
+      priority: 20
+    - id: "scala-testing"
+      title: "Scala Testing"
+      content: |
+        ## Scala Testing Rules
+
+        - Use ScalaTest or MUnit for all tests
+        - Every class MUST have a corresponding test suite
+        - Run `sbt test` before every commit
+        - Use property-based testing with ScalaCheck for data-driven tests
+      priority: 21
+settings:
+  permissions:
+    allow:
+      - "Bash(sbt *)"
+      - "Bash(scala *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

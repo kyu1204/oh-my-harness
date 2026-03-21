@@ -1,0 +1,42 @@
+name: rust
+displayName: "Rust"
+description: "Rust project with cargo, clippy, and testing"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["rust"]
+variables:
+  language: "rust"
+  testRunner: "cargo test"
+  linter: "cargo clippy"
+claudeMd:
+  sections:
+    - id: "rust-rules"
+      title: "Rust Rules"
+      content: |
+        ## Rust Development Rules
+
+        - Follow Rust ownership and borrowing rules; prefer references over cloning
+        - Run `cargo fmt` before every commit to enforce consistent formatting
+        - Run `cargo clippy -- -D warnings` and fix all warnings before pushing
+        - Use `Result` and `Option` for error handling; avoid `unwrap()` in production code
+        - Prefer `?` operator for error propagation over explicit match
+        - Write unit tests in the same file under `#[cfg(test)]` module
+        - Use `cargo test` to run all tests including doc tests
+      priority: 20
+    - id: "rust-testing"
+      title: "Rust Testing"
+      content: |
+        ## Rust Testing Rules
+
+        - Write unit tests in `#[cfg(test)]` blocks within source files
+        - Write integration tests in the `tests/` directory
+        - Every public function MUST have at least one test
+        - Run `cargo test` before every commit
+      priority: 21
+settings:
+  permissions:
+    allow:
+      - "Bash(cargo *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

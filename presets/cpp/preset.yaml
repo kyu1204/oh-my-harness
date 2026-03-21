@@ -1,0 +1,50 @@
+name: cpp
+displayName: "C / C++"
+description: "C/C++ project with CMake, CTest, and clang-tidy"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["cpp", "c++", "c", "cmake", "systems"]
+variables:
+  language: "cpp"
+  testRunner: "cmake --build . && ctest --output-on-failure"
+  linter: "clang-tidy"
+claudeMd:
+  sections:
+    - id: "cpp-rules"
+      title: "C / C++ Rules"
+      content: |
+        ## C / C++ Development Rules
+
+        - Use C++17 or later; prefer modern features over C-style patterns
+        - Use RAII for resource management; prefer smart pointers over raw pointers
+        - Run `clang-format` before every commit to enforce consistent style
+        - Run `clang-tidy` and fix all warnings before pushing
+        - Use CMake as the build system; keep CMakeLists.txt clean and modular
+        - Enable compiler warnings (-Wall -Wextra -Werror) and treat them as errors
+        - Prefer std library algorithms over hand-written loops
+      priority: 20
+    - id: "cpp-testing"
+      title: "C / C++ Testing"
+      content: |
+        ## C / C++ Testing Rules
+
+        - Use Google Test (gtest) or Catch2 for unit tests
+        - Every module MUST have corresponding test files
+        - Run `cmake --build . && ctest --output-on-failure` before every commit
+        - Use AddressSanitizer (-fsanitize=address) in test builds to detect memory errors
+      priority: 21
+settings:
+  permissions:
+    allow:
+      - "Bash(cmake *)"
+      - "Bash(make *)"
+      - "Bash(gcc *)"
+      - "Bash(g++ *)"
+      - "Bash(clang *)"
+      - "Bash(clang++ *)"
+      - "Bash(clang-tidy *)"
+      - "Bash(clang-format *)"
+      - "Bash(ctest *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

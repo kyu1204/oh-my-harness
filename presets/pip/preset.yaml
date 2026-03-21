@@ -1,0 +1,13 @@
+name: pip
+displayName: "pip"
+description: "pip package manager for Python"
+version: "1.0.0"
+tags: ["python", "pip", "package-manager"]
+variables:
+  packageManager: "pip"
+settings:
+  permissions:
+    allow:
+      - "Bash(pip install *)"
+      - "Bash(pip *)"
+      - "Bash(python -m pip *)"

@@ -1,0 +1,61 @@
+name: react
+displayName: "React (TypeScript)"
+description: "React with TypeScript, Vite, and React Testing Library"
+version: "1.0.0"
+extends: ["typescript"]
+tags: ["react", "typescript", "frontend", "vite", "vitest"]
+variables:
+  framework: "react"
+  testRunner: "vitest"
+claudeMd:
+  sections:
+    - id: "react-rules"
+      title: "React Rules"
+      content: |
+        ## React Development Rules
+
+        - Use functional components exclusively; never use class components
+        - Custom logic MUST be extracted into custom hooks (`use` prefix)
+        - Keep components small and focused on a single responsibility
+        - Use React Testing Library for all component tests; never test implementation details
+        - Avoid `useEffect` for data fetching; use a data-fetching library (React Query, SWR)
+        - Prop types MUST be defined as TypeScript interfaces, not inline
+        - Avoid prop drilling beyond 2 levels; use context or state management instead
+      priority: 20
+    - id: "react-testing"
+      title: "React Testing"
+      content: |
+        ## React Testing Rules
+
+        - Use vitest + @testing-library/react for all tests
+        - Every component MUST have a corresponding .test.tsx file
+        - Test from the user's perspective: query by role, label, text
+        - Run `npx vitest` before every commit
+      priority: 21
+    - id: "react-structure"
+      title: "React Structure"
+      content: |
+        ## React Project Structure
+
+        ```
+        src/
+          components/
+            ui/             # Primitive UI components
+          hooks/            # Custom React hooks
+          pages/            # Route-level components
+          lib/              # Utility functions, constants
+          types/            # TypeScript type definitions
+          App.tsx
+          main.tsx
+        ```
+      priority: 22
+settings:
+  permissions:
+    allow:
+      - "Bash(npx vite*)"
+      - "Bash(npx vitest*)"
+      - "Bash(npm run *)"
+      - "Bash(pnpm *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"

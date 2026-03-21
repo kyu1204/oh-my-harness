@@ -1,0 +1,13 @@
+name: maven
+displayName: "maven"
+description: "Maven build system for Java"
+version: "1.0.0"
+tags: ["java", "maven", "package-manager"]
+variables:
+  packageManager: "maven"
+  testRunner: "mvn test"
+settings:
+  permissions:
+    allow:
+      - "Bash(mvn *)"
+      - "Bash(./mvnw *)"

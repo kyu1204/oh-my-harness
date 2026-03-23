@@ -100,6 +100,7 @@ export async function initCommand(
       if (!message.includes("Preset not found")) {
         console.error("Run `oh-my-harness init --help` for usage information.");
       }
+      process.exitCode = 1;
     }
     return;
   }

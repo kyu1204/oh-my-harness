@@ -8,7 +8,7 @@ export interface StatsCommandOptions {
 }
 
 export async function statsCommand(options: StatsCommandOptions = {}): Promise<void> {
-  if (!process.stdin.isTTY) {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
     console.error("oh-my-harness: stats requires an interactive terminal (TTY). Run this command directly in your terminal.");
     return;
   }

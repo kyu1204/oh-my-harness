@@ -56,9 +56,16 @@ export async function generateSettings(options: GenerateSettingsOptions): Promis
 
   // Compare content without timestamp to decide if managedAt should update
   const newContent = JSON.stringify(result, null, 2) + "\n";
-  const oldResultForCompare = { ...existing };
-  if ((oldResultForCompare._ohMyHarness as Record<string, unknown>)?.managedAt) {
-    (oldResultForCompare._ohMyHarness as Record<string, unknown>).managedAt = "__PLACEHOLDER__";
+  const oldMeta =
+    existing._ohMyHarness && typeof existing._ohMyHarness === "object" && !Array.isArray(existing._ohMyHarness)
+      ? { ...(existing._ohMyHarness as Record<string, unknown>) }
+      : {};
+  const oldResultForCompare: Record<string, unknown> = {
+    ...existing,
+    _ohMyHarness: oldMeta,
+  };
+  if (oldMeta.managedAt) {
+    oldMeta.managedAt = "__PLACEHOLDER__";
   }
   const oldContent = JSON.stringify(oldResultForCompare, null, 2) + "\n";
 

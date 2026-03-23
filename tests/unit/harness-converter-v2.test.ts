@@ -326,6 +326,11 @@ describe("harnessToMergedConfigV2", () => {
     // Both instances should exist, not just the first
     const lintHooks = result.hooks.postToolUse.filter((h) => h.id.includes("lint-on-save"));
     expect(lintHooks.length).toBe(2);
+    // Verify different params rendered into different scripts
+    expect(lintHooks[0].inline).toContain("eslint");
+    expect(lintHooks[1].inline).toContain("ruff");
+    // Verify distinct IDs
+    expect(lintHooks[0].id).not.toBe(lintHooks[1].id);
     // No duplicate error
     expect(result.catalogErrors?.some((e) => e.includes("Duplicate"))).toBeFalsy();
   });

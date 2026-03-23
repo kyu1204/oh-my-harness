@@ -334,7 +334,8 @@ describe("generateHooks — extended events", () => {
     const result = await generateHooks({ projectDir, config });
 
     expect(result.generatedFiles).toHaveLength(1);
-    expect(result.hooksConfig["Notification"]).toBeDefined();
+    expect(result.hooksConfig["Notification"]).toHaveLength(1);
+    expect(result.hooksConfig["Notification"][0].hooks[0].command).toContain("desktop-notify.sh");
   });
 
   it("generates scripts for ConfigChange hooks", async () => {
@@ -351,7 +352,8 @@ describe("generateHooks — extended events", () => {
     const result = await generateHooks({ projectDir, config });
 
     expect(result.generatedFiles).toHaveLength(1);
-    expect(result.hooksConfig["ConfigChange"]).toBeDefined();
+    expect(result.hooksConfig["ConfigChange"]).toHaveLength(1);
+    expect(result.hooksConfig["ConfigChange"][0].hooks[0].command).toContain("config-audit.sh");
   });
 
   it("mixes standard and extended events in single config", async () => {

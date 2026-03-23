@@ -36,6 +36,10 @@ export async function generateSettings(options: GenerateSettingsOptions): Promis
     new Set([...(existingPermissions.deny ?? []), ...(config.settings.permissions.deny ?? [])]),
   );
 
+  // Preserve managedAt if content is unchanged
+  const existingMeta = (existing._ohMyHarness ?? {}) as { managedAt?: string };
+  const previousManagedAt = existingMeta.managedAt;
+
   const result: Record<string, unknown> = {
     ...existing,
     permissions: {
@@ -45,10 +49,31 @@ export async function generateSettings(options: GenerateSettingsOptions): Promis
     },
     hooks: hooksOutput.hooksConfig,
     _ohMyHarness: {
-      managedAt: new Date().toISOString(),
+      managedAt: "__PLACEHOLDER__",
       presets: config.presets,
     },
   };
+
+  // Compare content without timestamp to decide if managedAt should update
+  const newContent = JSON.stringify(result, null, 2) + "\n";
+  const oldMeta =
+    existing._ohMyHarness && typeof existing._ohMyHarness === "object" && !Array.isArray(existing._ohMyHarness)
+      ? { ...(existing._ohMyHarness as Record<string, unknown>) }
+      : {};
+  const oldResultForCompare: Record<string, unknown> = {
+    ...existing,
+    _ohMyHarness: oldMeta,
+  };
+  if (oldMeta.managedAt) {
+    oldMeta.managedAt = "__PLACEHOLDER__";
+  }
+  const oldContent = JSON.stringify(oldResultForCompare, null, 2) + "\n";
+
+  const managedAt = newContent === oldContent && previousManagedAt
+    ? previousManagedAt
+    : new Date().toISOString();
+
+  (result._ohMyHarness as Record<string, unknown>).managedAt = managedAt;
 
   await fs.mkdir(claudeDir, { recursive: true });
   await fs.writeFile(settingsPath, JSON.stringify(result, null, 2) + "\n", "utf-8");

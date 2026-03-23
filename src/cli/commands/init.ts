@@ -92,7 +92,16 @@ export async function initCommand(
 
   // If --preset flag is used, go through preset flow
   if (options.preset && options.preset.length > 0) {
-    await initWithPresets(options.preset, projectDir, presetsDir, options);
+    try {
+      await initWithPresets(options.preset, projectDir, presetsDir, options);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`oh-my-harness: ${message}`);
+      if (!message.includes("Preset not found")) {
+        console.error("Run `oh-my-harness init --help` for usage information.");
+      }
+      process.exitCode = 1;
+    }
     return;
   }
 

@@ -7,6 +7,7 @@ export interface DoctorOptions {
 
 export interface DoctorResult {
   healthy: boolean;
+  exitCode: number;
   checks: {
     stateFile: boolean;
     claudeMd: boolean;
@@ -88,6 +89,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<Doctor
   }
 
   const healthy = Object.values(checks).every(Boolean);
+  const exitCode = healthy ? 0 : 1;
 
   if (healthy) {
     console.log("oh-my-harness: all checks passed");
@@ -98,5 +100,5 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<Doctor
     }
   }
 
-  return { healthy, checks, messages };
+  return { healthy, exitCode, checks, messages };
 }

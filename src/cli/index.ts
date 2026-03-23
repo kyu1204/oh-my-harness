@@ -43,7 +43,10 @@ export function createCli(): Command {
     .description("Validate harness configuration health")
     .action(async () => {
       const { doctorCommand } = await import("./commands/doctor.js");
-      await doctorCommand();
+      const result = await doctorCommand();
+      if (result.exitCode !== 0) {
+        process.exitCode = result.exitCode;
+      }
     });
 
   program

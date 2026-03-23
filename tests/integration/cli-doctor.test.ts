@@ -75,4 +75,18 @@ describe("doctorCommand", () => {
     // At minimum stateFile, claudeMd, and settingsJson should fail
     expect(failMessages.length).toBeGreaterThanOrEqual(1);
   });
+
+  it("returns exitCode 1 when unhealthy", async () => {
+    // Nothing initialized — doctor should indicate failure
+    const result = await doctorCommand({ projectDir: tmpDir });
+    expect(result.healthy).toBe(false);
+    expect(result.exitCode).toBe(1);
+  });
+
+  it("returns exitCode 0 when healthy", async () => {
+    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    const result = await doctorCommand({ projectDir: tmpDir });
+    expect(result.healthy).toBe(true);
+    expect(result.exitCode).toBe(0);
+  });
 });

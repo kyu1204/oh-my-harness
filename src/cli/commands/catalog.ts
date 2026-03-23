@@ -12,6 +12,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
   notification: "🔔",
   prompt: "💬",
   permission: "🔐",
+  audit: "📝",
 };
 
 function categoryLabel(category: string): string {

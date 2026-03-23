@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { HarnessConfigSchema } from "../../src/core/harness-schema.js";
 import { renderTemplate, validateParams } from "../../src/catalog/template-engine.js";
 import { convertHookEntries } from "../../src/catalog/converter.js";
@@ -11,6 +11,7 @@ import { appendEvent, readEvents } from "../../src/cli/event-logger.js";
 import { wrapWithLogger } from "../../src/generators/hooks.js";
 import { generateClaudeMd } from "../../src/generators/claude-md.js";
 import { detectProject } from "../../src/detector/project-detector.js";
+import { initCommand } from "../../src/cli/commands/init.js";
 import type { MergedConfig } from "../../src/core/preset-types.js";
 import type { BuildingBlock } from "../../src/catalog/types.js";
 
@@ -311,6 +312,36 @@ describe("generateClaudeMd edge cases", () => {
     expect(result).toContain("New content");
     // The broken section remains untouched (regex won't match without end marker)
     expect(result).toContain("<!-- oh-my-harness:start:broken-section -->");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// initCommand — invalid preset name
+// ---------------------------------------------------------------------------
+
+describe("initCommand invalid preset", () => {
+  it("prints user-friendly error and does not expose stack trace for unknown preset", async () => {
+    const logs: string[] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => logs.push(args.join(" "));
+
+    let threw = false;
+    try {
+      await initCommand([], {
+        yes: true,
+        projectDir: tmpDir,
+        presetsDir: resolve(import.meta.dirname, "../../presets"),
+        preset: ["nonexistent_preset_xyz"],
+      });
+    } catch {
+      threw = true;
+    }
+
+    console.error = originalError;
+
+    // Should not propagate the raw error — it should be caught and logged
+    expect(threw).toBe(false);
+    expect(logs.some((l) => l.includes("nonexistent_preset_xyz"))).toBe(true);
   });
 });
 

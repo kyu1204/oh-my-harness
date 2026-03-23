@@ -8,6 +8,11 @@ export interface StatsCommandOptions {
 }
 
 export async function statsCommand(options: StatsCommandOptions = {}): Promise<void> {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    console.error("oh-my-harness: stats requires an interactive terminal (TTY). Run this command directly in your terminal.");
+    return;
+  }
+
   const projectDir = options.projectDir ?? process.cwd();
   const data = await loadStatsData(projectDir);
 

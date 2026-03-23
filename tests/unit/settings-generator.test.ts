@@ -130,4 +130,21 @@ describe("generateSettings", () => {
     expect(settings.permissions.allow).toContain("Bash(pnpm test*)");
     expect(settings.permissions.deny).toContain("Bash(rm -rf /)");
   });
+
+  it("is idempotent — running twice with same config produces identical output", async () => {
+    const config = makeMergedConfig();
+    const hooksOutput = makeHooksOutput();
+
+    await generateSettings({ projectDir: tmpDir, config, hooksOutput });
+    const settingsPath = path.join(tmpDir, ".claude", "settings.json");
+    const first = await fs.readFile(settingsPath, "utf-8");
+
+    // Force a different timestamp by waiting
+    await new Promise((r) => setTimeout(r, 50));
+
+    await generateSettings({ projectDir: tmpDir, config, hooksOutput });
+    const second = await fs.readFile(settingsPath, "utf-8");
+
+    expect(first).toBe(second);
+  });
 });

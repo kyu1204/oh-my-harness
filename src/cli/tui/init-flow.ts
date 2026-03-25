@@ -11,7 +11,9 @@ import { PresetRegistry } from "../../core/preset-registry.js";
 import { loadAndMergePresets, writeHarnessState } from "../commands/init.js";
 import { mergePresets } from "../../core/config-merger.js";
 import { generate } from "../../core/generator.js";
-import { generateHarnessConfig } from "../../nl/parse-intent.js";
+import { generateHarnessConfig, createDefaultRunner } from "../../nl/parse-intent.js";
+import { hasProviderConfig } from "../../nl/config-store.js";
+import { runProviderSetup } from "./provider-setup.js";
 import { mergeEnforcementAndHooks } from "../../core/harness-converter.js";
 import type { HarnessConfig } from "../../core/harness-schema.js";
 import { HarnessConfigSchema } from "../../core/harness-schema.js";
@@ -232,7 +234,19 @@ export async function runInitTUI(options?: {
   let presetNames: string[] | undefined;
 
   if (mode === "nl") {
-    // Step 4a: NL Mode
+    // Step 4a: NL Mode — check provider config
+    const hasConfig = await hasProviderConfig();
+    if (!hasConfig) {
+      p.log.info("No AI provider configured yet. Let's set one up.");
+      const providerConfig = await runProviderSetup();
+      if (!providerConfig) {
+        p.cancel("Provider setup cancelled. Use preset mode instead.");
+        process.exit(0);
+      }
+    }
+
+    const runner = await createDefaultRunner();
+
     const description = await p.text({
       message: "Describe your project:",
       placeholder: "e.g., Next.js e-commerce app with Stripe and Tailwind",
@@ -254,7 +268,7 @@ export async function runInitTUI(options?: {
         description: b.description,
         params: b.params.map((pp) => ({ name: pp.name, required: pp.required, default: pp.default, description: pp.description })),
       }));
-      harnessConfig = await generateHarnessConfig(description as string, undefined, catalogBlocks, projectFacts);
+      harnessConfig = await generateHarnessConfig(description as string, runner, catalogBlocks, projectFacts);
       genSpinner.stop("Configuration generated");
     } catch (err) {
       genSpinner.stop("Generation failed");

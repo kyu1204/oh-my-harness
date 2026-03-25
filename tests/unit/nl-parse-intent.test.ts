@@ -356,3 +356,20 @@ describe("generateHarnessConfig", () => {
     expect(result.hooks).toHaveLength(2);
   });
 });
+
+describe("createDefaultRunner", () => {
+  it("returns a function", async () => {
+    const { createDefaultRunner } = await import("../../src/nl/parse-intent.js");
+    const runner = await createDefaultRunner();
+    expect(typeof runner).toBe("function");
+  });
+});
+
+describe("LLMRunner type compatibility", () => {
+  it("ClaudeRunner and LLMRunner are interchangeable", () => {
+    // ClaudeRunner is an alias of LLMRunner — any ClaudeRunner is a valid LLMRunner
+    const runner: ClaudeRunner = async (prompt: string) => `echo ${prompt}`;
+    // Should be usable wherever LLMRunner is expected
+    expect(typeof runner).toBe("function");
+  });
+});

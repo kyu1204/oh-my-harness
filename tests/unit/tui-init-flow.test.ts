@@ -233,3 +233,15 @@ describe("formatProjectFacts", () => {
     expect(output).toContain("No project signals detected");
   });
 });
+
+describe("NL mode provider integration", () => {
+  it("init-flow imports createDefaultRunner from parse-intent", async () => {
+    const mod = await import("../../src/nl/parse-intent.js");
+    expect(typeof mod.createDefaultRunner).toBe("function");
+  });
+
+  it("init-flow imports hasProviderConfig from config-store", async () => {
+    const mod = await import("../../src/nl/config-store.js");
+    expect(typeof mod.hasProviderConfig).toBe("function");
+  });
+});

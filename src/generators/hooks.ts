@@ -61,6 +61,7 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
     ["SessionStart", config.hooks.sessionStart ?? []],
     ["Notification", config.hooks.notification ?? []],
     ["ConfigChange", config.hooks.configChange ?? []],
+    ["WorktreeCreate", config.hooks.worktreeCreate ?? []],
   ];
 
   const allHooks = eventMap.flatMap(([event, hooks]) =>

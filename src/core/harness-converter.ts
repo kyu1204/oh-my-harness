@@ -92,6 +92,7 @@ export function harnessToMergedConfig(harness: HarnessConfig): MergedConfig {
       sessionStart: [],
       notification: [],
       configChange: [],
+      worktreeCreate: [],
     },
     settings: {
       permissions: {

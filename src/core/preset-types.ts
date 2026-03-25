@@ -33,6 +33,7 @@ export const HooksConfigSchema = z.object({
   sessionStart: z.array(HookDefinitionSchema).optional(),
   notification: z.array(HookDefinitionSchema).optional(),
   configChange: z.array(HookDefinitionSchema).optional(),
+  worktreeCreate: z.array(HookDefinitionSchema).optional(),
 });
 
 export type HooksConfig = z.infer<typeof HooksConfigSchema>;

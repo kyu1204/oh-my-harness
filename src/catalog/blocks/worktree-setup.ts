@@ -14,14 +14,14 @@ export const worktreeSetup: BuildingBlock = {
       type: "string[]",
       description: "Paths to symlink from main worktree (heavy dependencies)",
       required: false,
-      default: "node_modules,.venv,vendor,target,.build",
+      default: ["node_modules", ".venv", "vendor", "target", ".build"],
     },
     {
       name: "copyPaths",
       type: "string[]",
       description: "Paths to hard-copy from main worktree (config files)",
       required: false,
-      default: ".env,.env.local",
+      default: [".env", ".env.local"],
     },
     {
       name: "installCommand",
@@ -53,10 +53,8 @@ fi
 echo "oh-my-harness: worktree-setup — setting up $WORKTREE_PATH"
 
 # Symlink heavy directories from main worktree
-SYMLINK_PATHS="{{{symlinkPaths}}}"
-IFS=',' read -ra SYMLINKS <<< "$SYMLINK_PATHS"
+SYMLINKS=({{#each symlinkPaths}}"{{{this}}}" {{/each}})
 for rel in "\${SYMLINKS[@]}"; do
-  rel=$(echo "$rel" | xargs) # trim whitespace
   [[ -z "$rel" ]] && continue
   src="$MAIN_WORKTREE/$rel"
   dst="$WORKTREE_PATH/$rel"
@@ -68,10 +66,8 @@ for rel in "\${SYMLINKS[@]}"; do
 done
 
 # Hard-copy config files from main worktree
-COPY_PATHS="{{{copyPaths}}}"
-IFS=',' read -ra COPIES <<< "$COPY_PATHS"
+COPIES=({{#each copyPaths}}"{{{this}}}" {{/each}})
 for rel in "\${COPIES[@]}"; do
-  rel=$(echo "$rel" | xargs)
   [[ -z "$rel" ]] && continue
   src="$MAIN_WORKTREE/$rel"
   dst="$WORKTREE_PATH/$rel"
@@ -85,9 +81,7 @@ done
 # Run install command if provided and no symlinked deps exist
 INSTALL_CMD="{{{installCommand}}}"
 if [[ -n "$INSTALL_CMD" ]]; then
-  # Check if primary dependency dir exists (first symlink target)
   first_symlink="\${SYMLINKS[0]}"
-  first_symlink=$(echo "$first_symlink" | xargs)
   if [[ -n "$first_symlink" && ! -e "$WORKTREE_PATH/$first_symlink" ]]; then
     echo "  running: $INSTALL_CMD"
     cd "$WORKTREE_PATH" && eval "$INSTALL_CMD"

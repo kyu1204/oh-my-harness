@@ -29,8 +29,20 @@ describe("worktree-setup block", () => {
     expect(worktreeSetup.template).toContain("cp");
   });
 
-  it("template includes install command param", () => {
+  it("has installCommand param", () => {
     const paramNames = worktreeSetup.params.map((p) => p.name);
     expect(paramNames).toContain("installCommand");
+  });
+
+  it("uses array defaults for symlinkPaths and copyPaths", () => {
+    const symlinkParam = worktreeSetup.params.find((p) => p.name === "symlinkPaths");
+    const copyParam = worktreeSetup.params.find((p) => p.name === "copyPaths");
+    expect(Array.isArray(symlinkParam!.default)).toBe(true);
+    expect(Array.isArray(copyParam!.default)).toBe(true);
+  });
+
+  it("template uses Handlebars each for array iteration", () => {
+    expect(worktreeSetup.template).toContain("{{#each symlinkPaths}}");
+    expect(worktreeSetup.template).toContain("{{#each copyPaths}}");
   });
 });

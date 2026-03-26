@@ -23,7 +23,7 @@ export type HookEvent =
   | "UserPromptSubmit"
   | "ConfigChange"
   | "WorktreeCreate"
-  | "WorktreeRemove";
+  | "WorktreeRemove"; // TODO: wire WorktreeRemove through runtime pipeline when cleanup blocks are needed
 
 export type BuildingBlockCategory =
   | "git"

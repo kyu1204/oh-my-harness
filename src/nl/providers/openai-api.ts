@@ -41,11 +41,12 @@ export function createOpenaiApiProvider(
         choices: Array<{ message: { content: string } }>;
       };
 
-      if (!data.choices?.[0]?.message?.content) {
+      const content = data.choices?.[0]?.message?.content;
+      if (content == null) {
         throw new Error("OpenAI API returned no content");
       }
 
-      return data.choices[0].message.content;
+      return content;
     },
   };
 }

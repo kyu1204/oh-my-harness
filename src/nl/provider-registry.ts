@@ -57,6 +57,10 @@ export function createProvider(config: ProviderConfig): LLMProvider {
     throw new Error(`Unknown AI provider: "${config.provider}". Available: ${providers.map((p) => p.name).join(", ")}`);
   }
 
+  if (config.method !== "cli" && config.method !== "api") {
+    throw new Error(`Unsupported provider method: "${String(config.method)}"`);
+  }
+
   if (config.method === "cli") {
     if (config.provider === "claude") {
       return createClaudeCliProvider(config.cliCommand ?? "claude");

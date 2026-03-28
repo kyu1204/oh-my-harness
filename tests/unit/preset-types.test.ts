@@ -22,6 +22,13 @@ describe("HooksConfigSchema", () => {
     expect(parsed.configChange).toHaveLength(1);
   });
 
+  it("supports worktreeCreate event type", () => {
+    const parsed = HooksConfigSchema.parse({
+      worktreeCreate: [{ id: "test-wt", matcher: "" }],
+    });
+    expect(parsed.worktreeCreate).toHaveLength(1);
+  });
+
   it("all event fields are optional", () => {
     const parsed = HooksConfigSchema.parse({});
     expect(parsed.preToolUse).toBeUndefined();
@@ -29,5 +36,6 @@ describe("HooksConfigSchema", () => {
     expect(parsed.sessionStart).toBeUndefined();
     expect(parsed.notification).toBeUndefined();
     expect(parsed.configChange).toBeUndefined();
+    expect(parsed.worktreeCreate).toBeUndefined();
   });
 });

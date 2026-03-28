@@ -16,6 +16,7 @@ const eventToField: Record<string, keyof HooksConfig> = {
   SessionStart: "sessionStart",
   Notification: "notification",
   ConfigChange: "configChange",
+  WorktreeCreate: "worktreeCreate",
 };
 
 export async function harnessToMergedConfigV2(
@@ -71,6 +72,7 @@ export async function harnessToMergedConfigV2(
     sessionStart: [...(base.hooks.sessionStart ?? []), ...(additionalHooks.sessionStart ?? [])],
     notification: [...(base.hooks.notification ?? []), ...(additionalHooks.notification ?? [])],
     configChange: [...(base.hooks.configChange ?? []), ...(additionalHooks.configChange ?? [])],
+    worktreeCreate: [...(base.hooks.worktreeCreate ?? []), ...(additionalHooks.worktreeCreate ?? [])],
   };
 
   return {

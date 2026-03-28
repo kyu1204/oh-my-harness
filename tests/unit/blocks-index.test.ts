@@ -10,6 +10,7 @@ describe("blocks index", () => {
     expect(ids).toContain("desktop-notify");
     expect(ids).toContain("config-audit");
     expect(ids).toContain("compact-context");
-    expect(builtinBlocks.length).toBe(16);
+    expect(ids).toContain("worktree-setup");
+    expect(builtinBlocks.length).toBe(17);
   });
 });

@@ -11,4 +11,14 @@ describe("catalog types", () => {
     const category: BuildingBlockCategory = "audit";
     expect(category).toBe("audit");
   });
+
+  it("WorktreeCreate is a valid HookEvent", () => {
+    const event: HookEvent = "WorktreeCreate";
+    expect(event).toBe("WorktreeCreate");
+  });
+
+  it("WorktreeRemove is a valid HookEvent", () => {
+    const event: HookEvent = "WorktreeRemove";
+    expect(event).toBe("WorktreeRemove");
+  });
 });

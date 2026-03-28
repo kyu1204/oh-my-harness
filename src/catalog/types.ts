@@ -21,7 +21,9 @@ export type HookEvent =
   | "PreToolResult"
   | "PostToolResult"
   | "UserPromptSubmit"
-  | "ConfigChange";
+  | "ConfigChange"
+  | "WorktreeCreate"
+  | "WorktreeRemove"; // TODO: wire WorktreeRemove through runtime pipeline when cleanup blocks are needed
 
 export type BuildingBlockCategory =
   | "git"
@@ -74,7 +76,7 @@ export const BuildingBlockSchema = z.object({
   name: z.string(),
   description: z.string(),
   category: z.enum(["git", "quality", "security", "notification", "formatting", "custom", "auto-fix", "automation", "file-protection", "audit"]),
-  event: z.enum(["PreToolUse", "PostToolUse", "PreCompact", "PostCompact", "Notification", "Stop", "SubagentStop", "PreBash", "PostBash", "PreEdit", "PostEdit", "PreRead", "PostRead", "PreWrite", "PostWrite", "SessionStart", "SessionEnd", "PreToolResult", "PostToolResult", "UserPromptSubmit", "ConfigChange"]),
+  event: z.enum(["PreToolUse", "PostToolUse", "PreCompact", "PostCompact", "Notification", "Stop", "SubagentStop", "PreBash", "PostBash", "PreEdit", "PostEdit", "PreRead", "PostRead", "PreWrite", "PostWrite", "SessionStart", "SessionEnd", "PreToolResult", "PostToolResult", "UserPromptSubmit", "ConfigChange", "WorktreeCreate", "WorktreeRemove"]),
   matcher: z.string().optional(),
   canBlock: z.boolean(),
   params: z.array(ParamDefinitionSchema),

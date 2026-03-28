@@ -8,6 +8,7 @@ export function mergePresets(presets: PresetConfig[]): MergedConfig {
   const sessionStartMap = new Map<string, HookDefinition>();
   const notificationMap = new Map<string, HookDefinition>();
   const configChangeMap = new Map<string, HookDefinition>();
+  const worktreeCreateMap = new Map<string, HookDefinition>();
   const allowSet = new Set<string>();
   const denySet = new Set<string>();
   const presetNames: string[] = [];
@@ -53,6 +54,11 @@ export function mergePresets(presets: PresetConfig[]): MergedConfig {
         configChangeMap.set(hook.id, hook);
       }
     }
+    if (preset.hooks?.worktreeCreate) {
+      for (const hook of preset.hooks.worktreeCreate) {
+        worktreeCreateMap.set(hook.id, hook);
+      }
+    }
 
     // Merge settings (accumulate)
     if (preset.settings?.permissions?.allow) {
@@ -76,6 +82,7 @@ export function mergePresets(presets: PresetConfig[]): MergedConfig {
       sessionStart: Array.from(sessionStartMap.values()),
       notification: Array.from(notificationMap.values()),
       configChange: Array.from(configChangeMap.values()),
+      worktreeCreate: Array.from(worktreeCreateMap.values()),
     },
     settings: {
       permissions: {

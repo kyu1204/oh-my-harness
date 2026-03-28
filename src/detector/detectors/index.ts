@@ -13,6 +13,7 @@ import { dartDetector } from "./dart.js";
 import { elixirDetector } from "./elixir.js";
 import { scalaDetector } from "./scala.js";
 import { zigDetector } from "./zig.js";
+import { terraformDetector } from "./terraform.js";
 
 export const allDetectors: Detector[] = [
   nodeDetector,
@@ -29,4 +30,5 @@ export const allDetectors: Detector[] = [
   elixirDetector,
   scalaDetector,
   zigDetector,
+  terraformDetector,
 ];

@@ -1,0 +1,65 @@
+name: terraform
+displayName: "Terraform"
+description: "Infrastructure as Code with Terraform/OpenTofu, tflint, and tfsec"
+version: "1.0.0"
+extends: ["_base"]
+tags: ["terraform", "iac", "infrastructure", "hcl"]
+variables:
+  language: "hcl"
+  framework: "terraform"
+  testRunner: "terraform test"
+  linter: "tflint"
+claudeMd:
+  sections:
+    - id: "terraform-rules"
+      title: "Terraform Rules"
+      content: |
+        ## Terraform Development Rules
+
+        - Run `terraform fmt` before every commit
+        - Run `terraform validate` to check syntax before applying
+        - NEVER modify `.tfstate` files directly — use `terraform state` commands
+        - NEVER hardcode secrets in `.tf` or `.tfvars` files — use variables with sensitive flag
+        - Use `terraform plan` to preview changes before `terraform apply`
+        - NEVER use `terraform apply -auto-approve` without explicit user confirmation
+        - Use consistent naming: snake_case for resources, variables, and outputs
+        - Pin provider versions in `required_providers` block
+        - Use modules for reusable infrastructure components
+      priority: 20
+    - id: "terraform-testing"
+      title: "Terraform Testing"
+      content: |
+        ## Terraform Testing Rules
+
+        - Write tests in `tests/` directory using `terraform test` (HCL-based)
+        - Validate all modules with `terraform validate` before commit
+        - Run `tflint` to catch common misconfigurations
+        - Run `tfsec` for security scanning
+        - Use `terraform plan` as a smoke test for syntax and dependency checks
+      priority: 21
+    - id: "terraform-structure"
+      title: "Terraform Structure"
+      content: |
+        ## Terraform Project Structure
+
+        - `main.tf` — Primary resource definitions
+        - `variables.tf` — Input variable declarations
+        - `outputs.tf` — Output value declarations
+        - `providers.tf` — Provider configuration and version constraints
+        - `terraform.tfvars` — Variable values (DO NOT commit secrets)
+        - `modules/` — Reusable module definitions
+        - `tests/` — Terraform test files
+      priority: 22
+settings:
+  permissions:
+    allow:
+      - "Bash(terraform *)"
+      - "Bash(tofu *)"
+      - "Bash(tflint *)"
+      - "Bash(tfsec *)"
+      - "Bash(terraform-docs *)"
+    deny:
+      - "Bash(sudo *)"
+      - "Bash(rm -rf *)"
+      - "Bash(terraform apply -auto-approve*)"
+      - "Bash(terraform apply --auto-approve*)"

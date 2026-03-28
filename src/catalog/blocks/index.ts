@@ -16,6 +16,7 @@ import { testOnSave } from "./test-on-save.js";
 import { desktopNotify } from "./desktop-notify.js";
 import { configAudit } from "./config-audit.js";
 import { compactContext } from "./compact-context.js";
+import { worktreeSetup } from "./worktree-setup.js";
 
 export const builtinBlocks: BuildingBlock[] = [
   branchGuard,
@@ -34,4 +35,5 @@ export const builtinBlocks: BuildingBlock[] = [
   desktopNotify,
   configAudit,
   compactContext,
+  worktreeSetup,
 ];

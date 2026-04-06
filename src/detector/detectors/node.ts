@@ -183,7 +183,7 @@ export const nodeDetector: Detector = {
     const tsconfigPath = path.join(projectDir, "tsconfig.json");
     if (await fileExists(tsconfigPath)) {
       languages.push("typescript");
-      typecheckCommands.push("tsc --noEmit");
+      typecheckCommands.push("npx tsc --noEmit");
       detectedFiles.push("tsconfig.json");
     } else {
       languages.push("javascript");

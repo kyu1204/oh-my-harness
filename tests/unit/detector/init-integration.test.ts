@@ -97,7 +97,7 @@ describe("NL init flow + detectProject integration", () => {
       testCommands: ["pnpm test"],
       lintCommands: ["eslint ."],
       buildCommands: ["pnpm build"],
-      typecheckCommands: ["tsc --noEmit"],
+      typecheckCommands: ["npx tsc --noEmit"],
       blockedPaths: ["node_modules/"],
       detectedFiles: ["package.json", "tsconfig.json"],
     };

@@ -80,7 +80,7 @@ describe("detectProject", () => {
         testCommands: ["pnpm test"],
         lintCommands: ["eslint --fix"],
         buildCommands: ["pnpm build"],
-        typecheckCommands: ["tsc --noEmit"],
+        typecheckCommands: ["npx tsc --noEmit"],
         blockedPaths: [".next/", "node_modules/"],
         detectedFiles: ["package.json", "tsconfig.json"],
       }),
@@ -94,7 +94,7 @@ describe("detectProject", () => {
     expect(facts.testCommands).toEqual(["pnpm test"]);
     expect(facts.lintCommands).toEqual(["eslint --fix"]);
     expect(facts.buildCommands).toEqual(["pnpm build"]);
-    expect(facts.typecheckCommands).toEqual(["tsc --noEmit"]);
+    expect(facts.typecheckCommands).toEqual(["npx tsc --noEmit"]);
     expect(facts.blockedPaths).toEqual([".next/", "node_modules/"]);
     expect(facts.detectedFiles).toEqual(["package.json", "tsconfig.json"]);
   });

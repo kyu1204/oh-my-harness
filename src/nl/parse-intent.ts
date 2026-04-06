@@ -1,10 +1,12 @@
-import { spawn } from "node:child_process";
 import yaml from "js-yaml";
 import { buildPresetSelectionPrompt, buildHarnessGenerationPrompt } from "./prompt-templates.js";
 import type { PresetInfo, CatalogBlockInfo } from "./prompt-templates.js";
 import { HarnessConfigSchema } from "../core/harness-schema.js";
 import type { HarnessConfig } from "../core/harness-schema.js";
 import type { ProjectFacts } from "../detector/project-detector.js";
+import { loadProviderConfig } from "./config-store.js";
+import { createProvider } from "./provider-registry.js";
+import { createClaudeCliProvider } from "./providers/claude-cli.js";
 
 export interface ParsedIntent {
   presets: string[];
@@ -12,41 +14,28 @@ export interface ParsedIntent {
   explanation: string;
 }
 
-export type ClaudeRunner = (prompt: string) => Promise<string>;
+/** Generic LLM runner type — takes a prompt and returns a response string */
+export type LLMRunner = (prompt: string) => Promise<string>;
 
-export const defaultClaudeRunner: ClaudeRunner = async (prompt) => {
-  return new Promise((resolve, reject) => {
-    const proc = spawn("claude", ["-p", "-"], {
-      stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env },
-    });
+/** @deprecated Use LLMRunner instead. Kept for backward compatibility. */
+export type ClaudeRunner = LLMRunner;
 
-    let stdout = "";
-    let stderr = "";
+/** Creates a runner from the saved provider config (~/.omh/config.json) or falls back to claude CLI */
+export async function createDefaultRunner(): Promise<LLMRunner> {
+  const config = await loadProviderConfig();
+  if (config) {
+    const provider = createProvider(config);
+    return (prompt: string) => provider.run(prompt);
+  }
+  // Fallback: claude CLI
+  const cliProvider = createClaudeCliProvider("claude");
+  return (prompt: string) => cliProvider.run(prompt);
+}
 
-    proc.stdout.on("data", (data: Buffer) => { stdout += data.toString(); });
-    proc.stderr.on("data", (data: Buffer) => { stderr += data.toString(); });
-
-    proc.on("error", (err: NodeJS.ErrnoException) => {
-      if (err.code === "ENOENT") {
-        reject(new Error("claude CLI not found. Install it with: npm install -g @anthropic-ai/claude-code"));
-      } else {
-        reject(err);
-      }
-    });
-
-    proc.on("close", (code) => {
-      if (code === 0) {
-        resolve(stdout);
-      } else {
-        reject(new Error(`claude exited with code ${code}: ${stderr || stdout}`));
-      }
-    });
-
-    // Write prompt to stdin and close
-    proc.stdin.write(prompt);
-    proc.stdin.end();
-  });
+/** Legacy default runner using claude CLI directly */
+export const defaultClaudeRunner: LLMRunner = async (prompt) => {
+  const cliProvider = createClaudeCliProvider("claude");
+  return cliProvider.run(prompt);
 };
 
 function extractJson(text: string): string {

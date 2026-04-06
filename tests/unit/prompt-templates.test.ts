@@ -10,7 +10,7 @@ const fullFacts: ProjectFacts = {
   testCommands: ["pnpm test"],
   lintCommands: ["eslint --fix"],
   buildCommands: ["pnpm build"],
-  typecheckCommands: ["tsc --noEmit"],
+  typecheckCommands: ["npx tsc --noEmit"],
   blockedPaths: [".next/", "node_modules/", "dist/"],
   detectedFiles: ["package.json", "tsconfig.json"],
 };
@@ -72,7 +72,7 @@ describe("buildHarnessGenerationPrompt with projectFacts", () => {
 
   it("includes typecheck commands in facts section", () => {
     const prompt = buildHarnessGenerationPrompt("my app", undefined, fullFacts);
-    expect(prompt).toContain("- Typecheck commands: tsc --noEmit");
+    expect(prompt).toContain("- Typecheck commands: npx tsc --noEmit");
   });
 
   it("includes blocked paths in facts section", () => {

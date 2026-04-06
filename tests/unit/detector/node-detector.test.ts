@@ -230,7 +230,7 @@ describe("nodeDetector", () => {
     const result = await nodeDetector.detect(tmpDir);
 
     expect(result.languages).toContain("typescript");
-    expect(result.typecheckCommands).toContain("tsc --noEmit");
+    expect(result.typecheckCommands).toContain("npx tsc --noEmit");
     expect(result.detectedFiles).toContain("tsconfig.json");
   });
 

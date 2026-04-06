@@ -140,6 +140,33 @@ describe("tdd-guard execution", () => {
   );
 
   it.runIf(hasJq())(
+    "blocks second source edit after first passed — test record consumed",
+    async () => {
+      const historyPath = join(tmpDir, ".claude/hooks/.state/edit-history.json");
+      // Turn 1: record test file
+      await writeFile(historyPath, JSON.stringify({ edits: ["tests/unit/event-logger.test.ts"] }));
+
+      // Turn 1: source edit passes (consumes the test record)
+      runScript(
+        scriptPath,
+        JSON.stringify({ tool_name: "Edit", tool_input: { file_path: "src/event-logger.ts" } }),
+        tmpDir,
+      );
+
+      // Turn 2: same source edit again — should block because test record was consumed
+      const stdout = runScript(
+        scriptPath,
+        JSON.stringify({ tool_name: "Edit", tool_input: { file_path: "src/event-logger.ts" } }),
+        tmpDir,
+      );
+      const trimmed = stdout.trim();
+      expect(trimmed).not.toBe("");
+      const result = JSON.parse(trimmed);
+      expect(result.decision).toBe("block");
+    },
+  );
+
+  it.runIf(hasJq())(
     "records decision=block in events.jsonl when source file blocked",
     async () => {
       // No edit-history → block

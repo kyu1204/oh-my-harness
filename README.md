@@ -65,11 +65,14 @@ omh stats         # TUI analytics dashboard
 ### 📁 What Gets Generated
 
 ```text
+~/.omh/
+└── config.json                        # AI provider config (global, not per-project)
+
 your-project/
 ├── CLAUDE.md                          # TDD rules, coding standards
 ├── harness.yaml                       # Your harness config (source of truth)
 └── .claude/
-    ├── settings.json                  # Hook configs, permissions, AI provider
+    ├── settings.json                  # Hook configs, permissions
     ├── hooks/
     │   ├── catalog-branch-guard.sh    # Blocks commits on merged branches
     │   ├── catalog-tdd-guard.sh       # Enforces test-first workflow

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { formatDepResults, formatConfigSummary, formatProjectFacts, buildPresetExtends } from "../../src/cli/tui/init-flow.js";
 import type { DepCheck } from "../../src/cli/deps-checker.js";
 import type { HarnessConfig } from "../../src/core/harness-schema.js";
@@ -243,5 +243,27 @@ describe("NL mode provider integration", () => {
   it("init-flow imports hasProviderConfig from config-store", async () => {
     const mod = await import("../../src/nl/config-store.js");
     expect(typeof mod.hasProviderConfig).toBe("function");
+  });
+
+  it("uses configured provider runner when generating harness in NL mode", async () => {
+    // Arrange: mock loadProviderConfig to return an OpenAI API config
+    const configStore = await import("../../src/nl/config-store.js");
+    const loadSpy = vi.spyOn(configStore, "loadProviderConfig").mockResolvedValue({
+      provider: "openai",
+      method: "api",
+      apiKey: "sk-test-key",
+      model: "gpt-4o",
+    });
+
+    // Act: createDefaultRunner should use the mocked OpenAI config
+    const { createDefaultRunner } = await import("../../src/nl/parse-intent.js");
+    const runner = await createDefaultRunner();
+
+    // Assert: runner is a function (not undefined/null), meaning provider was created from config
+    expect(typeof runner).toBe("function");
+    // loadProviderConfig was called to retrieve the saved config
+    expect(loadSpy).toHaveBeenCalled();
+
+    loadSpy.mockRestore();
   });
 });

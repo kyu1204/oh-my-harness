@@ -1,4 +1,4 @@
-import { mkdir, writeFile, chmod } from "node:fs/promises";
+import { mkdir, writeFile, chmod, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import type { MergedConfig } from "../core/preset-types.js";
 
@@ -68,11 +68,30 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
     hooks.map((h) => ({ ...h, event })),
   );
 
-  if (allHooks.length === 0) {
-    return { hooksConfig: {}, generatedFiles: [] };
+  await mkdir(hooksDir, { recursive: true });
+
+  // Read previous manifest to clean up stale hook files
+  const manifestPath = join(hooksDir, "oh-my-harness-manifest.json");
+  let previousHooks: string[] = [];
+  try {
+    const manifestRaw = await readFile(manifestPath, "utf8");
+    const manifest = JSON.parse(manifestRaw) as { hooks?: string[] };
+    previousHooks = manifest.hooks ?? [];
+  } catch {
+    // No prior manifest — nothing to clean up
   }
 
-  await mkdir(hooksDir, { recursive: true });
+  if (allHooks.length === 0) {
+    // Remove all previously generated hooks
+    for (const name of previousHooks) {
+      try {
+        await unlink(join(hooksDir, name));
+      } catch {
+        // Already gone — ignore
+      }
+    }
+    return { hooksConfig: {}, generatedFiles: [] };
+  }
 
   const generatedFiles: string[] = [];
   const hooksConfig: Record<string, Array<{ matcher: string; hooks: HookCommand[] }>> = {};
@@ -108,12 +127,23 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
     hooksConfig[hook.event].push(entry);
   }
 
+  // Remove stale hook files from previous sync that are no longer generated
+  const currentNames = new Set(generatedFiles.map((f) => f.split("/").pop() as string));
+  for (const name of previousHooks) {
+    if (!currentNames.has(name)) {
+      try {
+        await unlink(join(hooksDir, name));
+      } catch {
+        // Already gone — ignore
+      }
+    }
+  }
+
   // Write manifest
   const manifest = {
     generatedAt: new Date().toISOString(),
     hooks: generatedFiles.map((f) => f.split("/").pop() as string),
   };
-  const manifestPath = join(hooksDir, "oh-my-harness-manifest.json");
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
 
   return { hooksConfig, generatedFiles };

@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { MergedConfig } from "../core/preset-types.js";
-import { upsertManagedSection } from "../utils/markdown.js";
+import { extractManagedSections, removeManagedSection, upsertManagedSection } from "../utils/markdown.js";
 
 export interface GenerateClaudeMdOptions {
   projectDir: string;
@@ -22,6 +22,15 @@ export async function generateClaudeMd(options: GenerateClaudeMdOptions): Promis
       content = "";
     } else {
       throw error;
+    }
+  }
+
+  // Remove managed sections that are no longer in the current config
+  const currentIds = new Set(config.claudeMdSections.map((s) => s.id));
+  const existingIds = extractManagedSections(content).map((s) => s.id);
+  for (const id of existingIds) {
+    if (!currentIds.has(id)) {
+      content = removeManagedSection(content, id);
     }
   }
 

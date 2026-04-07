@@ -165,4 +165,31 @@ describe("catalog block execution", () => {
       expect(trimmed).toBe("");
     }
   });
+
+  it("path-guard: generated script normalizes path before comparison to prevent traversal bypass", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+
+    const rendered = renderTemplate(pathGuard.template, {
+      blockedPaths: ["dist/"],
+    });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "path-guard-normalize.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    // Test path traversal bypass: ./foo/../dist/secret.js should be normalized to dist/secret.js
+    const stdout = runScript(
+      scriptPath,
+      JSON.stringify({
+        tool_name: "Write",
+        tool_input: { file_path: "./foo/../dist/secret.js" },
+      }),
+    );
+
+    const result = JSON.parse(stdout.trim());
+    expect(result.decision).toBe("block");
+    expect(result.reason).toContain("dist/");
+  });
 });

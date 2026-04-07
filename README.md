@@ -92,42 +92,31 @@ your-project/
 ## ⚙️ How It Works
 
 ```text
-                    ┌─────────────────────┐
-  "React + FastAPI  │                     │
-   TDD enforced"    │   claude -p (NL)    │
-  ─────────────────▶│   or --preset flag  │
-                    │                     │
-                    └────────┬────────────┘
-                             │
-                    ┌────────▼────────────┐
-                    │  Project Detector   │  ← Auto-detects language,
-                    │  (14 languages)     │    framework, package manager
-                    └────────┬────────────┘
-                             │
-                    ┌────────▼────────────┐
-                    │   harness.yaml      │  ← Source of truth
-                    │   (editable, git    │    (hooks + rules)
-                    │    trackable)       │
-                    └────────┬────────────┘
-                             │
-              ┌──────────────┼──────────────────────┐
-              ▼              ▼              ▼        ▼
-        ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
-        │CLAUDE.md │  │  Hooks   │  │settings. │  │   AI     │
-        │ (rules)  │  │(enforce) │  │  json    │  │ Providers│
-        │          │  │          │  │(perms)   │  │          │
-        └──────────┘  └──────────┘  └──────────┘  └──────────┘
-                                            │
-                    ┌───────────────────────┘
-                    │
-         ┌──────────▼──────────┐
-         │  nl/providers       │
-         ├─────────────────────┤
-         │ • Claude CLI        │ ← default
-         │ • Claude API        │
-         │ • OpenAI API        │
-         │ • Gemini API        │
-         └─────────────────────┘
+  ~/.omh/config.json   ┌─────────────────────┐
+  ┌────────────────┐   │                     │
+  │ • Claude CLI   │──▶│   NL Processing     │◀── "React + FastAPI
+  │ • Claude API   │   │   or --preset flag  │     TDD enforced"
+  │ • OpenAI API   │   │                     │
+  │ • Gemini API   │   └────────┬────────────┘
+  └────────────────┘            │
+   (global AI config)  ┌────────▼────────────┐
+                        │  Project Detector   │  ← Auto-detects language,
+                        │  (14 languages)     │    framework, package manager
+                        └────────┬────────────┘
+                                 │
+                        ┌────────▼────────────┐
+                        │   harness.yaml      │  ← Source of truth
+                        │   (editable, git    │    (hooks + rules)
+                        │    trackable)       │
+                        └────────┬────────────┘
+                                 │
+                  ┌──────────────┼──────────────┐
+                  ▼              ▼              ▼
+            ┌──────────┐  ┌──────────┐  ┌──────────┐
+            │CLAUDE.md │  │  Hooks   │  │settings. │
+            │ (rules)  │  │(enforce) │  │  json    │
+            │          │  │          │  │(perms)   │
+            └──────────┘  └──────────┘  └──────────┘
 ```
 
 ### 🔍 Project Detector

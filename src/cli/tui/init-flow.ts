@@ -602,23 +602,31 @@ export async function runInitTUI(options?: {
   p.note(summaryLines.join("\n"), "Harness configured successfully!");
 
   // Step 8: GitHub Star Prompt (first time only)
-  if (!(await hasStarPromptBeenShown())) {
-    const wantsStar = await p.confirm({
-      message: "Enjoying oh-my-harness? Star us on GitHub?",
-      initialValue: true,
-    });
+  try {
+    if (!(await hasStarPromptBeenShown())) {
+      const wantsStar = await p.confirm({
+        message: "Enjoying oh-my-harness? Star us on GitHub?",
+        initialValue: true,
+      });
 
-    if (!p.isCancel(wantsStar)) {
+      // Mark shown regardless of cancel so the prompt never repeats
       await markStarPromptShown();
-      if (wantsStar) {
-        const ok = await starRepo();
-        if (ok) {
-          p.log.success("Thanks for the star!");
-        } else {
+
+      if (!p.isCancel(wantsStar) && wantsStar) {
+        try {
+          const ok = await starRepo();
+          if (ok) {
+            p.log.success("Thanks for the star!");
+          } else {
+            p.log.info("Star us anytime: https://github.com/kyu1204/oh-my-harness");
+          }
+        } catch {
           p.log.info("Star us anytime: https://github.com/kyu1204/oh-my-harness");
         }
       }
     }
+  } catch {
+    // Star prompt errors must never abort init
   }
 
   p.outro("Happy coding!");

@@ -19,7 +19,12 @@ describe("github-star state persistence", () => {
   });
 
   afterEach(async () => {
-    process.env.HOME = originalHome;
+    // Safely restore HOME: avoid setting string "undefined"
+    if (originalHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = originalHome;
+    }
     await rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -37,5 +42,11 @@ describe("github-star state persistence", () => {
     const raw = await readFile(join(tmpDir, ".omh", "star-prompt.json"), "utf-8");
     const state = JSON.parse(raw);
     expect(state.prompted).toBe(true);
+  });
+
+  it("markStarPromptShown is idempotent — calling twice still returns true", async () => {
+    await markStarPromptShown();
+    await markStarPromptShown();
+    expect(await hasStarPromptBeenShown()).toBe(true);
   });
 });

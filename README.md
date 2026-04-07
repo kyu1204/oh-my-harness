@@ -99,7 +99,7 @@ your-project/
   │ • OpenAI API   │   │                     │
   │ • Gemini API   │   └────────┬────────────┘
   └────────────────┘            │
-   (global AI config)  ┌────────▼────────────┐
+   (global AI config)   ┌────────▼────────────┐
                         │  Project Detector   │  ← Auto-detects language,
                         │  (14 languages)     │    framework, package manager
                         └────────┬────────────┘

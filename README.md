@@ -339,6 +339,8 @@ oh-my-harness/
 │   │   ├── harness-tester.ts  # Hook simulation engine
 │   │   ├── event-logger.ts    # events.jsonl read/write/stats
 │   │   ├── event-verifier.ts  # Event-based verification
+│   │   ├── tui/               # Interactive provider & model selection
+│   │   ├── provider-setup.ts  # Provider configuration UI
 │   │   └── tool-checker.ts    # Command executable checks
 │   ├── core/
 │   │   ├── harness-schema.ts   # harness.yaml Zod schema
@@ -354,9 +356,6 @@ oh-my-harness/
 │   │   ├── project-detector.ts  # Deterministic project detection
 │   │   ├── types.ts             # ProjectFacts, Detector interface
 │   │   └── detectors/           # 14 language detectors
-│   ├── cli/
-│   │   ├── tui/            # Interactive provider & model selection
-│   │   └── provider-setup.ts # Provider configuration UI
 │   └── nl/
 │       ├── provider-registry.ts # Multi-provider definitions
 │       ├── config-store.ts      # ~/.omh/config.json persistence

@@ -102,6 +102,34 @@ describe("generateHooks", () => {
     ]);
   });
 
+  it("writes an empty manifest after removing all previously generated hooks", async () => {
+    await generateHooks({
+      projectDir,
+      config: makeMergedConfig({
+        hooks: {
+          preToolUse: [{ id: "command-guard", matcher: "Bash", inline: "#!/bin/bash\nexit 0" }],
+          postToolUse: [],
+        },
+      }),
+    });
+
+    const result = await generateHooks({ projectDir, config: makeMergedConfig() });
+    const manifestPath = join(projectDir, ".claude/hooks/oh-my-harness-manifest.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+
+    expect(result).toEqual({ hooksConfig: {}, generatedFiles: [] });
+    expect(manifest.hooks).toEqual([]);
+  });
+
+  it("throws when an existing hooks manifest cannot be parsed", async () => {
+    const hooksDir = join(projectDir, ".claude/hooks");
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    await mkdir(hooksDir, { recursive: true });
+    await writeFile(join(hooksDir, "oh-my-harness-manifest.json"), "{not-json", "utf8");
+
+    await expect(generateHooks({ projectDir, config: makeMergedConfig() })).rejects.toThrow();
+  });
+
   it("writes manifest file tracking generated hooks", async () => {
     const config = makeMergedConfig({
       hooks: {

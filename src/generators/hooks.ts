@@ -51,6 +51,46 @@ export interface HooksOutput {
   generatedFiles: string[];
 }
 
+interface HookManifest {
+  generatedAt: string;
+  hooks: string[];
+}
+
+function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
+  return err instanceof Error;
+}
+
+async function readPreviousHookNames(manifestPath: string): Promise<string[]> {
+  try {
+    const manifestRaw = await readFile(manifestPath, "utf8");
+    const manifest = JSON.parse(manifestRaw) as { hooks?: string[] };
+    return manifest.hooks ?? [];
+  } catch (err) {
+    if (isErrnoException(err) && err.code === "ENOENT") {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function unlinkIfPresent(filePath: string): Promise<void> {
+  try {
+    await unlink(filePath);
+  } catch (err) {
+    if (!isErrnoException(err) || err.code !== "ENOENT") {
+      throw err;
+    }
+  }
+}
+
+async function writeHookManifest(manifestPath: string, hooks: string[]): Promise<void> {
+  const manifest: HookManifest = {
+    generatedAt: new Date().toISOString(),
+    hooks,
+  };
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
+}
+
 export async function generateHooks(options: GenerateHooksOptions): Promise<HooksOutput> {
   const { projectDir, config } = options;
   const hooksDir = join(projectDir, ".claude/hooks");
@@ -72,24 +112,14 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
 
   // Read previous manifest to clean up stale hook files
   const manifestPath = join(hooksDir, "oh-my-harness-manifest.json");
-  let previousHooks: string[] = [];
-  try {
-    const manifestRaw = await readFile(manifestPath, "utf8");
-    const manifest = JSON.parse(manifestRaw) as { hooks?: string[] };
-    previousHooks = manifest.hooks ?? [];
-  } catch {
-    // No prior manifest — nothing to clean up
-  }
+  const previousHooks = await readPreviousHookNames(manifestPath);
 
   if (allHooks.length === 0) {
     // Remove all previously generated hooks
     for (const name of previousHooks) {
-      try {
-        await unlink(join(hooksDir, name));
-      } catch {
-        // Already gone — ignore
-      }
+      await unlinkIfPresent(join(hooksDir, name));
     }
+    await writeHookManifest(manifestPath, []);
     return { hooksConfig: {}, generatedFiles: [] };
   }
 
@@ -131,20 +161,14 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
   const currentNames = new Set(generatedFiles.map((f) => f.split("/").pop() as string));
   for (const name of previousHooks) {
     if (!currentNames.has(name)) {
-      try {
-        await unlink(join(hooksDir, name));
-      } catch {
-        // Already gone — ignore
-      }
+      await unlinkIfPresent(join(hooksDir, name));
     }
   }
 
-  // Write manifest
-  const manifest = {
-    generatedAt: new Date().toISOString(),
-    hooks: generatedFiles.map((f) => f.split("/").pop() as string),
-  };
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
+  await writeHookManifest(
+    manifestPath,
+    generatedFiles.map((f) => f.split("/").pop() as string),
+  );
 
   return { hooksConfig, generatedFiles };
 }

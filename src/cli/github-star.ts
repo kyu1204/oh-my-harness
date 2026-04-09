@@ -29,7 +29,24 @@ export async function hasStarPromptBeenShown(): Promise<boolean> {
 export async function markStarPromptShown(): Promise<void> {
   const dir = getConfigDir();
   await fs.mkdir(dir, { recursive: true });
-  await fs.writeFile(getStatePath(), JSON.stringify({ prompted: true }, null, 2) + "\n", "utf-8");
+
+  const statePath = getStatePath();
+  let prev: Record<string, unknown> = {};
+  try {
+    const raw = await fs.readFile(statePath, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      prev = parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Missing or invalid state file falls back to a fresh object.
+  }
+
+  await fs.writeFile(
+    statePath,
+    JSON.stringify({ ...prev, prompted: true }, null, 2) + "\n",
+    "utf-8",
+  );
 }
 
 export async function starRepo(): Promise<boolean> {

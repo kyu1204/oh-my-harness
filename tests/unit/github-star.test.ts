@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -42,6 +42,22 @@ describe("github-star state persistence", () => {
     const raw = await readFile(join(tmpDir, ".omh", "star-prompt.json"), "utf-8");
     const state = JSON.parse(raw);
     expect(state.prompted).toBe(true);
+  });
+
+  it("markStarPromptShown preserves existing state keys", async () => {
+    const statePath = join(tmpDir, ".omh", "star-prompt.json");
+    await mkdir(join(tmpDir, ".omh"), { recursive: true });
+    await writeFile(
+      statePath,
+      JSON.stringify({ prompted: false, dismissedAt: "2026-04-09T00:00:00Z" }, null, 2) + "\n",
+      "utf-8",
+    );
+
+    await markStarPromptShown();
+
+    const raw = await readFile(statePath, "utf-8");
+    const state = JSON.parse(raw);
+    expect(state).toEqual({ prompted: true, dismissedAt: "2026-04-09T00:00:00Z" });
   });
 
   it("markStarPromptShown is idempotent — calling twice still returns true", async () => {

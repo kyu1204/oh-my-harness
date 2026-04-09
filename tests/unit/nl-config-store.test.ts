@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -20,6 +20,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   process.env.HOME = originalHome;
   await fs.rm(tmpHome, { recursive: true, force: true });
 });
@@ -87,6 +88,20 @@ describe("config-store", () => {
 
     const loaded = await loadProviderConfig();
     expect(loaded!.provider).toBe("openai");
+  });
+
+  it("saveProviderConfig creates new files with mode 0o600", async () => {
+    const writeFileSpy = vi.spyOn(fs, "writeFile");
+    const config: ProviderConfig = { provider: "openai", method: "api", apiKey: "sk-secret" };
+    const configPath = path.join(tmpHome, ".omh", "config.json");
+
+    await saveProviderConfig(config);
+
+    expect(writeFileSpy).toHaveBeenCalledWith(
+      configPath,
+      JSON.stringify(config, null, 2) + "\n",
+      { encoding: "utf-8", mode: 0o600 },
+    );
   });
 
   it("saveProviderConfig sets file permissions to 0o600", async () => {

@@ -39,21 +39,44 @@ export const defaultClaudeRunner: LLMRunner = async (prompt) => {
 };
 
 function extractJson(text: string): string {
-  // Extract the first complete JSON object using balanced brace counting
-  // to avoid greedy matching that would capture multiple objects
   const start = text.indexOf("{");
   if (start === -1) return text.trim();
 
   let depth = 0;
+  let inString = false;
+  let escaped = false;
+
   for (let i = start; i < text.length; i++) {
-    if (text[i] === "{") depth++;
-    else if (text[i] === "}") {
+    const ch = text[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (ch === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === "\"") {
+      inString = true;
+      continue;
+    }
+
+    if (ch === "{") depth++;
+    else if (ch === "}") {
       depth--;
       if (depth === 0) return text.slice(start, i + 1);
     }
   }
-  // If no balanced closing brace found, return the rest of the text
-  return text.trim();
+
+  return text.slice(start).trim();
 }
 
 function validateParsedIntent(obj: unknown): ParsedIntent {

@@ -130,6 +130,35 @@ describe("parseNaturalLanguage", () => {
     expect(result.explanation).toBe("app with val{nested}");
   });
 
+  it("ignores closing braces that appear inside quoted strings", async () => {
+    const mockRunner: ClaudeRunner = async () =>
+      'prefix {"presets": ["react"], "confidence": 0.8, "explanation": "brace } in string"} trailing';
+
+    const result = await parseNaturalLanguage("build app", samplePresets, mockRunner);
+
+    expect(result.presets).toEqual(["react"]);
+    expect(result.explanation).toBe("brace } in string");
+  });
+
+  it("handles escaped quotes and braces inside quoted strings", async () => {
+    const mockRunner: ClaudeRunner = async () =>
+      'prefix {"presets": ["react"], "confidence": 0.8, "explanation": "quote \\"{test}\\" kept"} trailing';
+
+    const result = await parseNaturalLanguage("build app", samplePresets, mockRunner);
+
+    expect(result.presets).toEqual(["react"]);
+    expect(result.explanation).toBe('quote "{test}" kept');
+  });
+
+  it("still rejects malformed JSON after dropping prefix text", async () => {
+    const mockRunner: ClaudeRunner = async () =>
+      'prefix {"presets": ["react"], "confidence": 0.8, "explanation": "missing end"';
+
+    await expect(parseNaturalLanguage("build app", samplePresets, mockRunner)).rejects.toThrow(
+      "Failed to parse JSON from claude output",
+    );
+  });
+
   it("throws when claude CLI runner rejects (not available)", async () => {
     const mockRunner: ClaudeRunner = async () => {
       const err = new Error("spawn claude ENOENT") as NodeJS.ErrnoException;

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   type LLMProvider,
   type ProviderDefinition,
@@ -7,6 +7,9 @@ import {
   createProvider,
 } from "../../src/nl/provider-registry.js";
 import type { ProviderConfig } from "../../src/nl/config-store.js";
+import { createOpenaiApiProvider } from "../../src/nl/providers/openai-api.js";
+import { createClaudeApiProvider } from "../../src/nl/providers/claude-api.js";
+import { createGeminiApiProvider } from "../../src/nl/providers/gemini-api.js";
 
 describe("provider-registry", () => {
   it("getAvailableProviders returns at least 3 providers", () => {
@@ -131,5 +134,204 @@ describe("provider-registry", () => {
   it("getAvailableModels returns empty array for unknown provider", () => {
     const models = getAvailableModels("unknown-llm");
     expect(models).toEqual([]);
+  });
+});
+
+describe("openai-api provider error handling", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("retries on 429 rate limit and succeeds on second attempt", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response("rate limited", { status: 429 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "hello" } }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    const provider = createOpenaiApiProvider("sk-test");
+    const result = await provider.run("test prompt");
+    expect(result).toBe("hello");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries on 500 server error and succeeds on second attempt", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(new Response("server error", { status: 500 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "ok" } }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    const provider = createOpenaiApiProvider("sk-test");
+    const result = await provider.run("test prompt");
+    expect(result).toBe("ok");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("throws after 3 failed attempts on 429", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response("rate limited", { status: 429 }));
+
+    const provider = createOpenaiApiProvider("sk-test");
+    await expect(provider.run("test")).rejects.toThrow("429");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry on 401 unauthorized", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response("unauthorized", { status: 401 }));
+
+    const provider = createOpenaiApiProvider("sk-test");
+    await expect(provider.run("test")).rejects.toThrow("401");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws timeout error with clear message on AbortError", async () => {
+    vi.stubGlobal("fetch", () => {
+      const err = new DOMException("aborted", "AbortError");
+      return Promise.reject(err);
+    });
+
+    const provider = createOpenaiApiProvider("sk-test");
+    await expect(provider.run("test")).rejects.toThrow(
+      "AI provider request timed out after 60 seconds",
+    );
+  });
+
+  it("throws on empty string response from OpenAI", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "" } }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const provider = createOpenaiApiProvider("sk-test");
+    await expect(provider.run("test")).rejects.toThrow(
+      "Empty response from OpenAI",
+    );
+  });
+});
+
+describe("claude-api provider error handling", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("retries on 429 rate limit and succeeds on second attempt", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(new Response("rate limited", { status: 429 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            content: [{ type: "text", text: "hello from claude" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    const provider = createClaudeApiProvider("sk-ant-test");
+    const result = await provider.run("test prompt");
+    expect(result).toBe("hello from claude");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("throws after 3 failed attempts on 500", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response("server error", { status: 500 }));
+
+    const provider = createClaudeApiProvider("sk-ant-test");
+    await expect(provider.run("test")).rejects.toThrow("500");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("throws timeout error with clear message on AbortError", async () => {
+    vi.stubGlobal("fetch", () => {
+      const err = new DOMException("aborted", "AbortError");
+      return Promise.reject(err);
+    });
+
+    const provider = createClaudeApiProvider("sk-ant-test");
+    await expect(provider.run("test")).rejects.toThrow(
+      "AI provider request timed out after 60 seconds",
+    );
+  });
+});
+
+describe("gemini-api provider error handling", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("retries on 429 rate limit and succeeds on second attempt", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(new Response("rate limited", { status: 429 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            candidates: [
+              { content: { parts: [{ text: "hello from gemini" }] } },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    const provider = createGeminiApiProvider("gemini-key");
+    const result = await provider.run("test prompt");
+    expect(result).toBe("hello from gemini");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("throws after 3 failed attempts on 429", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response("rate limited", { status: 429 }));
+
+    const provider = createGeminiApiProvider("gemini-key");
+    await expect(provider.run("test")).rejects.toThrow("429");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("throws timeout error with clear message on AbortError", async () => {
+    vi.stubGlobal("fetch", () => {
+      const err = new DOMException("aborted", "AbortError");
+      return Promise.reject(err);
+    });
+
+    const provider = createGeminiApiProvider("gemini-key");
+    await expect(provider.run("test")).rejects.toThrow(
+      "AI provider request timed out after 60 seconds",
+    );
   });
 });

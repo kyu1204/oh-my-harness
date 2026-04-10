@@ -339,6 +339,8 @@ oh-my-harness/
 │   │   ├── harness-tester.ts  # Hook simulation engine
 │   │   ├── event-logger.ts    # events.jsonl read/write/stats
 │   │   ├── event-verifier.ts  # Event-based verification
+│   │   ├── tui/               # Interactive provider & model selection
+│   │   ├── provider-setup.ts  # Provider configuration UI
 │   │   └── tool-checker.ts    # Command executable checks
 │   ├── core/
 │   │   ├── harness-schema.ts   # harness.yaml Zod schema

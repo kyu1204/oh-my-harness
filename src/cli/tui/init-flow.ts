@@ -18,6 +18,7 @@ import { mergeEnforcementAndHooks } from "../../core/harness-converter.js";
 import type { HarnessConfig } from "../../core/harness-schema.js";
 import { HarnessConfigSchema } from "../../core/harness-schema.js";
 import { detectProject } from "../../detector/project-detector.js";
+import { hasStarPromptBeenShown, markStarPromptShown, starRepo } from "../github-star.js";
 import type { ProjectFacts } from "../../detector/types.js";
 
 function getDefaultPresetsDir(): string {
@@ -599,6 +600,34 @@ export async function runInitTUI(options?: {
   summaryLines.push("  3. Restart your Claude Code session");
 
   p.note(summaryLines.join("\n"), "Harness configured successfully!");
+
+  // Step 8: GitHub Star Prompt (first time only)
+  try {
+    if (!(await hasStarPromptBeenShown())) {
+      const wantsStar = await p.confirm({
+        message: "Enjoying oh-my-harness? Star us on GitHub?",
+        initialValue: true,
+      });
+
+      // Mark shown regardless of cancel so the prompt never repeats
+      await markStarPromptShown();
+
+      if (!p.isCancel(wantsStar) && wantsStar) {
+        try {
+          const ok = await starRepo();
+          if (ok) {
+            p.log.success("Thanks for the star!");
+          } else {
+            p.log.info("Star us anytime: https://github.com/kyu1204/oh-my-harness");
+          }
+        } catch {
+          p.log.info("Star us anytime: https://github.com/kyu1204/oh-my-harness");
+        }
+      }
+    }
+  } catch {
+    // Star prompt errors must never abort init
+  }
 
   p.outro("Happy coding!");
 }

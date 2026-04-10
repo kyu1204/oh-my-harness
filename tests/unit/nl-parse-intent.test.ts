@@ -1,8 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { buildPresetSelectionPrompt, buildHarnessGenerationPrompt } from "../../src/nl/prompt-templates.js";
 import { parseNaturalLanguage, generateHarnessConfig } from "../../src/nl/parse-intent.js";
 import type { ClaudeRunner } from "../../src/nl/parse-intent.js";
 import yaml from "js-yaml";
+
+vi.mock("../../src/nl/config-store.js", () => ({
+  loadProviderConfig: vi.fn().mockResolvedValue(undefined),
+  hasProviderConfig: vi.fn().mockResolvedValue(false),
+  saveProviderConfig: vi.fn().mockResolvedValue(undefined),
+  getConfigDir: vi.fn().mockReturnValue("/tmp/omh-test"),
+}));
 
 const samplePresets = [
   {

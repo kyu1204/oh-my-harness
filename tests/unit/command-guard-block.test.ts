@@ -13,4 +13,8 @@ describe("commandGuard block", () => {
     // Without --, patterns like --no-verify are interpreted as grep options
     expect(commandGuard.template).toContain('grep -qF -- ');
   });
+
+  it("generated script normalizes all whitespace before pattern matching", () => {
+    expect(commandGuard.template).toContain("tr '[:space:]' ' ' | tr -s ' '");
+  });
 });

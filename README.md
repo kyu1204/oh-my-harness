@@ -99,7 +99,7 @@ your-project/
   │ • OpenAI API   │   │                     │
   │ • Gemini API   │   └────────┬────────────┘
   └────────────────┘            │
-   (global AI config)  ┌────────▼────────────┐
+   (global AI config)   ┌────────▼────────────┐
                         │  Project Detector   │  ← Auto-detects language,
                         │  (14 languages)     │    framework, package manager
                         └────────┬────────────┘
@@ -356,6 +356,9 @@ oh-my-harness/
 │   │   ├── project-detector.ts  # Deterministic project detection
 │   │   ├── types.ts             # ProjectFacts, Detector interface
 │   │   └── detectors/           # 14 language detectors
+│   ├── cli/
+│   │   ├── tui/            # Interactive provider & model selection
+│   │   └── provider-setup.ts # Provider configuration UI
 │   └── nl/
 │       ├── provider-registry.ts # Multi-provider definitions
 │       ├── config-store.ts      # ~/.omh/config.json persistence

@@ -108,6 +108,57 @@ describe("parseNaturalLanguage", () => {
     expect(result.presets).toEqual(["react"]);
   });
 
+  it("stops at first complete JSON object, not last closing brace", async () => {
+    const mockRunner: ClaudeRunner = async () =>
+      '{"presets": ["typescript"], "confidence": 0.9, "explanation": "ts project"} extra text {"another": "object"}';
+
+    const result = await parseNaturalLanguage("build typescript", samplePresets, mockRunner);
+    expect(result.presets).toEqual(["typescript"]);
+    expect(result.confidence).toBe(0.9);
+    expect(result.explanation).toBe("ts project");
+  });
+
+  it("extracts first complete JSON with nested braces", async () => {
+    const mockRunner: ClaudeRunner = async () =>
+      'text {"presets": ["react"], "confidence": 0.8, "explanation": "app with val{nested}"} more text {"other":1}';
+
+    const result = await parseNaturalLanguage("build app", samplePresets, mockRunner);
+    expect(result).toBeDefined();
+    expect(result.presets).toEqual(["react"]);
+    expect(result.confidence).toBe(0.8);
+    // Verify it extracted the first complete object (with nested braces in the explanation)
+    expect(result.explanation).toBe("app with val{nested}");
+  });
+
+  it("ignores closing braces that appear inside quoted strings", async () => {
+    const mockRunner: ClaudeRunner = async () =>
+      'prefix {"presets": ["react"], "confidence": 0.8, "explanation": "brace } in string"} trailing';
+
+    const result = await parseNaturalLanguage("build app", samplePresets, mockRunner);
+
+    expect(result.presets).toEqual(["react"]);
+    expect(result.explanation).toBe("brace } in string");
+  });
+
+  it("handles escaped quotes and braces inside quoted strings", async () => {
+    const mockRunner: ClaudeRunner = async () =>
+      'prefix {"presets": ["react"], "confidence": 0.8, "explanation": "quote \\"{test}\\" kept"} trailing';
+
+    const result = await parseNaturalLanguage("build app", samplePresets, mockRunner);
+
+    expect(result.presets).toEqual(["react"]);
+    expect(result.explanation).toBe('quote "{test}" kept');
+  });
+
+  it("still rejects malformed JSON after dropping prefix text", async () => {
+    const mockRunner: ClaudeRunner = async () =>
+      'prefix {"presets": ["react"], "confidence": 0.8, "explanation": "missing end"';
+
+    await expect(parseNaturalLanguage("build app", samplePresets, mockRunner)).rejects.toThrow(
+      "Failed to parse JSON from claude output",
+    );
+  });
+
   it("throws when claude CLI runner rejects (not available)", async () => {
     const mockRunner: ClaudeRunner = async () => {
       const err = new Error("spawn claude ENOENT") as NodeJS.ErrnoException;

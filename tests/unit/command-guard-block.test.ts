@@ -14,9 +14,7 @@ describe("commandGuard block", () => {
     expect(commandGuard.template).toContain('grep -qF -- ');
   });
 
-  it("generated script normalizes multiple spaces before pattern matching", () => {
-    // Verify that the template normalizes multiple consecutive spaces
-    // to prevent bypassing patterns like "rm -rf /" with "rm  -rf /"
-    expect(commandGuard.template).toContain("tr -s ' '");
+  it("generated script normalizes all whitespace before pattern matching", () => {
+    expect(commandGuard.template).toContain("tr '[:space:]' ' ' | tr -s ' '");
   });
 });

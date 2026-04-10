@@ -66,6 +66,29 @@ describe("catalog block execution", () => {
     expect(result.reason).toContain("rm -rf /");
   });
 
+  it("command-guard: blocks a matched dangerous command with tab-normalized whitespace", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+
+    const rendered = renderTemplate(commandGuard.template, {
+      patterns: ["rm -rf /", "sudo rm"],
+    });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "command-guard-tab.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    const stdout = runScript(
+      scriptPath,
+      JSON.stringify({ tool_name: "Bash", tool_input: { command: "rm\t-rf /" } }),
+    );
+
+    const result = JSON.parse(stdout.trim());
+    expect(result.decision).toBe("block");
+    expect(result.reason).toContain("rm -rf /");
+  });
+
   it("command-guard: allows a safe command (exit 0, no block output)", async () => {
     if (!hasJq()) {
       console.log("jq not found, skipping");

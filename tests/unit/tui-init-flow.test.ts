@@ -1,9 +1,34 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import fs from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
 import { formatDepResults, formatConfigSummary, formatProjectFacts, buildPresetExtends } from "../../src/cli/tui/init-flow.js";
 import type { DepCheck } from "../../src/cli/deps-checker.js";
 import type { HarnessConfig } from "../../src/core/harness-schema.js";
 import { emptyFacts } from "../../src/detector/types.js";
 // updated: TUI init now passes catalogBlocks to generateHarnessConfig
+
+let tmpDir: string;
+
+beforeEach(async () => {
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "omh-tui-init-"));
+});
+
+afterEach(async () => {
+  vi.restoreAllMocks();
+  vi.resetModules();
+  vi.doUnmock("@clack/prompts");
+  vi.doUnmock("../../src/cli/deps-checker.js");
+  vi.doUnmock("../../src/cli/tool-checker.js");
+  vi.doUnmock("../../src/detector/project-detector.js");
+  vi.doUnmock("../../src/nl/config-store.js");
+  vi.doUnmock("../../src/nl/parse-intent.js");
+  vi.doUnmock("../../src/core/generator.js");
+  vi.doUnmock("../../src/cli/commands/init.js");
+  vi.doUnmock("../../src/core/harness-converter-v2.js");
+  vi.doUnmock("../../src/catalog/registry.js");
+  await fs.rm(tmpDir, { recursive: true, force: true });
+});
 
 describe("formatDepResults", () => {
   it("formats installed deps with checkmark and version", () => {
@@ -243,5 +268,124 @@ describe("NL mode provider integration", () => {
   it("init-flow imports hasProviderConfig from config-store", async () => {
     const mod = await import("../../src/nl/config-store.js");
     expect(typeof mod.hasProviderConfig).toBe("function");
+  });
+
+  it("uses configured provider runner when generating harness in NL mode", async () => {
+    const promptMock = {
+      intro: vi.fn(),
+      note: vi.fn(),
+      outro: vi.fn(),
+      cancel: vi.fn(),
+      isCancel: vi.fn(() => false),
+      spinner: vi.fn(() => ({ start: vi.fn(), stop: vi.fn() })),
+      log: {
+        error: vi.fn(),
+        warn: vi.fn(),
+        info: vi.fn(),
+        success: vi.fn(),
+      },
+      select: vi.fn(async () => "nl"),
+      text: vi.fn(async () => "build app"),
+      confirm: vi.fn(async () => true),
+      multiselect: vi.fn(async () => []),
+    };
+
+    const mockLoadProviderConfig = vi.fn(async () => ({
+      provider: "openai" as const,
+      method: "api" as const,
+      apiKey: "sk-test-key",
+      model: "gpt-4o",
+    }));
+    const mockHasProviderConfig = vi.fn(async () => true);
+    const mockGenerateHarnessConfig = vi.fn(async () => ({
+      version: "1.0",
+      project: {
+        name: "test-app",
+        stacks: [{ name: "frontend", framework: "nextjs", language: "typescript" }],
+      },
+      rules: [],
+      enforcement: { preCommit: [], blockedPaths: [], blockedCommands: [], postSave: [] },
+      hooks: [],
+      permissions: { allow: [], deny: [] },
+    }));
+    const createDefaultRunnerSpy = vi.fn();
+
+    vi.resetModules();
+    vi.doMock("@clack/prompts", () => promptMock);
+    vi.doMock("../../src/cli/deps-checker.js", () => ({
+      checkDependencies: vi.fn(async () => [
+        {
+          name: "claude",
+          command: "claude --version",
+          required: false,
+          purpose: "AI mode",
+          installHint: "install claude",
+          installed: true,
+        },
+      ]),
+    }));
+    vi.doMock("../../src/cli/tool-checker.js", () => ({
+      checkReferencedTools: vi.fn(async () => []),
+    }));
+    vi.doMock("../../src/detector/project-detector.js", () => ({
+      detectProject: vi.fn(async () => emptyFacts()),
+    }));
+    vi.doMock("../../src/nl/config-store.js", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("../../src/nl/config-store.js")>();
+      return {
+        ...actual,
+        hasProviderConfig: mockHasProviderConfig,
+        loadProviderConfig: mockLoadProviderConfig,
+      };
+    });
+    vi.doMock("../../src/nl/parse-intent.js", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("../../src/nl/parse-intent.js")>();
+      createDefaultRunnerSpy.mockImplementation(actual.createDefaultRunner);
+      return {
+        ...actual,
+        createDefaultRunner: createDefaultRunnerSpy,
+        generateHarnessConfig: mockGenerateHarnessConfig,
+      };
+    });
+    vi.doMock("../../src/core/generator.js", () => ({
+      generate: vi.fn(async () => ({ files: [path.join(tmpDir, "CLAUDE.md")] })),
+    }));
+    vi.doMock("../../src/cli/commands/init.js", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("../../src/cli/commands/init.js")>();
+      return {
+        ...actual,
+        writeHarnessState: vi.fn(async () => undefined),
+      };
+    });
+    vi.doMock("../../src/core/harness-converter-v2.js", () => ({
+      harnessToMergedConfigV2: vi.fn(async () => ({
+        presets: [],
+        variables: {},
+        claudeMdSections: [],
+        hooks: {
+          preToolUse: [],
+          postToolUse: [],
+          sessionStart: [],
+          notification: [],
+          configChange: [],
+          worktreeCreate: [],
+        },
+        settings: { permissions: { allow: [], deny: [] } },
+      })),
+    }));
+    vi.doMock("../../src/catalog/registry.js", () => ({
+      createDefaultRegistry: vi.fn(async () => ({
+        list: () => [],
+      })),
+    }));
+
+    const { runInitTUI } = await import("../../src/cli/tui/init-flow.js");
+
+    await runInitTUI({ projectDir: tmpDir, presetsDir: path.resolve(import.meta.dirname, "../../presets") });
+
+    expect(createDefaultRunnerSpy).toHaveBeenCalledOnce();
+    expect(mockHasProviderConfig).toHaveBeenCalledOnce();
+    expect(mockLoadProviderConfig).toHaveBeenCalledOnce();
+    expect(mockGenerateHarnessConfig).toHaveBeenCalledOnce();
   });
 });

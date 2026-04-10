@@ -39,10 +39,44 @@ export const defaultClaudeRunner: LLMRunner = async (prompt) => {
 };
 
 function extractJson(text: string): string {
-  // Try to extract a JSON object from text that may contain extra content
-  const match = text.match(/\{[\s\S]*\}/);
-  if (match) return match[0];
-  return text.trim();
+  const start = text.indexOf("{");
+  if (start === -1) return text.trim();
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (ch === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === "\"") {
+      inString = true;
+      continue;
+    }
+
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+
+  return text.slice(start).trim();
 }
 
 function validateParsedIntent(obj: unknown): ParsedIntent {

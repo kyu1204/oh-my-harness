@@ -74,4 +74,12 @@ describe("tddGuard block", () => {
     expect(tddGuard.template).toContain("{{testPattern}}");
     expect(tddGuard.template).toContain("{{srcPattern}}");
   });
+
+  it("generated script uses flock for atomic read-write", () => {
+    // Two concurrent hook processes must not overwrite each other's writes.
+    // The script must use flock (file locking) around the jq read/write operations.
+    expect(tddGuard.template).toMatch(/flock/);
+    // The lock file descriptor redirect pattern: 200> or similar fd redirect
+    expect(tddGuard.template).toMatch(/\d+>.*\.lock/);
+  });
 });

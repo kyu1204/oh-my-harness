@@ -1,4 +1,4 @@
-import { mkdir, writeFile, chmod } from "node:fs/promises";
+import { mkdir, writeFile, chmod, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import type { MergedConfig } from "../core/preset-types.js";
 
@@ -51,6 +51,46 @@ export interface HooksOutput {
   generatedFiles: string[];
 }
 
+interface HookManifest {
+  generatedAt: string;
+  hooks: string[];
+}
+
+function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
+  return err instanceof Error;
+}
+
+async function readPreviousHookNames(manifestPath: string): Promise<string[]> {
+  try {
+    const manifestRaw = await readFile(manifestPath, "utf8");
+    const manifest = JSON.parse(manifestRaw) as { hooks?: string[] };
+    return manifest.hooks ?? [];
+  } catch (err) {
+    if (isErrnoException(err) && err.code === "ENOENT") {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function unlinkIfPresent(filePath: string): Promise<void> {
+  try {
+    await unlink(filePath);
+  } catch (err) {
+    if (!isErrnoException(err) || err.code !== "ENOENT") {
+      throw err;
+    }
+  }
+}
+
+async function writeHookManifest(manifestPath: string, hooks: string[]): Promise<void> {
+  const manifest: HookManifest = {
+    generatedAt: new Date().toISOString(),
+    hooks,
+  };
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
+}
+
 export async function generateHooks(options: GenerateHooksOptions): Promise<HooksOutput> {
   const { projectDir, config } = options;
   const hooksDir = join(projectDir, ".claude/hooks");
@@ -68,11 +108,20 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
     hooks.map((h) => ({ ...h, event })),
   );
 
+  await mkdir(hooksDir, { recursive: true });
+
+  // Read previous manifest to clean up stale hook files
+  const manifestPath = join(hooksDir, "oh-my-harness-manifest.json");
+  const previousHooks = await readPreviousHookNames(manifestPath);
+
   if (allHooks.length === 0) {
+    // Remove all previously generated hooks
+    for (const name of previousHooks) {
+      await unlinkIfPresent(join(hooksDir, name));
+    }
+    await writeHookManifest(manifestPath, []);
     return { hooksConfig: {}, generatedFiles: [] };
   }
-
-  await mkdir(hooksDir, { recursive: true });
 
   const generatedFiles: string[] = [];
   const hooksConfig: Record<string, Array<{ matcher: string; hooks: HookCommand[] }>> = {};
@@ -108,13 +157,18 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
     hooksConfig[hook.event].push(entry);
   }
 
-  // Write manifest
-  const manifest = {
-    generatedAt: new Date().toISOString(),
-    hooks: generatedFiles.map((f) => f.split("/").pop() as string),
-  };
-  const manifestPath = join(hooksDir, "oh-my-harness-manifest.json");
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
+  // Remove stale hook files from previous sync that are no longer generated
+  const currentNames = new Set(generatedFiles.map((f) => f.split("/").pop() as string));
+  for (const name of previousHooks) {
+    if (!currentNames.has(name)) {
+      await unlinkIfPresent(join(hooksDir, name));
+    }
+  }
+
+  await writeHookManifest(
+    manifestPath,
+    generatedFiles.map((f) => f.split("/").pop() as string),
+  );
 
   return { hooksConfig, generatedFiles };
 }

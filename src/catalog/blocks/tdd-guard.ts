@@ -46,14 +46,17 @@ SRC_RE='{{{srcPattern}}}'
 TEST_RE="\${TEST_RE//\\\\\\\\/\\\\}"
 SRC_RE="\${SRC_RE//\\\\\\\\/\\\\}"
 if [[ "\$FILE_PATH" =~ \$TEST_RE ]]; then
-  # 테스트 파일 수정 → 기록 + 통과
-  if [[ ! -f "\$HISTORY_FILE" ]]; then
-    echo '{"edits":[]}' > "\$HISTORY_FILE"
-  fi
-  UPDATED=$(jq --arg f "\$FILE_PATH" '.edits += [$f] | .edits |= unique' "\$HISTORY_FILE" 2>/dev/null) || true
-  if [[ -n "\$UPDATED" ]]; then
-    echo "\$UPDATED" > "\$HISTORY_FILE"
-  fi
+  # 테스트 파일 수정 → 기록 + 통과 (flock으로 원자적 읽기/쓰기)
+  (
+    flock -x 200
+    if [[ ! -f "\$HISTORY_FILE" ]]; then
+      echo '{"edits":[]}' > "\$HISTORY_FILE"
+    fi
+    UPDATED=$(jq --arg f "\$FILE_PATH" '.edits += [$f] | .edits |= unique' "\$HISTORY_FILE" 2>/dev/null) || true
+    if [[ -n "\$UPDATED" ]]; then
+      echo "\$UPDATED" > "\$HISTORY_FILE"
+    fi
+  ) 200>"\$HISTORY_FILE.lock"
   exit 0
 fi
 
@@ -72,16 +75,27 @@ if [[ ! -f "\$HISTORY_FILE" ]]; then
   exit 0
 fi
 
-# edit-history에서 테스트 파일 검색
-if jq -e --arg b "\$BASENAME" '.edits[] | select(contains($b) and (contains(".test.") or contains(".spec.") or contains("test_")))' "\$HISTORY_FILE" >/dev/null 2>&1; then
-  # 테스트 먼저 수정됨 → 매칭 테스트 기록 소비(제거) + 소스 기록 + 통과
-  UPDATED=$(jq --arg b "\$BASENAME" --arg f "\$FILE_PATH" '
-    .edits |= [.[] | select((contains($b) and (contains(".test.") or contains(".spec.") or contains("test_"))) | not)]
-    | .edits += [$f] | .edits |= unique
-  ' "\$HISTORY_FILE" 2>/dev/null) || true
-  if [[ -n "\$UPDATED" ]]; then
-    echo "\$UPDATED" > "\$HISTORY_FILE"
-  fi
+# edit-history에서 테스트 파일 검색 (flock으로 원자적 읽기/쓰기)
+DECISION=$(
+  (
+    flock -x 200
+    if jq -e --arg b "\$BASENAME" '.edits[] | select(contains($b) and (contains(".test.") or contains(".spec.") or contains("test_")))' "\$HISTORY_FILE" >/dev/null 2>&1; then
+      # 테스트 먼저 수정됨 → 매칭 테스트 기록 소비(제거) + 소스 기록 + 통과
+      UPDATED=$(jq --arg b "\$BASENAME" --arg f "\$FILE_PATH" '
+        .edits |= [.[] | select((contains($b) and (contains(".test.") or contains(".spec.") or contains("test_"))) | not)]
+        | .edits += [$f] | .edits |= unique
+      ' "\$HISTORY_FILE" 2>/dev/null) || true
+      if [[ -n "\$UPDATED" ]]; then
+        echo "\$UPDATED" > "\$HISTORY_FILE"
+      fi
+      echo "allow"
+    else
+      echo "block"
+    fi
+  ) 200>"\$HISTORY_FILE.lock"
+)
+
+if [[ "\$DECISION" == "allow" ]]; then
   exit 0
 fi
 

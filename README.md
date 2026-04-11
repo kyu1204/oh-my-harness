@@ -65,6 +65,9 @@ omh stats         # TUI analytics dashboard
 ### 📁 What Gets Generated
 
 ```text
+~/.omh/
+└── config.json                        # AI provider config (global, not per-project)
+
 your-project/
 ├── CLAUDE.md                          # TDD rules, coding standards
 ├── harness.yaml                       # Your harness config (source of truth)
@@ -89,30 +92,31 @@ your-project/
 ## ⚙️ How It Works
 
 ```text
-                    ┌─────────────────────┐
-  "React + FastAPI  │                     │
-   TDD enforced"    │   claude -p (NL)    │
-  ─────────────────▶│   or --preset flag  │
-                    │                     │
-                    └────────┬────────────┘
-                             │
-                    ┌────────▼────────────┐
-                    │  Project Detector   │  ← Auto-detects language,
-                    │  (14 languages)     │    framework, package manager
-                    └────────┬────────────┘
-                             │
-                    ┌────────▼────────────┐
-                    │   harness.yaml      │  ← Source of truth
-                    │   (editable, git    │    (hooks + rules)
-                    │    trackable)       │
-                    └────────┬────────────┘
-                             │
-              ┌──────────────┼──────────────┐
-              ▼              ▼              ▼
-        ┌──────────┐  ┌──────────┐  ┌──────────────┐
-        │ CLAUDE.md│  │  Hooks   │  │ settings.json│
-        │ (rules)  │  │ (enforce)│  │ (permissions)│
-        └──────────┘  └──────────┘  └──────────────┘
+  ~/.omh/config.json   ┌─────────────────────┐
+  ┌────────────────┐   │                     │
+  │ • Claude CLI   │──▶│   NL Processing     │◀── "React + FastAPI
+  │ • Claude API   │   │   or --preset flag  │     TDD enforced"
+  │ • OpenAI API   │   │                     │
+  │ • Gemini API   │   └────────┬────────────┘
+  └────────────────┘            │
+   (global AI config)   ┌────────▼────────────┐
+                        │  Project Detector   │  ← Auto-detects language,
+                        │  (14 languages)     │    framework, package manager
+                        └────────┬────────────┘
+                                 │
+                        ┌────────▼────────────┐
+                        │   harness.yaml      │  ← Source of truth
+                        │   (editable, git    │    (hooks + rules)
+                        │    trackable)       │
+                        └────────┬────────────┘
+                                 │
+                  ┌──────────────┼──────────────┐
+                  ▼              ▼              ▼
+            ┌──────────┐  ┌──────────┐  ┌──────────┐
+            │CLAUDE.md │  │  Hooks   │  │settings. │
+            │ (rules)  │  │(enforce) │  │  json    │
+            │          │  │          │  │(perms)   │
+            └──────────┘  └──────────┘  └──────────┘
 ```
 
 ### 🔍 Project Detector
@@ -136,6 +140,23 @@ oh-my-harness automatically detects your project type and injects accurate facts
 | 🔷 Scala | build.sbt | sbt test |
 | ⚡ Zig | build.zig | zig build test |
 
+### 🤖 AI Provider Setup
+
+oh-my-harness supports multiple AI providers for natural language mode:
+
+| Provider | Setup | Available Models | Default |
+|----------|-------|------------------|---------|
+| **Claude CLI** | `claude` command installed | Opus 4.6, Sonnet 4.6, Haiku 4.5 | ✓ |
+| **Claude API** | Set `ANTHROPIC_API_KEY` | Opus 4.6, Sonnet 4.6, Haiku 4.5 | Sonnet 4.6 |
+| **OpenAI API** | Set `OPENAI_API_KEY` | GPT-5.4, GPT-5.4-mini, GPT-5.4-nano, GPT-4.1, GPT-4.1-mini, o3, o4-mini | GPT-5.4 |
+| **Gemini API** | Set `GOOGLE_API_KEY` | Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.5 Flash Lite, Gemini 3.1 Pro Preview | Gemini 2.5 Pro |
+
+Configuration is saved to `~/.omh/config.json` and selected via interactive UI on first use:
+
+```bash
+omh init  # will prompt for AI provider selection and model choice
+```
+
 ---
 
 ## 🧱 Building Block Catalog
@@ -153,8 +174,14 @@ All enforcement is powered by **catalog blocks** — reusable, parameterized hoo
 | 🤫 `secret-file-guard` | security | Blocks edits to .env, credentials |
 | ✏️ `lint-on-save` | auto-fix | Auto-lint on file save |
 | 🎨 `format-on-save` | auto-fix | Auto-format on file save |
+| 🧪 `test-on-save` | auto-fix | Auto-run tests on file save |
 | 🔀 `auto-pr` | automation | Auto-create PR after push |
 | 🧪 `tdd-guard` | quality | Blocks source edits unless test modified first (JS/TS/Python) |
+| 🔒 `sql-guard` | security | Blocks dangerous SQL operations |
+| 🌳 `worktree-setup` | monorepo | Supports monorepo worktree patterns |
+| 🗜️ `compact-context` | maintenance | Re-injects context on session start |
+| 📋 `config-audit` | audit | Audit trail for config changes |
+| 🔔 `desktop-notify` | ux | Cross-platform desktop notifications |
 
 ### Usage in `harness.yaml`
 
@@ -190,7 +217,7 @@ hooks:
 
 ```bash
 # 🚀 Initialize
-omh init "your project description"      # NL-powered (requires Claude CLI)
+omh init "your project description"      # NL-powered (requires AI provider)
 omh init --preset nextjs fastapi          # Preset-based (instant)
 
 # 📋 Catalog
@@ -298,7 +325,7 @@ oh-my-harness/
 ├── bin/                    # CLI entry point
 ├── src/
 │   ├── catalog/
-│   │   ├── blocks/         # 11 building block definitions
+│   │   ├── blocks/         # 17 building block definitions
 │   │   ├── types.ts        # BuildingBlock, HookEntry schemas
 │   │   ├── registry.ts     # Block discovery & search
 │   │   ├── template-engine.ts # Handlebars rendering + applyDefaults
@@ -312,6 +339,8 @@ oh-my-harness/
 │   │   ├── harness-tester.ts  # Hook simulation engine
 │   │   ├── event-logger.ts    # events.jsonl read/write/stats
 │   │   ├── event-verifier.ts  # Event-based verification
+│   │   ├── tui/               # Interactive provider & model selection
+│   │   ├── provider-setup.ts  # Provider configuration UI
 │   │   └── tool-checker.ts    # Command executable checks
 │   ├── core/
 │   │   ├── harness-schema.ts   # harness.yaml Zod schema
@@ -327,11 +356,21 @@ oh-my-harness/
 │   │   ├── project-detector.ts  # Deterministic project detection
 │   │   ├── types.ts             # ProjectFacts, Detector interface
 │   │   └── detectors/           # 14 language detectors
+│   ├── cli/
+│   │   ├── tui/            # Interactive provider & model selection
+│   │   └── provider-setup.ts # Provider configuration UI
 │   └── nl/
-│       ├── parse-intent.ts     # claude -p integration
-│       └── prompt-templates.ts # LLM prompt construction
+│       ├── provider-registry.ts # Multi-provider definitions
+│       ├── config-store.ts      # ~/.omh/config.json persistence
+│       ├── providers/           # Provider implementations
+│       │   ├── claude-cli.ts
+│       │   ├── claude-api.ts
+│       │   ├── openai-api.ts
+│       │   └── gemini-api.ts
+│       ├── parse-intent.ts      # LLM prompt integration
+│       └── prompt-templates.ts  # NL prompt construction
 ├── presets/                # Built-in preset definitions
-└── tests/                  # 745+ tests (unit + integration)
+└── tests/                  # 873+ tests (unit + integration)
 ```
 
 ---
@@ -339,7 +378,8 @@ oh-my-harness/
 ## 📦 Requirements
 
 - **Node.js** >= 20
-- **Claude CLI** (optional, for NL mode) — [Install guide](https://docs.anthropic.com/en/docs/claude-code)
+- **Claude CLI** (optional, for default NL mode) — [Install guide](https://docs.anthropic.com/en/docs/claude-code)
+- **API Keys** (optional, for Claude/OpenAI/Gemini API modes) — set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY`
 
 ---
 
@@ -347,12 +387,15 @@ oh-my-harness/
 
 - [x] `npx oh-my-harness` — zero-install usage
 - [x] `omh sync` — regenerate from harness.yaml
-- [x] Building block catalog — 11 verified hook templates
+- [x] Building block catalog — 17 verified hook templates
 - [x] Project detector — 14 language auto-detection
 - [x] `omh test` — dry-run hook verification
 - [x] `omh stats` — TUI analytics dashboard (ink)
 - [x] Stateful hook logging — events.jsonl
 - [x] TDD Guard — enforce test-first workflow
+- [x] Multi-provider AI support — Claude API, OpenAI, Gemini
+- [x] Interactive model selection per provider
+- [x] GitHub star prompt — first-time only
 - [ ] Cursor (`.cursor/rules/`) emitter
 - [ ] Codex (`AGENTS.md`) emitter
 - [ ] GitHub Copilot emitter

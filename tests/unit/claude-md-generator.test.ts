@@ -105,6 +105,29 @@ More user content.
     void first; // used only to trigger first write
   });
 
+  it("removes managed sections that are no longer in config after sync", async () => {
+    // First sync: config has rule-a
+    const configWithA = makeMergedConfig({
+      claudeMdSections: [
+        { id: "rule-a", title: "Rule A", content: "## Rule A\n- item a", priority: 10 },
+      ],
+    });
+    await generateClaudeMd({ projectDir: tmpDir, config: configWithA });
+
+    // Second sync: config no longer has rule-a
+    const configWithoutA = makeMergedConfig({
+      claudeMdSections: [],
+    });
+    const result = await generateClaudeMd({ projectDir: tmpDir, config: configWithoutA });
+
+    expect(result).not.toContain("<!-- oh-my-harness:start:rule-a -->");
+    expect(result).not.toContain("<!-- oh-my-harness:end:rule-a -->");
+    expect(result).not.toContain("item a");
+
+    const written = await fs.readFile(path.join(tmpDir, "CLAUDE.md"), "utf8");
+    expect(written).toBe(result);
+  });
+
   it("handles empty config (no sections)", async () => {
     const config = makeMergedConfig();
 

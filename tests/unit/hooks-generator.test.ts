@@ -102,6 +102,34 @@ describe("generateHooks", () => {
     ]);
   });
 
+  it("writes an empty manifest after removing all previously generated hooks", async () => {
+    await generateHooks({
+      projectDir,
+      config: makeMergedConfig({
+        hooks: {
+          preToolUse: [{ id: "command-guard", matcher: "Bash", inline: "#!/bin/bash\nexit 0" }],
+          postToolUse: [],
+        },
+      }),
+    });
+
+    const result = await generateHooks({ projectDir, config: makeMergedConfig() });
+    const manifestPath = join(projectDir, ".claude/hooks/oh-my-harness-manifest.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+
+    expect(result).toEqual({ hooksConfig: {}, generatedFiles: [] });
+    expect(manifest.hooks).toEqual([]);
+  });
+
+  it("throws when an existing hooks manifest cannot be parsed", async () => {
+    const hooksDir = join(projectDir, ".claude/hooks");
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    await mkdir(hooksDir, { recursive: true });
+    await writeFile(join(hooksDir, "oh-my-harness-manifest.json"), "{not-json", "utf8");
+
+    await expect(generateHooks({ projectDir, config: makeMergedConfig() })).rejects.toThrow();
+  });
+
   it("writes manifest file tracking generated hooks", async () => {
     const config = makeMergedConfig({
       hooks: {
@@ -288,6 +316,89 @@ describe("wrapWithLogger", () => {
     const result = wrapWithLogger(script);
     expect(result).toContain("_OMH_STATE_DIR");
     expect(result).toContain("#!/usr/bin/env bash");
+  });
+});
+
+describe("generateHooks — stale hook cleanup on sync", () => {
+  let projectDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "oh-my-harness-cleanup-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  it("removes stale hook file when hook is deleted from harness.yaml", async () => {
+    // First sync: tdd-guard + branch-guard
+    const configBefore = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          { id: "tdd-guard", matcher: "Bash", inline: "#!/bin/bash\nexit 0" },
+          { id: "branch-guard", matcher: "Bash", inline: "#!/bin/bash\nexit 0" },
+        ],
+        postToolUse: [],
+      },
+    });
+    await generateHooks({ projectDir, config: configBefore });
+
+    const tddScript = join(projectDir, ".claude/hooks/tdd-guard.sh");
+    const branchScript = join(projectDir, ".claude/hooks/branch-guard.sh");
+
+    // Verify both files exist
+    await expect(stat(tddScript)).resolves.toBeDefined();
+    await expect(stat(branchScript)).resolves.toBeDefined();
+
+    // Second sync: tdd-guard removed
+    const configAfter = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          { id: "branch-guard", matcher: "Bash", inline: "#!/bin/bash\nexit 0" },
+        ],
+        postToolUse: [],
+      },
+    });
+    await generateHooks({ projectDir, config: configAfter });
+
+    // tdd-guard.sh must be deleted
+    await expect(stat(tddScript)).rejects.toThrow();
+    // branch-guard.sh must remain
+    await expect(stat(branchScript)).resolves.toBeDefined();
+  });
+
+  it("removes all stale hooks when all hooks are removed", async () => {
+    const configBefore = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          { id: "tdd-guard", matcher: "Bash", inline: "#!/bin/bash\nexit 0" },
+        ],
+        postToolUse: [],
+      },
+    });
+    await generateHooks({ projectDir, config: configBefore });
+
+    const tddScript = join(projectDir, ".claude/hooks/tdd-guard.sh");
+    await expect(stat(tddScript)).resolves.toBeDefined();
+
+    // Second sync: no hooks
+    const configAfter = makeMergedConfig();
+    await generateHooks({ projectDir, config: configAfter });
+
+    await expect(stat(tddScript)).rejects.toThrow();
+  });
+
+  it("does not error when there is no prior manifest", async () => {
+    // First sync with no prior manifest — should work cleanly
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          { id: "branch-guard", matcher: "Bash", inline: "#!/bin/bash\nexit 0" },
+        ],
+        postToolUse: [],
+      },
+    });
+    await expect(generateHooks({ projectDir, config })).resolves.toBeDefined();
   });
 });
 

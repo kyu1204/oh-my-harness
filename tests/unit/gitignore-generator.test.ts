@@ -55,4 +55,22 @@ describe("updateGitignore", () => {
     const shCount = (content.match(/\.claude\/hooks\/\*\.sh/g) ?? []).length;
     expect(shCount).toBe(1);
   });
+
+  it("handles CRLF line endings without creating duplicate sections", async () => {
+    // Write gitignore with Windows line endings (CRLF)
+    const crlfContent = "node_modules/\r\ndist/\r\n# oh-my-harness\r\n.old-entry/\r\n";
+    await fs.writeFile(path.join(tmpDir, ".gitignore"), crlfContent);
+
+    // Update with new entries
+    await updateGitignore(tmpDir, [".claude/hooks/*.sh"]);
+
+    const content = await fs.readFile(path.join(tmpDir, ".gitignore"), "utf-8");
+
+    // Section header should appear only once (not duplicated)
+    const headerCount = (content.match(/# oh-my-harness/g) ?? []).length;
+    expect(headerCount).toBe(1);
+
+    // New entry should be added
+    expect(content).toContain(".claude/hooks/*.sh");
+  });
 });

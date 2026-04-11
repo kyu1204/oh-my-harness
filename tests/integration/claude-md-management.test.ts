@@ -74,9 +74,9 @@ describe("generateClaudeMd()", () => {
     expect(hasManagedSection(content, "section-one")).toBe(true);
     expect(hasManagedSection(content, "section-two")).toBe(true);
 
-    // Now regenerate with only one section — section-two should remain in file
-    // (generateClaudeMd only upserts, does not remove absent sections)
-    // But section-one content can be updated independently
+    // Now regenerate with only one section — section-two should be removed
+    // (generateClaudeMd removes managed sections absent from config)
+    // section-one content is updated independently
     const configWithOne = makeConfig([
       { id: "section-one", title: "Section One", content: "Updated content one", priority: 10 },
     ]);
@@ -84,8 +84,10 @@ describe("generateClaudeMd()", () => {
 
     content = await readFile(claudeMdPath, "utf-8");
     expect(content).toContain("Updated content one");
-    // section-two marker still present (upsert doesn't remove)
-    expect(hasManagedSection(content, "section-two")).toBe(true);
+    // section-two marker pair is removed because it is no longer in the config
+    expect(hasManagedSection(content, "section-two")).toBe(false);
+    expect(content).not.toContain("<!-- oh-my-harness:start:section-two -->");
+    expect(content).not.toContain("<!-- oh-my-harness:end:section-two -->");
   });
 
   it("manages multiple sections simultaneously in correct priority order", async () => {

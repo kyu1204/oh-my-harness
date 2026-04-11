@@ -14,7 +14,9 @@ export async function updateGitignore(projectDir: string, entries: string[]): Pr
   }
 
   // Collect entries already present anywhere in the file
-  const existingLines = new Set(content.split("\n").map((l) => l.trim()));
+  // Normalize CRLF to LF before processing to handle Windows line endings
+  const lines = content.split("\n").map(line => line.replace(/\r$/, ""));
+  const existingLines = new Set(lines.map((l) => l.trim()));
 
   // Filter to only entries not yet present
   const newEntries = entries.filter((e) => !existingLines.has(e));
@@ -29,7 +31,6 @@ export async function updateGitignore(projectDir: string, entries: string[]): Pr
 
   if (hasSection) {
     // Append new entries after the existing section header
-    const lines = content.split("\n");
     const headerIdx = lines.findIndex((l) => l.trim() === SECTION_HEADER);
     lines.splice(headerIdx + 1, 0, ...newEntries);
     content = lines.join("\n");

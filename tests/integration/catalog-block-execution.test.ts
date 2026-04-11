@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
@@ -29,17 +29,27 @@ function hasJq(): boolean {
   }
 }
 
-function runScript(scriptPath: string, stdin: string): string {
+function runScript(scriptPath: string, stdin: string, env?: NodeJS.ProcessEnv): string {
   try {
-    return execSync(`bash "${scriptPath}"`, {
+    return execSync(`/bin/bash "${scriptPath}"`, {
       input: stdin,
       cwd: tmpDir,
       encoding: "utf-8",
       timeout: 5000,
+      env: env ?? process.env,
     });
   } catch (e) {
     return (e as { stdout?: string }).stdout ?? "";
   }
+}
+
+async function makeBrokenPythonPath(): Promise<string> {
+  const binDir = join(tmpDir, "bin-no-python");
+  await mkdir(binDir, { recursive: true });
+  const pythonPath = join(binDir, "python3");
+  await writeFile(pythonPath, "#!/bin/bash\nexit 127\n", { mode: 0o755 });
+  await chmod(pythonPath, 0o755);
+  return `${binDir}:${process.env.PATH ?? ""}`;
 }
 
 describe("catalog block execution", () => {
@@ -66,6 +76,29 @@ describe("catalog block execution", () => {
     expect(result.reason).toContain("rm -rf /");
   });
 
+  it("command-guard: blocks a matched dangerous command with tab-normalized whitespace", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+
+    const rendered = renderTemplate(commandGuard.template, {
+      patterns: ["rm -rf /", "sudo rm"],
+    });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "command-guard-tab.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    const stdout = runScript(
+      scriptPath,
+      JSON.stringify({ tool_name: "Bash", tool_input: { command: "rm\t-rf /" } }),
+    );
+
+    const result = JSON.parse(stdout.trim());
+    expect(result.decision).toBe("block");
+    expect(result.reason).toContain("rm -rf /");
+  });
+
   it("command-guard: allows a safe command (exit 0, no block output)", async () => {
     if (!hasJq()) {
       console.log("jq not found, skipping");
@@ -84,14 +117,11 @@ describe("catalog block execution", () => {
       JSON.stringify({ tool_name: "Bash", tool_input: { command: "npm test" } }),
     );
 
-    // No block JSON in output
     const trimmed = stdout.trim();
     if (trimmed.length > 0) {
-      // If there is output it must NOT be a block decision
       const result = JSON.parse(trimmed);
       expect(result.decision).not.toBe("block");
     } else {
-      // Empty output means the script exited cleanly without blocking
       expect(trimmed).toBe("");
     }
   });
@@ -164,5 +194,58 @@ describe("catalog block execution", () => {
     } else {
       expect(trimmed).toBe("");
     }
+  });
+
+  it("path-guard: generated script normalizes path before comparison to prevent traversal bypass", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+
+    const rendered = renderTemplate(pathGuard.template, {
+      blockedPaths: ["dist/"],
+    });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "path-guard-normalize.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    const stdout = runScript(
+      scriptPath,
+      JSON.stringify({
+        tool_name: "Write",
+        tool_input: { file_path: "./foo/../dist/secret.js" },
+      }),
+    );
+
+    const result = JSON.parse(stdout.trim());
+    expect(result.decision).toBe("block");
+    expect(result.reason).toContain("dist/");
+  });
+
+  it("path-guard: blocks non-canonical paths when python3 normalization fails", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+
+    const rendered = renderTemplate(pathGuard.template, {
+      blockedPaths: ["src/generated/"],
+    });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "path-guard-no-python.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    const stdout = runScript(
+      scriptPath,
+      JSON.stringify({
+        tool_name: "Write",
+        tool_input: { file_path: "src/foo/../generated/file.ts" },
+      }),
+      { ...process.env, PATH: await makeBrokenPythonPath() },
+    );
+
+    const result = JSON.parse(stdout.trim());
+    expect(result.decision).toBe("block");
+    expect(result.reason).toContain("path normalization unavailable");
   });
 });

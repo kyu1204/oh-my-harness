@@ -198,6 +198,30 @@ describe("generateHooks", () => {
     expect(content).toContain("exit 0");
   });
 
+  it("falls back to a safe default name when hook.id sanitizes to empty", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          { id: "!!!", matcher: "Bash", inline: "#!/bin/bash\necho first" },
+          { id: "...", matcher: "Edit|Write", inline: "#!/bin/bash\necho second" },
+        ],
+        postToolUse: [],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+
+    const file1 = join(projectDir, ".claude/hooks/hook.sh");
+    const file2 = join(projectDir, ".claude/hooks/hook-1.sh");
+
+    expect(result.generatedFiles).toContain(file1);
+    expect(result.generatedFiles).toContain(file2);
+    expect(result.hooksConfig["PreToolUse"]).toEqual([
+      { matcher: "Bash", hooks: [{ type: "command", command: "bash .claude/hooks/hook.sh" }] },
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: "bash .claude/hooks/hook-1.sh" }] },
+    ]);
+  });
+
   it("does not register hooks without inline content in hooksConfig", async () => {
     const config = makeMergedConfig({
       hooks: {
@@ -292,6 +316,33 @@ describe("generateHooks", () => {
     const commands = result.hooksConfig["PreToolUse"].map(h => h.hooks[0].command);
     expect(commands).toContain("bash .claude/hooks/myhook.sh");
     expect(commands).toContain("bash .claude/hooks/myhook-1.sh");
+  });
+
+  it("avoids file collision when same hook id exists in different events", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          { id: "myhook", matcher: "Bash", inline: "#!/bin/bash\necho pre" },
+        ],
+        postToolUse: [
+          { id: "myhook", matcher: "Edit|Write", inline: "#!/bin/bash\necho post" },
+        ],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+
+    const file1 = join(projectDir, ".claude/hooks/myhook.sh");
+    const file2 = join(projectDir, ".claude/hooks/myhook-1.sh");
+
+    expect(result.generatedFiles).toContain(file1);
+    expect(result.generatedFiles).toContain(file2);
+    expect(result.hooksConfig["PreToolUse"]).toEqual([
+      { matcher: "Bash", hooks: [{ type: "command", command: "bash .claude/hooks/myhook.sh" }] },
+    ]);
+    expect(result.hooksConfig["PostToolUse"]).toEqual([
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: "bash .claude/hooks/myhook-1.sh" }] },
+    ]);
   });
 });
 

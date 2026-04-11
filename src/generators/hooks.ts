@@ -132,7 +132,7 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
       continue;
     }
 
-    const safeId = hook.id.replace(/[^a-zA-Z0-9_-]/g, "");
+    const safeId = hook.id.replace(/[^a-zA-Z0-9_-]/g, "") || "hook";
     let scriptName = `${safeId}.sh`;
     // Prevent collisions within the same event using numeric suffix
     if (usedScriptNames.has(scriptName)) {

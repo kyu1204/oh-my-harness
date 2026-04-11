@@ -57,6 +57,12 @@ export async function generateSettings(options: GenerateSettingsOptions): Promis
   // User-added = existing - previous managed
   const userAllow = existingAllow.filter((p) => !prevManagedAllow.has(p));
   const userDeny = existingDeny.filter((p) => !prevManagedDeny.has(p));
+  const userAllowSet = new Set(userAllow);
+  const userDenySet = new Set(userDeny);
+
+  // Only track permissions as managed if they were not already user-owned.
+  const trackedManagedAllow = newManagedAllow.filter((p) => !userAllowSet.has(p));
+  const trackedManagedDeny = newManagedDeny.filter((p) => !userDenySet.has(p));
 
   // Final = user-added + new managed (deduplicated)
   const mergedAllow = Array.from(new Set([...userAllow, ...newManagedAllow]));
@@ -75,8 +81,8 @@ export async function generateSettings(options: GenerateSettingsOptions): Promis
       managedAt: "__PLACEHOLDER__",
       presets: config.presets,
       managedPermissions: {
-        allow: newManagedAllow,
-        deny: newManagedDeny,
+        allow: trackedManagedAllow,
+        deny: trackedManagedDeny,
       },
     },
   };

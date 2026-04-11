@@ -282,6 +282,63 @@ describe("generateSettings", () => {
     expect(after.permissions.deny).toEqual(["Bash(rm -rf /)"]);
   });
 
+  it("preserves pre-existing user permissions even when they temporarily overlap with managed ones", async () => {
+    const hooksOutput = makeHooksOutput();
+    const claudeDir = path.join(tmpDir, ".claude");
+    await fs.mkdir(claudeDir, { recursive: true });
+    const settingsPath = path.join(claudeDir, "settings.json");
+
+    const existingSettings = {
+      permissions: {
+        allow: ["Bash(git push)"],
+        deny: [],
+      },
+      _ohMyHarness: {
+        managedAt: "2024-01-01T00:00:00.000Z",
+        presets: ["_base"],
+        managedPermissions: {
+          allow: [],
+          deny: [],
+        },
+      },
+    };
+    await fs.writeFile(settingsPath, JSON.stringify(existingSettings, null, 2) + "\n");
+
+    await generateSettings({
+      projectDir: tmpDir,
+      config: makeMergedConfig({
+        settings: {
+          permissions: {
+            allow: ["Bash(git push)", "Bash(pnpm test*)"],
+            deny: [],
+          },
+        },
+      }),
+      hooksOutput,
+    });
+
+    const afterFirstSync = JSON.parse(await fs.readFile(settingsPath, "utf-8"));
+    expect(afterFirstSync.permissions.allow).toContain("Bash(git push)");
+    expect(afterFirstSync._ohMyHarness.managedPermissions.allow).toEqual(["Bash(pnpm test*)"]);
+
+    await generateSettings({
+      projectDir: tmpDir,
+      config: makeMergedConfig({
+        settings: {
+          permissions: {
+            allow: ["Bash(pnpm test*)"],
+            deny: [],
+          },
+        },
+      }),
+      hooksOutput,
+    });
+
+    const afterSecondSync = JSON.parse(await fs.readFile(settingsPath, "utf-8"));
+    expect(afterSecondSync.permissions.allow).toContain("Bash(git push)");
+    expect(afterSecondSync.permissions.allow).toContain("Bash(pnpm test*)");
+  });
+
   it("is idempotent — running twice with same config produces identical output", async () => {
     const config = makeMergedConfig();
     const hooksOutput = makeHooksOutput();

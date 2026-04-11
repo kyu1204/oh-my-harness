@@ -249,6 +249,39 @@ describe("generateSettings", () => {
     expect(after.permissions.allow).toContain("Bash(pnpm test*)");
   });
 
+  it("tolerates malformed existing permission fields without breaking sync", async () => {
+    const hooksOutput = makeHooksOutput();
+    const claudeDir = path.join(tmpDir, ".claude");
+    await fs.mkdir(claudeDir, { recursive: true });
+
+    const malformedSettings = {
+      permissions: {
+        allow: "Bash(npm test)",
+        deny: ["Bash(rm -rf /)", 123, null],
+      },
+      _ohMyHarness: {
+        managedAt: "2024-01-01T00:00:00.000Z",
+        presets: ["_base"],
+        managedPermissions: {
+          allow: "Bash(old*)",
+          deny: ["Bash(rm -rf /)", false],
+        },
+      },
+    };
+    await fs.writeFile(
+      path.join(claudeDir, "settings.json"),
+      JSON.stringify(malformedSettings, null, 2) + "\n",
+    );
+
+    await expect(
+      generateSettings({ projectDir: tmpDir, config: makeMergedConfig(), hooksOutput }),
+    ).resolves.not.toThrow();
+
+    const after = JSON.parse(await fs.readFile(path.join(claudeDir, "settings.json"), "utf-8"));
+    expect(after.permissions.allow).toEqual(["Bash(pnpm test*)"]);
+    expect(after.permissions.deny).toEqual(["Bash(rm -rf /)"]);
+  });
+
   it("is idempotent — running twice with same config produces identical output", async () => {
     const config = makeMergedConfig();
     const hooksOutput = makeHooksOutput();

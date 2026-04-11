@@ -9,6 +9,10 @@ export interface GenerateSettingsOptions {
   hooksOutput: HooksOutput;
 }
 
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
 export async function generateSettings(options: GenerateSettingsOptions): Promise<void> {
   const { projectDir, config, hooksOutput } = options;
   const claudeDir = path.join(projectDir, ".claude");
@@ -23,21 +27,46 @@ export async function generateSettings(options: GenerateSettingsOptions): Promis
     // File doesn't exist or is invalid JSON — start fresh
   }
 
-  // Deep merge permissions: preserve existing, add managed entries
-  const existingPermissions = (existing.permissions ?? {}) as {
-    allow?: string[];
-    deny?: string[];
+  // Deep merge permissions: preserve user-added, replace managed entries
+  const existingPermissions =
+    existing.permissions && typeof existing.permissions === "object" && !Array.isArray(existing.permissions)
+      ? (existing.permissions as Record<string, unknown>)
+      : {};
+  const existingAllow = asStringArray(existingPermissions.allow);
+  const existingDeny = asStringArray(existingPermissions.deny);
+
+  const existingMeta = (existing._ohMyHarness ?? {}) as {
+    managedAt?: string;
+    managedPermissions?: { allow?: unknown; deny?: unknown };
   };
 
-  const mergedAllow = Array.from(
-    new Set([...(existingPermissions.allow ?? []), ...(config.settings.permissions.allow ?? [])]),
-  );
-  const mergedDeny = Array.from(
-    new Set([...(existingPermissions.deny ?? []), ...(config.settings.permissions.deny ?? [])]),
-  );
+  // Previous managed permissions (empty if legacy settings without tracking)
+  const prevManaged =
+    existingMeta.managedPermissions &&
+      typeof existingMeta.managedPermissions === "object" &&
+      !Array.isArray(existingMeta.managedPermissions)
+      ? existingMeta.managedPermissions
+      : {};
+  const prevManagedAllow = new Set(asStringArray(prevManaged.allow));
+  const prevManagedDeny = new Set(asStringArray(prevManaged.deny));
 
-  // Preserve managedAt if content is unchanged
-  const existingMeta = (existing._ohMyHarness ?? {}) as { managedAt?: string };
+  // New managed permissions from current config
+  const newManagedAllow = asStringArray(config.settings.permissions.allow);
+  const newManagedDeny = asStringArray(config.settings.permissions.deny);
+
+  // User-added = existing - previous managed
+  const userAllow = existingAllow.filter((p) => !prevManagedAllow.has(p));
+  const userDeny = existingDeny.filter((p) => !prevManagedDeny.has(p));
+  const userAllowSet = new Set(userAllow);
+  const userDenySet = new Set(userDeny);
+
+  // Only track permissions as managed if they were not already user-owned.
+  const trackedManagedAllow = newManagedAllow.filter((p) => !userAllowSet.has(p));
+  const trackedManagedDeny = newManagedDeny.filter((p) => !userDenySet.has(p));
+
+  // Final = user-added + new managed (deduplicated)
+  const mergedAllow = Array.from(new Set([...userAllow, ...newManagedAllow]));
+  const mergedDeny = Array.from(new Set([...userDeny, ...newManagedDeny]));
   const previousManagedAt = existingMeta.managedAt;
 
   const result: Record<string, unknown> = {
@@ -51,6 +80,10 @@ export async function generateSettings(options: GenerateSettingsOptions): Promis
     _ohMyHarness: {
       managedAt: "__PLACEHOLDER__",
       presets: config.presets,
+      managedPermissions: {
+        allow: trackedManagedAllow,
+        deny: trackedManagedDeny,
+      },
     },
   };
 

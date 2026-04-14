@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, stat } from "node:fs/promises";
+import { mkdtemp, rm, readFile, stat, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { generateHooks, wrapWithLogger } from "../../src/generators/hooks.js";
 import type { MergedConfig } from "../../src/core/preset-types.js";
+
+const execFileAsync = promisify(execFile);
 
 function makeMergedConfig(overrides: Partial<MergedConfig> = {}): MergedConfig {
   return {
@@ -586,5 +590,81 @@ describe("generateHooks — extended events", () => {
     expect(result.generatedFiles).toHaveLength(2);
     expect(result.hooksConfig["PreToolUse"]).toHaveLength(1);
     expect(result.hooksConfig["SessionStart"]).toHaveLength(1);
+  });
+});
+
+describe("generateHooks — cwd-independence", () => {
+  let projectDir: string;
+  let differentDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "oh-my-harness-cwd-"));
+    differentDir = await mkdtemp(join(tmpdir(), "oh-my-harness-other-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+    await rm(differentDir, { recursive: true, force: true });
+  });
+
+  it("hook script executes successfully when cwd differs from projectDir", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          { id: "cwd-test", matcher: "Bash", inline: '#!/bin/bash\nset -euo pipefail\nINPUT=$(cat)\nexit 0' },
+        ],
+        postToolUse: [],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+    const scriptPath = result.generatedFiles[0];
+
+    // Execute the hook script from a DIFFERENT working directory, piping empty stdin
+    const { stderr } = await execFileAsync("bash", ["-c", `echo '{}' | bash "${scriptPath}"`], {
+      cwd: differentDir,
+      env: { ...process.env },
+      timeout: 5000,
+    });
+
+    // Script should exit 0 (no error thrown)
+    expect(stderr).toBe("");
+  });
+
+  it("logger writes events.jsonl to absolute path under projectDir, not cwd", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          {
+            id: "logger-test",
+            matcher: "Bash",
+            inline: '#!/bin/bash\nset -euo pipefail\nINPUT=$(cat)\n_log_event "block" "test"\nexit 0',
+          },
+        ],
+        postToolUse: [],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+    const scriptPath = result.generatedFiles[0];
+
+    // Execute from a different directory, piping empty stdin
+    await execFileAsync("bash", ["-c", `echo '{}' | bash "${scriptPath}"`], {
+      cwd: differentDir,
+      env: { ...process.env },
+      timeout: 5000,
+    });
+
+    // events.jsonl should be under projectDir, NOT under differentDir
+    const eventsPath = join(projectDir, ".claude/hooks/.state/events.jsonl");
+    await expect(access(eventsPath)).resolves.toBeUndefined();
+
+    const events = await readFile(eventsPath, "utf8");
+    expect(events).toContain('"decision":"block"');
+    expect(events).toContain('"reason":"test"');
+
+    // Verify nothing was written under differentDir
+    const wrongEventsPath = join(differentDir, ".claude/hooks/.state/events.jsonl");
+    await expect(access(wrongEventsPath)).rejects.toThrow();
   });
 });

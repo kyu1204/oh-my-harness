@@ -2,9 +2,12 @@ import { mkdir, writeFile, chmod, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import type { MergedConfig } from "../core/preset-types.js";
 
-function buildLoggerSnippet(event: string): string {
+function buildLoggerSnippet(event: string, projectDir?: string): string {
+  const stateDir = projectDir
+    ? `${projectDir}/.claude/hooks/.state`
+    : ".claude/hooks/.state";
   return `# --- oh-my-harness event logger ---
-_OMH_STATE_DIR=".claude/hooks/.state"
+_OMH_STATE_DIR="${stateDir}"
 mkdir -p "$_OMH_STATE_DIR" 2>/dev/null || true
 _OMH_HOOK_NAME="$(basename "$0")"
 _OMH_EVENT="${event}"
@@ -20,8 +23,8 @@ trap '[ "$_OMH_LOGGED" -eq 0 ] && _log_event "allow"' EXIT
 # --- end logger ---`;
 }
 
-export function wrapWithLogger(script: string, event: string = "unknown"): string {
-  const snippet = buildLoggerSnippet(event);
+export function wrapWithLogger(script: string, event: string = "unknown", projectDir?: string): string {
+  const snippet = buildLoggerSnippet(event, projectDir);
   if (script.includes("INPUT=$(cat)")) {
     return script.replace("INPUT=$(cat)", `INPUT=$(cat)\n\n${snippet}`);
   }
@@ -145,14 +148,14 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
     usedScriptNames.add(scriptName);
 
     const scriptPath = join(hooksDir, scriptName);
-    const wrappedScript = wrapWithLogger(hook.inline, hook.event);
+    const wrappedScript = wrapWithLogger(hook.inline, hook.event, projectDir);
     await writeFile(scriptPath, wrappedScript, "utf8");
     await chmod(scriptPath, 0o755);
     generatedFiles.push(scriptPath);
 
     const entry = {
       matcher: hook.matcher,
-      hooks: [{ type: "command" as const, command: `bash .claude/hooks/${scriptName}` }],
+      hooks: [{ type: "command" as const, command: `bash "${scriptPath}"` }],
     };
     if (!hooksConfig[hook.event]) {
       hooksConfig[hook.event] = [];

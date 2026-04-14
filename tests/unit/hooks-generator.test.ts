@@ -95,10 +95,10 @@ describe("generateHooks", () => {
     expect(result.hooksConfig).toHaveProperty("PostToolUse");
 
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: [{ type: "command", command: "bash .claude/hooks/command-guard.sh" }] },
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/command-guard.sh")}"` }] },
     ]);
     expect(result.hooksConfig["PostToolUse"]).toEqual([
-      { matcher: "Edit|Write", hooks: [{ type: "command", command: "bash .claude/hooks/lint-on-save.sh" }] },
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/lint-on-save.sh")}"` }] },
     ]);
   });
 
@@ -168,8 +168,8 @@ describe("generateHooks", () => {
 
     expect(result.hooksConfig["PreToolUse"]).toHaveLength(2);
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: [{ type: "command", command: "bash .claude/hooks/guard-bash.sh" }] },
-      { matcher: "Edit|Write", hooks: [{ type: "command", command: "bash .claude/hooks/guard-edit.sh" }] },
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/guard-bash.sh")}"` }] },
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/guard-edit.sh")}"` }] },
     ]);
   });
 
@@ -190,7 +190,7 @@ describe("generateHooks", () => {
     const scriptPath = join(projectDir, `.claude/hooks/${safeId}.sh`);
     expect(result.generatedFiles).toContain(scriptPath);
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: [{ type: "command", command: `bash .claude/hooks/${safeId}.sh` }] },
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash "${join(projectDir, `.claude/hooks/${safeId}.sh`)}"` }] },
     ]);
     // Ensure no file was written outside the hooks dir
     const content = await readFile(scriptPath, "utf8");
@@ -217,8 +217,8 @@ describe("generateHooks", () => {
     expect(result.generatedFiles).toContain(file1);
     expect(result.generatedFiles).toContain(file2);
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: [{ type: "command", command: "bash .claude/hooks/hook.sh" }] },
-      { matcher: "Edit|Write", hooks: [{ type: "command", command: "bash .claude/hooks/hook-1.sh" }] },
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/hook.sh")}"` }] },
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/hook-1.sh")}"` }] },
     ]);
   });
 
@@ -314,8 +314,9 @@ describe("generateHooks", () => {
     // Check hooksConfig contains both hooks
     expect(result.hooksConfig["PreToolUse"]).toHaveLength(2);
     const commands = result.hooksConfig["PreToolUse"].map(h => h.hooks[0].command);
-    expect(commands).toContain("bash .claude/hooks/myhook.sh");
-    expect(commands).toContain("bash .claude/hooks/myhook-1.sh");
+    expect(commands).toContain(`bash "${join(projectDir, ".claude/hooks/myhook.sh")}"`);
+    expect(commands).toContain(`bash "${join(projectDir, ".claude/hooks/myhook-1.sh")}"`);
+
   });
 
   it("avoids file collision when same hook id exists in different events", async () => {
@@ -338,10 +339,10 @@ describe("generateHooks", () => {
     expect(result.generatedFiles).toContain(file1);
     expect(result.generatedFiles).toContain(file2);
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: [{ type: "command", command: "bash .claude/hooks/myhook.sh" }] },
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/myhook.sh")}"` }] },
     ]);
     expect(result.hooksConfig["PostToolUse"]).toEqual([
-      { matcher: "Edit|Write", hooks: [{ type: "command", command: "bash .claude/hooks/myhook-1.sh" }] },
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/myhook-1.sh")}"` }] },
     ]);
   });
 });
@@ -404,6 +405,18 @@ describe("wrapWithLogger", () => {
     const result = wrapWithLogger(script);
     expect(result).toContain("_OMH_STATE_DIR");
     expect(result).toContain("#!/usr/bin/env bash");
+  });
+
+  it("produces absolute _OMH_STATE_DIR when projectDir is provided", () => {
+    const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
+    const result = wrapWithLogger(script, "PreToolUse", "/tmp/my-project");
+    expect(result).toContain('_OMH_STATE_DIR="/tmp/my-project/.claude/hooks/.state"');
+  });
+
+  it("keeps relative _OMH_STATE_DIR when projectDir is omitted", () => {
+    const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
+    const result = wrapWithLogger(script, "PreToolUse");
+    expect(result).toContain('_OMH_STATE_DIR=".claude/hooks/.state"');
   });
 });
 

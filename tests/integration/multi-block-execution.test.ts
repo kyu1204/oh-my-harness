@@ -416,7 +416,7 @@ describe("hooksConfig structure validation", () => {
         // Each hook has type: "command" and command string
         expect(hook.type).toBe("command");
         expect(typeof hook.command).toBe("string");
-        expect(hook.command).toMatch(/\.sh$/);
+        expect(hook.command).toMatch(/\.sh"?$/);
       }
     }
   });

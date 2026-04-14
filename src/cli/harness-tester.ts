@@ -179,11 +179,11 @@ export function generateBlockTestCases(
     };
     const aliases = blockIdAliases[block.id] ?? [block.id];
     const matchedHook = registeredHooks?.find((h) => {
-      const scriptName = h.command.replace(/^bash\s+/, "");
+      const scriptName = h.command.replace(/^bash\s+/, "").replace(/^"|"$/g, "");
       return aliases.some((alias) => scriptName.includes(alias));
     });
     const hookScript = matchedHook
-      ? matchedHook.command.replace(/^bash\s+/, "")
+      ? matchedHook.command.replace(/^bash\s+/, "").replace(/^"|"$/g, "")
       : `.claude/hooks/catalog-${block.id}.sh`;
 
     switch (block.id) {

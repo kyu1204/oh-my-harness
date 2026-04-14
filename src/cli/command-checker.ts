@@ -79,7 +79,7 @@ export async function checkHarnessCommands(
   const path = await import("node:path");
 
   for (const hook of hooks) {
-    const scriptPath = hook.command.replace(/^bash\s+/, "");
+    const scriptPath = hook.command.replace(/^bash\s+/, "").replace(/^"|"$/g, "");
     const fullPath = path.join(projectDir, scriptPath);
 
     let content: string;

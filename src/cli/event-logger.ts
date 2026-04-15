@@ -5,7 +5,7 @@ export interface HookEvent {
   ts: string;
   event: string;
   hook: string;
-  decision: "block" | "allow";
+  decision: "block" | "allow" | "error";
   reason?: string;
   tool?: string;
 }
@@ -42,7 +42,7 @@ export async function readEvents(projectDir: string): Promise<HookEvent[]> {
         typeof parsed.ts === "string" &&
         typeof parsed.event === "string" &&
         typeof parsed.hook === "string" &&
-        (parsed.decision === "block" || parsed.decision === "allow")
+        (parsed.decision === "block" || parsed.decision === "allow" || parsed.decision === "error")
       ) {
         events.push(parsed as unknown as HookEvent);
       }
@@ -66,7 +66,8 @@ export interface EventStats {
   totalEvents: number;
   blockCount: number;
   allowCount: number;
-  byHook: Record<string, { block: number; allow: number }>;
+  errorCount: number;
+  byHook: Record<string, { block: number; allow: number; error: number }>;
 }
 
 export function aggregateStats(events: HookEvent[]): EventStats {
@@ -74,15 +75,17 @@ export function aggregateStats(events: HookEvent[]): EventStats {
     totalEvents: events.length,
     blockCount: 0,
     allowCount: 0,
+    errorCount: 0,
     byHook: {},
   };
 
   for (const e of events) {
     if (e.decision === "block") stats.blockCount++;
+    else if (e.decision === "error") stats.errorCount++;
     else stats.allowCount++;
 
     if (!stats.byHook[e.hook]) {
-      stats.byHook[e.hook] = { block: 0, allow: 0 };
+      stats.byHook[e.hook] = { block: 0, allow: 0, error: 0 };
     }
     stats.byHook[e.hook][e.decision]++;
   }

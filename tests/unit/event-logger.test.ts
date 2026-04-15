@@ -114,6 +114,27 @@ describe("readEvents", () => {
     expect(events[1].hook).toBe("file-guard");
   });
 
+  it("'error' decision 이벤트도 정상 파싱", async () => {
+    const stateDir = path.join(tmpDir, ".claude/hooks/.state");
+    await fs.mkdir(stateDir, { recursive: true });
+    const filePath = path.join(stateDir, "events.jsonl");
+
+    await fs.writeFile(
+      filePath,
+      [
+        '{"ts":"2024-01-01T00:00:00Z","event":"PreToolUse","hook":"tdd-guard","decision":"error","reason":"hook exited with code 127"}',
+        '{"ts":"2024-01-01T00:00:01Z","event":"PreToolUse","hook":"tdd-guard","decision":"allow"}',
+      ].join("\n") + "\n",
+      "utf-8",
+    );
+
+    const events = await readEvents(tmpDir);
+    expect(events).toHaveLength(2);
+    expect(events[0].decision).toBe("error");
+    expect(events[0].reason).toBe("hook exited with code 127");
+    expect(events[1].decision).toBe("allow");
+  });
+
   it("필수 필드 누락된 JSON은 무시 (런타임 검증)", async () => {
     const stateDir = path.join(tmpDir, ".claude/hooks/.state");
     await fs.mkdir(stateDir, { recursive: true });
@@ -199,8 +220,24 @@ describe("aggregateStats", () => {
     expect(stats.totalEvents).toBe(4);
     expect(stats.blockCount).toBe(2);
     expect(stats.allowCount).toBe(2);
-    expect(stats.byHook["bash-guard"]).toEqual({ block: 2, allow: 1 });
-    expect(stats.byHook["file-guard"]).toEqual({ block: 0, allow: 1 });
+    expect(stats.byHook["bash-guard"]).toEqual({ block: 2, allow: 1, error: 0 });
+    expect(stats.byHook["file-guard"]).toEqual({ block: 0, allow: 1, error: 0 });
+  });
+
+  it("error decision 포함 집계", () => {
+    const events: HookEvent[] = [
+      { ts: "2024-01-01T00:00:00.000Z", event: "PreToolUse", hook: "tdd-guard", decision: "error", reason: "hook exited with code 127" },
+      { ts: "2024-01-01T00:01:00.000Z", event: "PreToolUse", hook: "tdd-guard", decision: "block" },
+      { ts: "2024-01-01T00:02:00.000Z", event: "PreToolUse", hook: "tdd-guard", decision: "allow" },
+    ];
+
+    const stats = aggregateStats(events);
+
+    expect(stats.totalEvents).toBe(3);
+    expect(stats.errorCount).toBe(1);
+    expect(stats.blockCount).toBe(1);
+    expect(stats.allowCount).toBe(1);
+    expect(stats.byHook["tdd-guard"]).toEqual({ block: 1, allow: 1, error: 1 });
   });
 
   it("빈 배열이면 전부 0", () => {

@@ -19,7 +19,7 @@ _log_event() {
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_OMH_EVENT" "$_OMH_HOOK_NAME" "$decision" "$reason" \\
     >> "$_OMH_STATE_DIR/events.jsonl"
 }
-trap '[ "$_OMH_LOGGED" -eq 0 ] && _log_event "allow"' EXIT
+trap '_OMH_EXIT_CODE=$?; if [ "$_OMH_LOGGED" -eq 0 ]; then if [ "$_OMH_EXIT_CODE" -ne 0 ]; then _log_event "error" "hook exited with code $_OMH_EXIT_CODE"; else _log_event "allow"; fi; fi' EXIT
 # --- end logger ---`;
 }
 

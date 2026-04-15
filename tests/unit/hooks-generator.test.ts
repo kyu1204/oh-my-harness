@@ -417,6 +417,15 @@ describe("wrapWithLogger", () => {
     expect(result).toContain('_OMH_STATE_DIR="/tmp/my-project/.claude/hooks/.state"');
   });
 
+  it("EXIT trap logs 'error' instead of 'allow' when script exits non-zero", () => {
+    const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
+    const result = wrapWithLogger(script);
+    // The trap must check exit code and log "error" for non-zero exits
+    // instead of unconditionally logging "allow"
+    expect(result).toContain("_OMH_EXIT_CODE=$?");
+    expect(result).toMatch(/error/);
+  });
+
   it("keeps relative _OMH_STATE_DIR when projectDir is omitted", () => {
     const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
     const result = wrapWithLogger(script, "PreToolUse");

@@ -57,6 +57,7 @@ oh-my-harness init --preset nextjs fastapi
 
 # Short alias works too
 omh init "React app with TDD"
+omh init --preset android            # Android/Kotlin with Hilt, JUnit, Gradle
 omh catalog list
 omh test          # Dry-run verify your harness
 omh stats         # TUI analytics dashboard
@@ -176,7 +177,7 @@ All enforcement is powered by **catalog blocks** — reusable, parameterized hoo
 | 🎨 `format-on-save` | auto-fix | Auto-format on file save |
 | 🧪 `test-on-save` | auto-fix | Auto-run tests on file save |
 | 🔀 `auto-pr` | automation | Auto-create PR after push |
-| 🧪 `tdd-guard` | quality | Blocks source edits unless test modified first (JS/TS/Python) |
+| 🧪 `tdd-guard` | quality | Blocks source edits unless test modified first (JS/TS/Python/Kotlin/Java) |
 | 🔒 `sql-guard` | security | Blocks dangerous SQL operations |
 | 🌳 `worktree-setup` | monorepo | Supports monorepo worktree patterns |
 | 🗜️ `compact-context` | maintenance | Re-injects context on session start |

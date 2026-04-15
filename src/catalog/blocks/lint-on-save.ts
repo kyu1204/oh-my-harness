@@ -21,6 +21,14 @@ export const lintOnSave: BuildingBlock = {
       description: "Lint command to run (e.g. eslint --fix)",
       required: true,
     },
+    {
+      name: "scope",
+      type: "string",
+      description:
+        "Lint scope: 'file' passes $FILE_PATH to command, 'module' runs command without file arg",
+      required: false,
+      default: "file",
+    },
   ],
   tags: ["lint", "auto-fix", "quality", "save"],
   template: `#!/bin/bash
@@ -31,8 +39,14 @@ FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // 
 PATTERN='{{{filePattern}}}'
 BASENAME=$(basename "$FILE_PATH")
 if [[ "$BASENAME" == $PATTERN ]]; then
-  echo "oh-my-harness: Running {{{command}}} on $FILE_PATH..." >&2
-  {{{command}}} "$FILE_PATH" >&2 2>&1 || true
+  SCOPE='{{{scope}}}'
+  if [[ "\${SCOPE:-file}" == "module" ]]; then
+    echo "oh-my-harness: Running {{{command}}} ..." >&2
+    {{{command}}} >&2 || true
+  else
+    echo "oh-my-harness: Running {{{command}}} on $FILE_PATH..." >&2
+    {{{command}}} "$FILE_PATH" >&2 || true
+  fi
 fi
 exit 0`,
 };

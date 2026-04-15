@@ -64,19 +64,19 @@ fi
 
 # 대응 테스트 파일 확인 — 확장자 제거
 BASENAME=$(basename "\$FILE_PATH" | sed -E 's/\\.[^.]+$//')
-TEST_SUFFIX=".test."
 
 if [[ ! -f "\$HISTORY_FILE" ]]; then
-  _log_event "block" "oh-my-harness: TDD — \${BASENAME}\${TEST_SUFFIX}* 테스트 파일을 먼저 수정하세요"
-  echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: TDD — \${BASENAME}\${TEST_SUFFIX}* 테스트 파일을 먼저 수정하세요\\"}"
+  _log_event "block" "oh-my-harness: TDD — \${BASENAME} 에 대응하는 테스트 파일을 먼저 수정하세요"
+  echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: TDD — \${BASENAME} 에 대응하는 테스트 파일을 먼저 수정하세요\\"}"
   exit 0
 fi
 
 # edit-history에서 테스트 파일 검색 (tmp+mv로 원자적 쓰기, 크로스 플랫폼)
-if jq -e --arg b "\$BASENAME" '.edits[] | select(contains($b) and (contains(".test.") or contains(".spec.") or contains("test_")))' "\$HISTORY_FILE" >/dev/null 2>&1; then
+# Supports JS/TS (.test. / .spec. / test_) and JVM (Test suffix, e.g. IoViewTest.kt) conventions
+if jq -e --arg b "\$BASENAME" '.edits[] | select(contains($b) and (contains(".test.") or contains(".spec.") or contains("test_") or contains("Test")))' "\$HISTORY_FILE" >/dev/null 2>&1; then
   # 테스트 먼저 수정됨 → 매칭 테스트 기록 소비(제거) + 소스 기록 + 통과
   UPDATED=$(jq --arg b "\$BASENAME" --arg f "\$FILE_PATH" '
-    .edits |= [.[] | select((contains($b) and (contains(".test.") or contains(".spec.") or contains("test_"))) | not)]
+    .edits |= [.[] | select((contains($b) and (contains(".test.") or contains(".spec.") or contains("test_") or contains("Test"))) | not)]
     | .edits += [$f] | .edits |= unique
   ' "\$HISTORY_FILE" 2>/dev/null) || true
   if [[ -n "\$UPDATED" ]]; then
@@ -91,8 +91,8 @@ if [[ "\$DECISION" == "allow" ]]; then
   exit 0
 fi
 
-_log_event "block" "oh-my-harness: TDD — \${BASENAME}\${TEST_SUFFIX}* 테스트 파일을 먼저 수정하세요"
-echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: TDD — \${BASENAME}\${TEST_SUFFIX}* 테스트 파일을 먼저 수정하세요\\"}"
+_log_event "block" "oh-my-harness: TDD — \${BASENAME} 에 대응하는 테스트 파일을 먼저 수정하세요"
+echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: TDD — \${BASENAME} 에 대응하는 테스트 파일을 먼저 수정하세요\\"}"
 exit 0`,
   tags: ["tdd", "workflow", "quality"],
 };

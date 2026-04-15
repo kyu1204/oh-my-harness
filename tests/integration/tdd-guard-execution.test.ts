@@ -184,3 +184,66 @@ describe("tdd-guard execution", () => {
     },
   );
 });
+
+describe("tdd-guard execution (Kotlin/JVM params)", () => {
+  let tmpDir: string;
+  let scriptPath: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "omh-tdd-kt-"));
+    // Render with Kotlin/JVM-style patterns
+    const kotlinParams = applyDefaults(tddBlock, {
+      srcPattern: "\\.kt$",
+      testPattern: "Test\\.kt$",
+    });
+    const rendered = renderTemplate(tddBlock.template, kotlinParams);
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    scriptPath = join(tmpDir, "catalog-tdd-guard.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+    await mkdir(join(tmpDir, ".claude/hooks/.state"), { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it.runIf(hasJq())(
+    "allows Kotlin source edit when JVM-style test file (IoViewTest.kt) was recorded",
+    async () => {
+      const historyPath = join(tmpDir, ".claude/hooks/.state/edit-history.json");
+      await writeFile(
+        historyPath,
+        JSON.stringify({ edits: ["app/src/test/java/com/example/IoViewTest.kt"] }),
+      );
+
+      const stdout = runScript(
+        scriptPath,
+        JSON.stringify({ tool_name: "Edit", tool_input: { file_path: "app/src/main/java/com/example/IoView.kt" } }),
+        tmpDir,
+      );
+      const trimmed = stdout.trim();
+      if (trimmed.length > 0) {
+        const result = JSON.parse(trimmed);
+        expect(result.decision).not.toBe("block");
+      } else {
+        expect(trimmed).toBe("");
+      }
+    },
+  );
+
+  it.runIf(hasJq())(
+    "blocks Kotlin source edit when no prior test recorded",
+    async () => {
+      const stdout = runScript(
+        scriptPath,
+        JSON.stringify({ tool_name: "Edit", tool_input: { file_path: "app/src/main/java/com/example/IoView.kt" } }),
+        tmpDir,
+      );
+      const trimmed = stdout.trim();
+      expect(trimmed).not.toBe("");
+      const result = JSON.parse(trimmed);
+      expect(result.decision).toBe("block");
+      expect(result.reason).toContain("IoView");
+    },
+  );
+});

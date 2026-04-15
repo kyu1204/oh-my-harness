@@ -48,6 +48,11 @@ describe("tddGuard block", () => {
     expect(tddGuard.template).toMatch(/\.test\.|\.spec\./);
   });
 
+  it("template supports JVM test convention (e.g. IoViewTest.kt)", () => {
+    // Android/Kotlin/Java projects use *Test.kt suffix instead of .test.ts
+    expect(tddGuard.template).toContain('contains("Test")');
+  });
+
   it("template allows non-code files to pass through", () => {
     expect(tddGuard.template).toMatch(/\.json|\.yaml|\.yml|\.md/);
   });

@@ -31,8 +31,11 @@ FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // 
 PATTERN='{{{filePattern}}}'
 BASENAME=$(basename "$FILE_PATH")
 if [[ "$BASENAME" == $PATTERN ]]; then
-  echo "oh-my-harness: Running {{{command}}} on $FILE_PATH..." >&2
-  {{{command}}} "$FILE_PATH" >&2 2>&1 || true
+  echo "oh-my-harness: Running {{{command}}} ..." >&2
+  # Note: Some linters (e.g. Android Lint, golangci-lint) operate on
+  # project/module scope and do not accept individual file paths.
+  # Pass the file path only when the tool supports it.
+  {{{command}}} >&2 2>&1 || true
 fi
 exit 0`,
 };

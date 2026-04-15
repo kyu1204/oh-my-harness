@@ -1,0 +1,150 @@
+name: android
+displayName: "Android (Kotlin)"
+description: "Android app with Kotlin, Gradle, Hilt DI, JUnit 4 + Mockito TDD enforcement"
+version: "1.0.0"
+extends: ["gradle"]
+tags: ["android", "kotlin", "mobile", "gradle", "hilt"]
+variables:
+  framework: "android"
+  language: "kotlin"
+  packageManager: "gradle"
+  testRunner: "./gradlew testDebugUnitTest"
+claudeMd:
+  sections:
+    - id: "android-rules"
+      title: "Android Kotlin Rules"
+      content: |
+        ## Android Kotlin Development Rules
+
+        - Use MVVM architecture pattern with ViewModel and LiveData/StateFlow
+        - Use Hilt for dependency injection; avoid manual DI or service locators
+        - Avoid non-null assertion (!!); use safe calls (?.) and let blocks instead
+        - No trailing commas, no wildcard imports
+        - companion object goes first in class member ordering
+        - All state classes must be data class with val properties only
+        - Use ConstraintLayout over nested LinearLayouts for performance
+      priority: 20
+    - id: "android-testing"
+      title: "Android Testing Rules"
+      content: |
+        ## Android Testing Rules
+
+        - Test class naming: [TargetClass]Test (e.g. IoViewTest, RetryPolicyTest)
+        - Test method naming: backtick-wrapped descriptions
+        - Use JUnit 4 + Mockito for unit tests, Espresso for UI tests
+        - Wrap FirebaseCrashlytics calls in try-catch for Robolectric compatibility
+        - Run `./gradlew testDebugUnitTest` before every commit
+      priority: 21
+    - id: "android-build"
+      title: "Android Build Verification"
+      content: |
+        ## Build Verification Rules
+
+        - After code changes, run Kotlin compile check first: `./gradlew :app:compileDebugKotlin`
+        - Then run full APK assembly: `./gradlew assembleDebug`
+        - Kotlin compile passing does NOT guarantee build success (XML resource linking errors)
+      priority: 22
+hooks:
+  preToolUse:
+    - id: "android-test-before-commit"
+      matcher: "Bash"
+      description: "Runs unit tests before git commit"
+      inline: |
+        #!/bin/bash
+        set -euo pipefail
+        INPUT=$(cat)
+        COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
+        if echo "$COMMAND" | grep -qE "git commit"; then
+          echo "oh-my-harness: Running ./gradlew testDebugUnitTest before commit..." >&2
+          if ! ./gradlew testDebugUnitTest >&2 2>&1; then
+            echo "{\"decision\": \"block\", \"reason\": \"oh-my-harness: unit tests failed, commit blocked\"}"
+            exit 0
+          fi
+        fi
+        exit 0
+    - id: "android-file-guard"
+      matcher: "Edit|Write"
+      description: "Prevents writing to build outputs and sensitive files"
+      inline: |
+        #!/bin/bash
+        set -euo pipefail
+        INPUT=$(cat)
+        FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null)
+        [[ -z "$FILE_PATH" ]] && exit 0
+        BASENAME=$(basename "$FILE_PATH")
+        # Block build output directories
+        BLOCKED_DIRS=("build/" ".gradle/" ".idea/")
+        for dir in "${BLOCKED_DIRS[@]}"; do
+          if [[ "$FILE_PATH" == *"/$dir"* ]] || [[ "$FILE_PATH" == "$dir"* ]]; then
+            echo "{\"decision\": \"block\", \"reason\": \"oh-my-harness: protected directory $dir\"}"
+            exit 0
+          fi
+        done
+        # Block build artifacts
+        case "$BASENAME" in
+          *.apk|*.aab) echo "{\"decision\": \"block\", \"reason\": \"oh-my-harness: build artifacts are read-only\"}"; exit 0 ;;
+        esac
+        # Block secret files
+        SECRET_PATTERNS=("local.properties" "*.jks" "*.keystore" "*.pem" "*.key")
+        for pattern in "${SECRET_PATTERNS[@]}"; do
+          if [[ "$BASENAME" == $pattern ]]; then
+            echo "{\"decision\": \"block\", \"reason\": \"oh-my-harness: secret file $BASENAME is protected\"}"
+            exit 0
+          fi
+        done
+        exit 0
+    - id: "android-command-guard"
+      matcher: "Bash"
+      description: "Blocks dangerous commands and release builds"
+      inline: |
+        #!/bin/bash
+        set -euo pipefail
+        INPUT=$(cat)
+        COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
+        [[ -z "$COMMAND" ]] && exit 0
+        BLOCKED=("rm -rf /" "sudo rm" "assembleRelease" "bundleRelease")
+        for pattern in "${BLOCKED[@]}"; do
+          if echo "$COMMAND" | grep -qF -- "$pattern"; then
+            echo "{\"decision\": \"block\", \"reason\": \"oh-my-harness: blocked command pattern: $pattern\"}"
+            exit 0
+          fi
+        done
+        exit 0
+  postToolUse:
+    - id: "android-lint-on-save"
+      matcher: "Edit|Write"
+      description: "Runs Android Lint after Kotlin file writes"
+      inline: |
+        #!/bin/bash
+        INPUT=$(cat)
+        FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null)
+        [[ -z "$FILE_PATH" ]] && exit 0
+        BASENAME=$(basename "$FILE_PATH")
+        if [[ "$BASENAME" == *.kt ]]; then
+          # Detect module from file path and run module-scoped lint
+          MODULE=""
+          case "$FILE_PATH" in
+            */app/*) MODULE=":app" ;;
+            */data/*) MODULE=":data" ;;
+            */domain/*) MODULE=":domain" ;;
+            */core/*) MODULE=":core" ;;
+          esac
+          if [[ -n "$MODULE" ]]; then
+            echo "oh-my-harness: Running ${MODULE}:lintDebug..." >&2
+            ./gradlew "${MODULE}:lintDebug" >&2 2>&1 || true
+          else
+            echo "oh-my-harness: Running lintDebug..." >&2
+            ./gradlew lintDebug >&2 2>&1 || true
+          fi
+        fi
+        exit 0
+settings:
+  permissions:
+    allow:
+      - "Bash(./gradlew *)"
+      - "Bash(gradle *)"
+      - "Bash(adb *)"
+      - "Bash(git *)"
+    deny:
+      - "Bash(rm -rf /)"
+      - "Bash(sudo *)"

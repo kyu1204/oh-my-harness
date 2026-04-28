@@ -78,11 +78,14 @@ export function buildCodexConfigToml(existing: string): string {
   if (existing.trim()) {
     try {
       data = parse(existing) as Record<string, unknown>;
-    } catch {
-      // Malformed user TOML: start fresh. We don't write back if the result
-      // matches `existing` (see generateCodexConfig), so an unrelated parse
-      // error doesn't silently destroy data — only an actual edit triggers
-      // a write, and at that point `existing` is broken anyway.
+    } catch (err) {
+      // Malformed user TOML: warn so the user knows we're regenerating, then
+      // start fresh. (generateCodexConfig still skips the write when the new
+      // content equals `existing`, so this only kicks in for actual edits.)
+      console.warn(
+        `oh-my-harness: .codex/config.toml is invalid TOML, regenerating ` +
+          `from scratch — original content will be replaced. (${(err as Error).message})`,
+      );
       data = {};
     }
   }

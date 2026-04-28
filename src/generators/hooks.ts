@@ -134,41 +134,45 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
     return { hooksConfig: {}, generatedFiles: [] };
   }
 
-  const generatedFiles: string[] = [];
-  const hooksConfig: Record<string, Array<{ matcher: string; hooks: HookCommand[] }>> = {};
   const usedScriptNames = new Set<string>();
+  const planned: Array<{ event: string; matcher: string; scriptPath: string; wrappedScript: string }> = [];
 
   for (const hook of allHooks) {
-    if (!hook.inline) {
-      continue;
-    }
+    if (!hook.inline) continue;
 
     const safeId = hook.id.replace(/[^a-zA-Z0-9_-]/g, "") || "hook";
     let scriptName = `${safeId}.sh`;
-    // Prevent collisions within the same event using numeric suffix
     if (usedScriptNames.has(scriptName)) {
       let counter = 1;
-      while (usedScriptNames.has(`${safeId}-${counter}.sh`)) {
-        counter++;
-      }
+      while (usedScriptNames.has(`${safeId}-${counter}.sh`)) counter++;
       scriptName = `${safeId}-${counter}.sh`;
     }
     usedScriptNames.add(scriptName);
 
-    const scriptPath = join(hooksDir, scriptName);
-    const wrappedScript = wrapWithLogger(hook.inline, hook.event, projectDir);
-    await writeFile(scriptPath, wrappedScript, "utf8");
-    await chmod(scriptPath, 0o755);
-    generatedFiles.push(scriptPath);
-
-    const entry = {
+    planned.push({
+      event: hook.event,
       matcher: hook.matcher,
-      hooks: [{ type: "command" as const, command: `bash "${scriptPath}"` }],
-    };
-    if (!hooksConfig[hook.event]) {
-      hooksConfig[hook.event] = [];
-    }
-    hooksConfig[hook.event].push(entry);
+      scriptPath: join(hooksDir, scriptName),
+      wrappedScript: wrapWithLogger(hook.inline, hook.event, projectDir),
+    });
+  }
+
+  // Independent IO across hooks — parallelize.
+  await Promise.all(
+    planned.map(async (p) => {
+      await writeFile(p.scriptPath, p.wrappedScript, "utf8");
+      await chmod(p.scriptPath, 0o755);
+    }),
+  );
+
+  const generatedFiles = planned.map((p) => p.scriptPath);
+  const hooksConfig: Record<string, Array<{ matcher: string; hooks: HookCommand[] }>> = {};
+  for (const p of planned) {
+    if (!hooksConfig[p.event]) hooksConfig[p.event] = [];
+    hooksConfig[p.event].push({
+      matcher: p.matcher,
+      hooks: [{ type: "command", command: `bash "${p.scriptPath}"` }],
+    });
   }
 
   // Remove stale hook files from previous sync that are no longer generated

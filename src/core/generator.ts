@@ -24,27 +24,27 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   // One-time migration of legacy .claude/hooks/.state → .omh/state
   await migrateLegacyState(projectDir);
 
-  // Generate CLAUDE.md (Claude Code instructions)
-  await generateClaudeMd({ projectDir, config });
-  files.push(`${projectDir}/CLAUDE.md`);
+  // CLAUDE.md and AGENTS.md operate on disjoint files with the same input.
+  await Promise.all([
+    generateClaudeMd({ projectDir, config }),
+    generateAgentsMd({ projectDir, config }),
+  ]);
+  files.push(`${projectDir}/CLAUDE.md`, `${projectDir}/AGENTS.md`);
 
-  // Generate AGENTS.md (Codex instructions, same managed sections)
-  await generateAgentsMd({ projectDir, config });
-  files.push(`${projectDir}/AGENTS.md`);
-
-  // Generate hook scripts (single source under .omh/hooks)
+  // Hook scripts (single source under .omh/hooks). Settings + Codex both
+  // depend on hooksOutput, so this stage runs first.
   const hooksOutput = await generateHooks({ projectDir, config });
   files.push(...hooksOutput.generatedFiles);
 
-  // Generate Claude settings.json (references .omh/hooks/*.sh)
-  await generateSettings({ projectDir, config, hooksOutput });
-  files.push(`${projectDir}/.claude/settings.json`);
+  // Claude settings.json and Codex config write to disjoint files using the
+  // same hooksOutput — independent.
+  const [, codexFiles] = await Promise.all([
+    generateSettings({ projectDir, config, hooksOutput }),
+    generateCodexConfig({ projectDir, hooksOutput }),
+  ]);
+  files.push(`${projectDir}/.claude/settings.json`, ...codexFiles);
 
-  // Generate Codex config (references same .omh/hooks/*.sh)
-  const codexFiles = await generateCodexConfig({ projectDir, hooksOutput });
-  files.push(...codexFiles);
-
-  // Update .gitignore — only state is volatile log data; hooks/manifest are reproducible
+  // .omh/state/ holds volatile log data; hooks/manifest are reproducible.
   await updateGitignore(projectDir, [`${OMH_DIR}/state/`]);
   files.push(`${projectDir}/.gitignore`);
 

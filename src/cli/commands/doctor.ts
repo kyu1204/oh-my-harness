@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { parse } from "smol-toml";
 import { OMH_HOOKS_DIR } from "../../utils/paths.js";
 
 export interface DoctorOptions {
@@ -85,7 +86,8 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<Doctor
   try {
     await fs.access(codexHooksPath);
     const tomlRaw = await fs.readFile(codexTomlPath, "utf-8");
-    if (!tomlRaw.includes("codex_hooks = true")) {
+    const parsed = parse(tomlRaw) as { features?: { codex_hooks?: unknown } };
+    if (parsed.features?.codex_hooks !== true) {
       messages.push("FAIL: .codex/config.toml missing [features] codex_hooks = true.");
     } else {
       checks.codexConfig = true;
@@ -94,7 +96,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<Doctor
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
       messages.push("FAIL: .codex/hooks.json or .codex/config.toml not found.");
     } else {
-      messages.push("FAIL: .codex/config.toml unreadable.");
+      messages.push("FAIL: .codex/config.toml invalid or unreadable.");
     }
   }
 

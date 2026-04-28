@@ -12,15 +12,7 @@ import {
   LEGACY_TDD_FILE,
   LEGACY_CONFIG_AUDIT_LOG,
 } from "./paths.js";
-
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await fs.access(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
+import { pathExists, endsWithNewline } from "./fs-helpers.js";
 
 interface ParsedConfigAudit {
   ts?: string;
@@ -114,13 +106,9 @@ export async function migrateLegacyState(projectDir: string): Promise<MigrationR
         // exists but its last byte isn't \n (truncation, manual edit), the
         // first absorbed entry would otherwise glue onto the last record
         // and break parsing for the whole file.
-        let prefix = "";
-        if (await pathExists(newEvents)) {
-          const existing = await fs.readFile(newEvents, "utf8");
-          if (existing.length > 0 && !existing.endsWith("\n")) {
-            prefix = "\n";
-          }
-        }
+        const prefix = (await pathExists(newEvents)) && !(await endsWithNewline(newEvents))
+          ? "\n"
+          : "";
         await fs.appendFile(newEvents, prefix + lines.join("\n") + "\n", "utf8");
         report.migrated.push(`${LEGACY_CONFIG_AUDIT_LOG} → events.jsonl (${lines.length} entries)`);
         cleanupTargets.add(legacyAuditLog);

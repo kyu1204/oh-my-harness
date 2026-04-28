@@ -28,4 +28,13 @@ describe("configAudit block", () => {
   it("template no longer writes to a separate .log file", () => {
     expect(configAudit.template).not.toContain(".log");
   });
+
+  it("template tolerates jq failure under set -euo pipefail", () => {
+    // META=$(jq ...) under errexit would abort if jq fails; the fallback line
+    // never executes. Mitigation: '|| true' (or '|| echo {...}') after the jq.
+    const tpl = configAudit.template;
+    const jqLineMatch = tpl.match(/META=\$\(jq[^\n]+\)/);
+    expect(jqLineMatch).not.toBeNull();
+    expect(jqLineMatch![0]).toMatch(/\|\|\s*(true|echo)/);
+  });
 });

@@ -58,23 +58,43 @@ export function buildCodexHooks(hooksOutput: HooksOutput): {
   return { codexHooks, skipped };
 }
 
+const MARKER_RE = new RegExp(`${CONFIG_MARKER_START}[\\s\\S]*?${CONFIG_MARKER_END}\\n?`);
+const FEATURES_HEADER_RE = /^\[features\]\s*$/m;
+
+const INLINE_BLOCK =
+  `${CONFIG_MARKER_START}\n` +
+  `codex_hooks = true\n` +
+  `${CONFIG_MARKER_END}`;
+
+const STANDALONE_BLOCK =
+  `${CONFIG_MARKER_START}\n` +
+  `[features]\n` +
+  `codex_hooks = true\n` +
+  `${CONFIG_MARKER_END}\n`;
+
 export function buildCodexConfigToml(existing: string): string {
-  const managedBlock =
-    `${CONFIG_MARKER_START}\n` +
-    `[features]\n` +
-    `codex_hooks = true\n` +
-    `${CONFIG_MARKER_END}\n`;
+  // Step 1: strip any prior managed marker block so we can re-place it
+  // correctly without leaving stale duplicates behind.
+  const stripped = existing.replace(MARKER_RE, "").replace(/\n{3,}/g, "\n\n");
 
-  if (!existing) {
-    return CODEX_CONFIG_HEADER + managedBlock;
+  // Step 2: empty input → emit a standalone block with our own [features].
+  if (!stripped.trim()) {
+    return CODEX_CONFIG_HEADER + STANDALONE_BLOCK;
   }
 
-  const re = new RegExp(`${CONFIG_MARKER_START}[\\s\\S]*?${CONFIG_MARKER_END}\\n?`);
-  if (re.test(existing)) {
-    return existing.replace(re, managedBlock);
+  // Step 3: user already declared [features] elsewhere in the file. We must
+  // NOT add a second [features] header (TOML v1.0 forbids redefining tables).
+  // Inject our key inside the existing table.
+  if (FEATURES_HEADER_RE.test(stripped)) {
+    return stripped.replace(
+      FEATURES_HEADER_RE,
+      (match) => `${match}\n${INLINE_BLOCK}`,
+    );
   }
-  const sep = existing.endsWith("\n") ? "" : "\n";
-  return existing + sep + managedBlock;
+
+  // Step 4: user content but no [features] yet → append our standalone block.
+  const sep = stripped.endsWith("\n") ? "" : "\n";
+  return stripped + sep + STANDALONE_BLOCK;
 }
 
 export async function generateCodexConfig(options: GenerateCodexConfigOptions): Promise<string[]> {

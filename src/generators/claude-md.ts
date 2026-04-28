@@ -25,14 +25,18 @@ export async function generateClaudeMd(options: GenerateClaudeMdOptions): Promis
     }
   }
 
-  // Remove managed sections that are no longer in the current config
-  const currentIds = new Set(config.claudeMdSections.map((s) => s.id));
+  // Strip ALL managed sections (including those still in config) so the
+  // re-insertion below honors the new priority order. upsertManagedSection
+  // does in-place replace when the marker exists, which would otherwise
+  // freeze the original ordering.
   const existingIds = extractManagedSections(content).map((s) => s.id);
   for (const id of existingIds) {
-    if (!currentIds.has(id)) {
-      content = removeManagedSection(content, id);
-    }
+    content = removeManagedSection(content, id);
   }
+  // Normalize whitespace so repeated stripping doesn't accumulate blank lines
+  // at the file edges (otherwise idempotency breaks across runs).
+  content = content.replace(/^\n+/, "").replace(/\n+$/, "");
+  if (content) content += "\n";
 
   // Sort sections by priority (lower = higher in file)
   const sections = [...config.claudeMdSections].sort((a, b) => (a.priority ?? 50) - (b.priority ?? 50));

@@ -104,6 +104,44 @@ command = "bar"
     const matches = second.match(/# >>> oh-my-harness >>>/g) ?? [];
     expect(matches).toHaveLength(1);
   });
+
+  it("does NOT duplicate [features] when user already has one (TOML v1.0 violation)", () => {
+    // User wrote their own [features] table with another key
+    const existing = `# my settings
+[features]
+some_other_flag = true
+
+[mcp_servers.foo]
+command = "bar"
+`;
+    const result = buildCodexConfigToml(existing);
+
+    // Must contain exactly one [features] header
+    const featuresHeaders = result.match(/^\[features\]\s*$/gm) ?? [];
+    expect(featuresHeaders).toHaveLength(1);
+
+    // Must preserve user's key
+    expect(result).toContain("some_other_flag = true");
+    // Must add our key
+    expect(result).toContain("codex_hooks = true");
+    // Must preserve other tables
+    expect(result).toContain("[mcp_servers.foo]");
+  });
+
+  it("injecting into an existing [features] table is idempotent", () => {
+    const existing = `[features]
+some_other_flag = true
+`;
+    const first = buildCodexConfigToml(existing);
+    const second = buildCodexConfigToml(first);
+    const third = buildCodexConfigToml(second);
+
+    expect(third).toBe(second);
+    const featuresHeaders = third.match(/^\[features\]\s*$/gm) ?? [];
+    expect(featuresHeaders).toHaveLength(1);
+    expect(third).toContain("some_other_flag = true");
+    expect(third).toContain("codex_hooks = true");
+  });
 });
 
 describe("generateCodexConfig", () => {

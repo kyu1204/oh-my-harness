@@ -105,4 +105,32 @@ describe("generateAgentsMd", () => {
 
     expect(second).toBe(first);
   });
+
+  it("re-orders existing managed sections when priorities change", async () => {
+    // First run: A=10, B=20 → A appears first
+    await generateAgentsMd({
+      projectDir: tmpDir,
+      config: makeMergedConfig({
+        claudeMdSections: [
+          { id: "alpha", title: "A", content: "## A", priority: 10 },
+          { id: "beta", title: "B", content: "## B", priority: 20 },
+        ],
+      }),
+    });
+
+    // Second run: priorities flipped → B should now appear first
+    const result = await generateAgentsMd({
+      projectDir: tmpDir,
+      config: makeMergedConfig({
+        claudeMdSections: [
+          { id: "alpha", title: "A", content: "## A", priority: 20 },
+          { id: "beta", title: "B", content: "## B", priority: 10 },
+        ],
+      }),
+    });
+
+    const posAlpha = result.indexOf("<!-- oh-my-harness:start:alpha -->");
+    const posBeta = result.indexOf("<!-- oh-my-harness:start:beta -->");
+    expect(posBeta).toBeLessThan(posAlpha);
+  });
 });

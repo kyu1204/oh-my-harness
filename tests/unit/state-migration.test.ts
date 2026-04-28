@@ -81,6 +81,37 @@ describe("migrateLegacyState", () => {
     expect(content).toBe("NEW\n");
   });
 
+  it("preserves a legacy file when migration was skipped (data-loss guard)", async () => {
+    // Both legacy and new exist with different content. Copy is skipped.
+    // Legacy MUST still exist after migration so user can recover its content.
+    const legacyState = path.join(tmpDir, ".claude/hooks/.state");
+    const newState = path.join(tmpDir, ".omh/state");
+    await fs.mkdir(legacyState, { recursive: true });
+    await fs.mkdir(newState, { recursive: true });
+    await fs.writeFile(path.join(legacyState, "events.jsonl"), "OLD\n", "utf8");
+    await fs.writeFile(path.join(newState, "events.jsonl"), "NEW\n", "utf8");
+    await fs.writeFile(
+      path.join(legacyState, "edit-history.json"),
+      JSON.stringify({ edits: ["legacy-only.test.ts"] }),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(newState, "tdd-edits.json"),
+      JSON.stringify({ edits: [] }),
+      "utf8",
+    );
+
+    await migrateLegacyState(tmpDir);
+
+    // Legacy events.jsonl preserved (skipped path must not delete data)
+    const legacyEvents = await fs.readFile(path.join(legacyState, "events.jsonl"), "utf8");
+    expect(legacyEvents).toBe("OLD\n");
+
+    // Legacy edit-history preserved as well
+    const legacyTdd = await fs.readFile(path.join(legacyState, "edit-history.json"), "utf8");
+    expect(JSON.parse(legacyTdd).edits).toEqual(["legacy-only.test.ts"]);
+  });
+
   it("moves the manifest from .claude/hooks to .omh/manifest.json", async () => {
     await fs.mkdir(path.join(tmpDir, ".claude/hooks/.state"), { recursive: true });
     await fs.writeFile(

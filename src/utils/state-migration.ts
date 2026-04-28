@@ -56,6 +56,9 @@ export interface MigrationReport {
 
 export async function migrateLegacyState(projectDir: string): Promise<MigrationReport> {
   const report: MigrationReport = { migrated: [], skipped: [] };
+  // Only files we actually consumed/copied get unlinked. Files skipped because
+  // a destination already exists are preserved so the user can recover them.
+  const cleanupTargets = new Set<string>();
 
   const legacyState = path.join(projectDir, LEGACY_STATE_DIR);
   const newState = path.join(projectDir, OMH_STATE_DIR);
@@ -70,17 +73,27 @@ export async function migrateLegacyState(projectDir: string): Promise<MigrationR
   // events.jsonl — copy if new doesn't exist
   const legacyEvents = path.join(legacyState, OMH_EVENTS_FILE);
   const newEvents = path.join(newState, OMH_EVENTS_FILE);
-  if ((await pathExists(legacyEvents)) && !(await pathExists(newEvents))) {
-    await fs.copyFile(legacyEvents, newEvents);
-    report.migrated.push("events.jsonl");
+  if (await pathExists(legacyEvents)) {
+    if (!(await pathExists(newEvents))) {
+      await fs.copyFile(legacyEvents, newEvents);
+      report.migrated.push("events.jsonl");
+      cleanupTargets.add(legacyEvents);
+    } else {
+      report.skipped.push("events.jsonl (destination exists)");
+    }
   }
 
   // edit-history.json → tdd-edits.json
   const legacyTdd = path.join(legacyState, LEGACY_TDD_FILE);
   const newTdd = path.join(newState, OMH_TDD_STATE_FILE);
-  if ((await pathExists(legacyTdd)) && !(await pathExists(newTdd))) {
-    await fs.copyFile(legacyTdd, newTdd);
-    report.migrated.push(`${LEGACY_TDD_FILE} → ${OMH_TDD_STATE_FILE}`);
+  if (await pathExists(legacyTdd)) {
+    if (!(await pathExists(newTdd))) {
+      await fs.copyFile(legacyTdd, newTdd);
+      report.migrated.push(`${LEGACY_TDD_FILE} → ${OMH_TDD_STATE_FILE}`);
+      cleanupTargets.add(legacyTdd);
+    } else {
+      report.skipped.push(`${LEGACY_TDD_FILE} (destination exists)`);
+    }
   }
 
   // config-audit.log → append into events.jsonl as ConfigChange entries
@@ -91,21 +104,27 @@ export async function migrateLegacyState(projectDir: string): Promise<MigrationR
     if (lines.length > 0) {
       await fs.appendFile(newEvents, lines.join("\n") + "\n", "utf8");
       report.migrated.push(`${LEGACY_CONFIG_AUDIT_LOG} → events.jsonl (${lines.length} entries)`);
+      cleanupTargets.add(legacyAuditLog);
+    } else {
+      report.skipped.push(`${LEGACY_CONFIG_AUDIT_LOG} (no valid lines)`);
     }
   }
 
   // manifest
   const legacyManifest = path.join(projectDir, LEGACY_MANIFEST);
   const newManifest = path.join(projectDir, OMH_MANIFEST);
-  if ((await pathExists(legacyManifest)) && !(await pathExists(newManifest))) {
-    await fs.copyFile(legacyManifest, newManifest);
-    report.migrated.push("manifest.json");
+  if (await pathExists(legacyManifest)) {
+    if (!(await pathExists(newManifest))) {
+      await fs.copyFile(legacyManifest, newManifest);
+      report.migrated.push("manifest.json");
+      cleanupTargets.add(legacyManifest);
+    } else {
+      report.skipped.push("manifest.json (destination exists)");
+    }
   }
 
-  // Best-effort cleanup of the legacy state directory contents we've copied.
-  // Leave the rest (e.g. user-added artifacts) alone.
-  for (const name of [OMH_EVENTS_FILE, LEGACY_TDD_FILE, LEGACY_CONFIG_AUDIT_LOG]) {
-    const p = path.join(legacyState, name);
+  // Cleanup only files we actually migrated.
+  for (const p of cleanupTargets) {
     try {
       await fs.unlink(p);
     } catch {

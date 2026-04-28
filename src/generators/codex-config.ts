@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { parse, stringify } from "smol-toml";
 import type { HooksOutput } from "./hooks.js";
 
 export interface GenerateCodexConfigOptions {
@@ -17,11 +18,10 @@ const CODEX_SUPPORTED_EVENTS = new Set([
 ]);
 
 const CODEX_CONFIG_HEADER =
-  "# Managed by oh-my-harness — do not edit between markers\n" +
-  "# https://github.com/kyu1204/oh-my-harness\n";
-
-const CONFIG_MARKER_START = "# >>> oh-my-harness >>>";
-const CONFIG_MARKER_END = "# <<< oh-my-harness <<<";
+  "# Managed by oh-my-harness.\n" +
+  "# The codex_hooks=true entry under [features] is required.\n" +
+  "# Add your own tables (e.g. [mcp_servers.foo]) above or below freely.\n" +
+  "# https://github.com/kyu1204/oh-my-harness\n\n";
 
 function normalizeMatcher(matcher: string): string {
   if (!matcher) return matcher;
@@ -58,68 +58,40 @@ export function buildCodexHooks(hooksOutput: HooksOutput): {
   return { codexHooks, skipped };
 }
 
-const MARKER_RE = new RegExp(`${CONFIG_MARKER_START}[\\s\\S]*?${CONFIG_MARKER_END}\\n?`);
-const FEATURES_HEADER_RE = /^\[features\]\s*\n?/m;
-const NEXT_TABLE_RE = /^\[[^\]]+\]\s*$/m;
-const CODEX_HOOKS_LINE_RE = /^[ \t]*codex_hooks\s*=\s*(?:true|false)[ \t]*\n?/m;
-
-const INLINE_BLOCK =
-  `${CONFIG_MARKER_START}\n` +
-  `codex_hooks = true\n` +
-  `${CONFIG_MARKER_END}`;
-
-const STANDALONE_BLOCK =
-  `${CONFIG_MARKER_START}\n` +
-  `[features]\n` +
-  `codex_hooks = true\n` +
-  `${CONFIG_MARKER_END}\n`;
-
-function injectIntoExistingFeatures(toml: string): string {
-  const headerMatch = toml.match(FEATURES_HEADER_RE);
-  if (!headerMatch || headerMatch.index === undefined) return toml;
-
-  const headerStart = headerMatch.index;
-  const headerEnd = headerStart + headerMatch[0].length;
-
-  // Find next table header (or EOF) to bound the [features] body.
-  const rest = toml.slice(headerEnd);
-  const nextHeader = rest.match(NEXT_TABLE_RE);
-  const bodyLen = nextHeader && nextHeader.index !== undefined ? nextHeader.index : rest.length;
-  const body = rest.slice(0, bodyLen);
-  const after = rest.slice(bodyLen);
-
-  let newBody: string;
-  if (CODEX_HOOKS_LINE_RE.test(body)) {
-    // User already declared codex_hooks (with or without trailing keys).
-    // Replace that single line with our marker block to avoid duplicate keys.
-    newBody = body.replace(CODEX_HOOKS_LINE_RE, `${INLINE_BLOCK}\n`);
-  } else {
-    newBody = `${INLINE_BLOCK}\n${body}`;
-  }
-
-  return toml.slice(0, headerStart) + headerMatch[0] + newBody + after;
-}
-
+/**
+ * Build the .codex/config.toml content using a real TOML parser.
+ *
+ * Why a parser, not regex: the prior regex-based approach kept producing
+ * spec-edge bugs (duplicate [features] headers, duplicate codex_hooks keys,
+ * unhandled [[array-tables]], inline comments, multi-line strings). A
+ * spec-compliant parse → mutate → stringify round-trip handles all those
+ * cases for free.
+ *
+ * Trade-off: TOML round-trip does NOT preserve comments. Users who hand-edit
+ * .codex/config.toml will lose any comments on the next sync. The header
+ * banner above documents this and points users to keep their notes elsewhere
+ * (or in the project repo). MCP server entries, custom tables, and key
+ * values are all preserved.
+ */
 export function buildCodexConfigToml(existing: string): string {
-  // Step 1: strip any prior managed marker block so we can re-place it
-  // correctly without leaving stale duplicates behind.
-  const stripped = existing.replace(MARKER_RE, "").replace(/\n{3,}/g, "\n\n");
-
-  // Step 2: empty input → emit a standalone block with our own [features].
-  if (!stripped.trim()) {
-    return CODEX_CONFIG_HEADER + STANDALONE_BLOCK;
+  let data: Record<string, unknown> = {};
+  if (existing.trim()) {
+    try {
+      data = parse(existing) as Record<string, unknown>;
+    } catch {
+      // Malformed user TOML: start fresh. We don't write back if the result
+      // matches `existing` (see generateCodexConfig), so an unrelated parse
+      // error doesn't silently destroy data — only an actual edit triggers
+      // a write, and at that point `existing` is broken anyway.
+      data = {};
+    }
   }
 
-  // Step 3: user already declared [features] elsewhere in the file. We must
-  // NOT add a second [features] header (TOML v1.0 forbids redefining tables)
-  // and we must NOT introduce a duplicate codex_hooks key (also invalid).
-  if (FEATURES_HEADER_RE.test(stripped)) {
-    return injectIntoExistingFeatures(stripped);
-  }
+  const features = (data.features as Record<string, unknown> | undefined) ?? {};
+  features.codex_hooks = true;
+  data.features = features;
 
-  // Step 4: user content but no [features] yet → append our standalone block.
-  const sep = stripped.endsWith("\n") ? "" : "\n";
-  return stripped + sep + STANDALONE_BLOCK;
+  return CODEX_CONFIG_HEADER + stringify(data) + "\n";
 }
 
 export async function generateCodexConfig(options: GenerateCodexConfigOptions): Promise<string[]> {

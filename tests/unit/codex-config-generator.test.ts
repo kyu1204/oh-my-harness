@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import { parse } from "smol-toml";
 import {
   generateCodexConfig,
   buildCodexHooks,
@@ -78,102 +79,119 @@ describe("buildCodexHooks", () => {
 });
 
 describe("buildCodexConfigToml", () => {
-  it("creates a fresh config.toml with [features] codex_hooks=true block", () => {
+  it("creates a fresh config.toml with [features] codex_hooks=true", () => {
     const result = buildCodexConfigToml("");
-    expect(result).toContain("# >>> oh-my-harness >>>");
-    expect(result).toContain("[features]");
-    expect(result).toContain("codex_hooks = true");
-    expect(result).toContain("# <<< oh-my-harness <<<");
+    const parsed = parse(result) as { features?: { codex_hooks?: unknown } };
+    expect(parsed.features?.codex_hooks).toBe(true);
+    expect(result).toMatch(/^# Managed by oh-my-harness/);
   });
 
-  it("upserts the managed block in an existing config.toml without losing user content", () => {
-    const existing = `# user comment
-[mcp_servers.foo]
+  it("preserves user tables and keys when adding [features] codex_hooks", () => {
+    const existing = `[mcp_servers.foo]
 command = "bar"
+args = ["--flag"]
 `;
     const result = buildCodexConfigToml(existing);
-    expect(result).toContain("# user comment");
-    expect(result).toContain("[mcp_servers.foo]");
-    expect(result).toContain("codex_hooks = true");
+    const parsed = parse(result) as {
+      features?: { codex_hooks?: unknown };
+      mcp_servers?: { foo?: { command?: unknown; args?: unknown } };
+    };
+    expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.mcp_servers?.foo?.command).toBe("bar");
+    expect(parsed.mcp_servers?.foo?.args).toEqual(["--flag"]);
   });
 
-  it("replaces a previous managed block on re-run (idempotent)", () => {
+  it("is idempotent — running twice produces identical output", () => {
     const first = buildCodexConfigToml("");
     const second = buildCodexConfigToml(first);
-    // Should still contain exactly one managed block
-    const matches = second.match(/# >>> oh-my-harness >>>/g) ?? [];
-    expect(matches).toHaveLength(1);
+    expect(second).toBe(first);
   });
 
-  it("does NOT duplicate [features] when user already has one (TOML v1.0 violation)", () => {
-    // User wrote their own [features] table with another key
-    const existing = `# my settings
-[features]
+  it("does NOT duplicate [features] when user already has one", () => {
+    const existing = `[features]
 some_other_flag = true
 
 [mcp_servers.foo]
 command = "bar"
 `;
     const result = buildCodexConfigToml(existing);
-
-    // Must contain exactly one [features] header
-    const featuresHeaders = result.match(/^\[features\]\s*$/gm) ?? [];
-    expect(featuresHeaders).toHaveLength(1);
-
-    // Must preserve user's key
-    expect(result).toContain("some_other_flag = true");
-    // Must add our key
-    expect(result).toContain("codex_hooks = true");
-    // Must preserve other tables
-    expect(result).toContain("[mcp_servers.foo]");
+    const parsed = parse(result) as {
+      features?: { codex_hooks?: unknown; some_other_flag?: unknown };
+      mcp_servers?: { foo?: { command?: unknown } };
+    };
+    // Single [features] table containing both keys
+    expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.features?.some_other_flag).toBe(true);
+    // User's other tables preserved
+    expect(parsed.mcp_servers?.foo?.command).toBe("bar");
   });
 
-  it("injecting into an existing [features] table is idempotent", () => {
-    const existing = `[features]
-some_other_flag = true
-`;
-    const first = buildCodexConfigToml(existing);
-    const second = buildCodexConfigToml(first);
-    const third = buildCodexConfigToml(second);
-
-    expect(third).toBe(second);
-    const featuresHeaders = third.match(/^\[features\]\s*$/gm) ?? [];
-    expect(featuresHeaders).toHaveLength(1);
-    expect(third).toContain("some_other_flag = true");
-    expect(third).toContain("codex_hooks = true");
-  });
-
-  it("does NOT duplicate codex_hooks when user already set it without marker", () => {
-    // Edge case: user manually enabled the flag, perhaps from a guide,
-    // before running omh init. We must replace the existing key with our
-    // marker block, not add a second one.
+  it("does NOT duplicate codex_hooks when user already set it without our markers", () => {
     const existing = `[features]
 codex_hooks = true
 some_other_flag = true
 `;
     const result = buildCodexConfigToml(existing);
-
-    // Only one codex_hooks key in the whole file
-    const codexLines = result.match(/codex_hooks\s*=/g) ?? [];
-    expect(codexLines).toHaveLength(1);
-    // Must be inside our managed marker
-    expect(result).toMatch(
-      /# >>> oh-my-harness >>>\ncodex_hooks = true\n# <<< oh-my-harness <<</,
-    );
-    // User's other key preserved
-    expect(result).toContain("some_other_flag = true");
+    const parsed = parse(result) as {
+      features?: { codex_hooks?: unknown; some_other_flag?: unknown };
+    };
+    expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.features?.some_other_flag).toBe(true);
+    // Only one TOML-level assignment of the key (parser would have rejected
+    // the file if there were two, but verify the rendered output too).
+    const codexAssignments = result.match(/^[ \t]*codex_hooks\s*=/gm) ?? [];
+    expect(codexAssignments).toHaveLength(1);
   });
 
-  it("upgrades existing codex_hooks=false to true via marker replacement", () => {
+  it("upgrades existing codex_hooks=false to true", () => {
     const existing = `[features]
 codex_hooks = false
 `;
     const result = buildCodexConfigToml(existing);
-
-    const codexLines = result.match(/codex_hooks\s*=/g) ?? [];
-    expect(codexLines).toHaveLength(1);
-    expect(result).toContain("codex_hooks = true");
+    const parsed = parse(result) as { features?: { codex_hooks?: unknown } };
+    expect(parsed.features?.codex_hooks).toBe(true);
     expect(result).not.toContain("codex_hooks = false");
+  });
+
+  it("handles [[array-table]] and other table forms without corrupting them", () => {
+    const existing = `[features]
+some_other_flag = true
+
+[[mcp_servers]]
+name = "first"
+
+[[mcp_servers]]
+name = "second"
+`;
+    const result = buildCodexConfigToml(existing);
+    const parsed = parse(result) as {
+      features?: { codex_hooks?: unknown };
+      mcp_servers?: Array<{ name?: unknown }>;
+    };
+    expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.mcp_servers).toHaveLength(2);
+    expect(parsed.mcp_servers?.[0].name).toBe("first");
+    expect(parsed.mcp_servers?.[1].name).toBe("second");
+  });
+
+  it("handles inline comments on existing keys without breaking parse", () => {
+    const existing = `[features]
+codex_hooks = false # legacy
+some_other_flag = true # keep this
+`;
+    const result = buildCodexConfigToml(existing);
+    const parsed = parse(result) as {
+      features?: { codex_hooks?: unknown; some_other_flag?: unknown };
+    };
+    expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.features?.some_other_flag).toBe(true);
+  });
+
+  it("falls back to a clean config when existing TOML is malformed", () => {
+    const existing = "this is [not valid TOML";
+    const result = buildCodexConfigToml(existing);
+    const parsed = parse(result) as { features?: { codex_hooks?: unknown } };
+    expect(parsed.features?.codex_hooks).toBe(true);
   });
 });
 
@@ -210,10 +228,11 @@ describe("generateCodexConfig", () => {
     expect(hooksJson.hooks.PreToolUse[0].matcher).toBe("Bash");
 
     const toml = await fs.readFile(path.join(tmpDir, ".codex/config.toml"), "utf8");
-    expect(toml).toContain("codex_hooks = true");
+    const parsed = parse(toml) as { features?: { codex_hooks?: unknown } };
+    expect(parsed.features?.codex_hooks).toBe(true);
   });
 
-  it("preserves existing config.toml content outside managed block", async () => {
+  it("preserves existing config.toml structure outside [features]", async () => {
     const codexDir = path.join(tmpDir, ".codex");
     await fs.mkdir(codexDir, { recursive: true });
     await fs.writeFile(
@@ -225,8 +244,12 @@ describe("generateCodexConfig", () => {
     await generateCodexConfig({ projectDir: tmpDir, hooksOutput: { hooksConfig: {}, generatedFiles: [] } });
 
     const toml = await fs.readFile(path.join(codexDir, "config.toml"), "utf8");
-    expect(toml).toContain("[mcp_servers.foo]");
-    expect(toml).toContain("codex_hooks = true");
+    const parsed = parse(toml) as {
+      features?: { codex_hooks?: unknown };
+      mcp_servers?: { foo?: { command?: unknown } };
+    };
+    expect(parsed.mcp_servers?.foo?.command).toBe("bar");
+    expect(parsed.features?.codex_hooks).toBe(true);
   });
 
   it("emits empty hooks.json when no hooks present", async () => {

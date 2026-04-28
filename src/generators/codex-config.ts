@@ -79,14 +79,15 @@ export function buildCodexConfigToml(existing: string): string {
     try {
       data = parse(existing) as Record<string, unknown>;
     } catch (err) {
-      // Malformed user TOML: warn so the user knows we're regenerating, then
-      // start fresh. (generateCodexConfig still skips the write when the new
-      // content equals `existing`, so this only kicks in for actual edits.)
-      console.warn(
-        `oh-my-harness: .codex/config.toml is invalid TOML, regenerating ` +
-          `from scratch — original content will be replaced. (${(err as Error).message})`,
+      // Refuse to silently overwrite: a parse failure here means the user
+      // has hand-edited config.toml and introduced a syntax error. If we
+      // regenerate from {} we'd discard their MCP server entries and any
+      // other user tables. Surface the error and let the user fix it.
+      throw new Error(
+        `oh-my-harness: .codex/config.toml is invalid TOML; ` +
+          `fix the syntax error before re-running sync to avoid losing user content. ` +
+          `(${(err as Error).message})`,
       );
-      data = {};
     }
   }
 

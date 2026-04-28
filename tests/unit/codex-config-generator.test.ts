@@ -187,11 +187,12 @@ some_other_flag = true # keep this
     expect(parsed.features?.some_other_flag).toBe(true);
   });
 
-  it("falls back to a clean config when existing TOML is malformed", () => {
+  it("refuses to overwrite when existing TOML is malformed (preserves user content)", () => {
+    // Earlier behavior was a silent rewrite that destroyed any user MCP
+    // server entries on the next sync. Now we throw so the user can fix
+    // the syntax error manually before re-running.
     const existing = "this is [not valid TOML";
-    const result = buildCodexConfigToml(existing);
-    const parsed = parse(result) as { features?: { codex_hooks?: unknown } };
-    expect(parsed.features?.codex_hooks).toBe(true);
+    expect(() => buildCodexConfigToml(existing)).toThrow(/invalid TOML/);
   });
 
   it("does NOT throw when existing `features` is a scalar boolean", () => {
@@ -227,7 +228,7 @@ describe("generateCodexConfig", () => {
     const hooksOutput: HooksOutput = {
       hooksConfig: {
         PreToolUse: [
-          { matcher: "Bash", hooks: [{ type: "command", command: `bash "${tmpDir}/.omh/hooks/g.sh"` }] },
+          { matcher: "Bash", hooks: [{ type: "command", command: `bash '${tmpDir}/.omh/hooks/g.sh'` }] },
         ],
       },
       generatedFiles: [],

@@ -180,11 +180,11 @@ export function generateBlockTestCases(
     };
     const aliases = blockIdAliases[block.id] ?? [block.id];
     const matchedHook = registeredHooks?.find((h) => {
-      const scriptName = h.command.replace(/^bash\s+/, "").replace(/^"|"$/g, "");
+      const scriptName = h.command.replace(/^bash\s+/, "").replace(/^['"]|['"]$/g, "");
       return aliases.some((alias) => scriptName.includes(alias));
     });
     const hookScript = matchedHook
-      ? matchedHook.command.replace(/^bash\s+/, "").replace(/^"|"$/g, "")
+      ? matchedHook.command.replace(/^bash\s+/, "").replace(/^['"]|['"]$/g, "")
       : `${OMH_HOOKS_DIR}/catalog-${block.id}.sh`;
 
     switch (block.id) {

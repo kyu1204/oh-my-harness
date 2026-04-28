@@ -1,14 +1,21 @@
 import { mkdir, writeFile, chmod, readFile, unlink } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import type { MergedConfig } from "../core/preset-types.js";
 import { OMH_HOOKS_DIR, OMH_STATE_DIR, OMH_MANIFEST, OMH_EVENTS_FILE } from "../utils/paths.js";
+
+// Wrap a path/value in bash single quotes, escaping any embedded single
+// quotes. Single-quoted strings are not subject to shell expansion, so this
+// is safe for paths containing $, backticks, double quotes, etc.
+function shellSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
 
 function buildLoggerSnippet(event: string, projectDir?: string): string {
   const stateDir = projectDir
     ? `${projectDir}/${OMH_STATE_DIR}`
     : OMH_STATE_DIR;
   return `# --- oh-my-harness event logger ---
-_OMH_STATE_DIR="${stateDir}"
+_OMH_STATE_DIR=${shellSingleQuote(stateDir)}
 mkdir -p "$_OMH_STATE_DIR" 2>/dev/null || true
 _OMH_HOOK_NAME="$(basename "$0")"
 _OMH_EVENT="${event}"
@@ -80,8 +87,15 @@ function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
 async function readPreviousHookNames(manifestPath: string): Promise<string[]> {
   try {
     const manifestRaw = await readFile(manifestPath, "utf8");
-    const manifest = JSON.parse(manifestRaw) as { hooks?: string[] };
-    return manifest.hooks ?? [];
+    const manifest = JSON.parse(manifestRaw) as { hooks?: unknown };
+    if (!Array.isArray(manifest.hooks)) return [];
+    // The manifest is on-disk input — a malicious or hand-edited entry like
+    // "../../etc/hosts" would otherwise become an unlink target. Allow only
+    // bare basenames to defend against path traversal during cleanup.
+    return manifest.hooks.filter(
+      (name): name is string =>
+        typeof name === "string" && name.length > 0 && basename(name) === name,
+    );
   } catch (err) {
     if (isErrnoException(err) && err.code === "ENOENT") {
       return [];
@@ -178,7 +192,7 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
     if (!hooksConfig[p.event]) hooksConfig[p.event] = [];
     hooksConfig[p.event].push({
       matcher: p.matcher,
-      hooks: [{ type: "command", command: `bash "${p.scriptPath}"` }],
+      hooks: [{ type: "command", command: `bash ${shellSingleQuote(p.scriptPath)}` }],
     });
   }
 

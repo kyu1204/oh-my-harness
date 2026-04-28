@@ -99,10 +99,10 @@ describe("generateHooks", () => {
     expect(result.hooksConfig).toHaveProperty("PostToolUse");
 
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: [{ type: "command", command: `bash "${join(projectDir, ".omh/hooks/command-guard.sh")}"` }] },
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/command-guard.sh")}'` }] },
     ]);
     expect(result.hooksConfig["PostToolUse"]).toEqual([
-      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash "${join(projectDir, ".omh/hooks/lint-on-save.sh")}"` }] },
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/lint-on-save.sh")}'` }] },
     ]);
   });
 
@@ -172,8 +172,8 @@ describe("generateHooks", () => {
 
     expect(result.hooksConfig["PreToolUse"]).toHaveLength(2);
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: [{ type: "command", command: `bash "${join(projectDir, ".omh/hooks/guard-bash.sh")}"` }] },
-      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash "${join(projectDir, ".omh/hooks/guard-edit.sh")}"` }] },
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/guard-bash.sh")}'` }] },
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/guard-edit.sh")}'` }] },
     ]);
   });
 
@@ -194,7 +194,7 @@ describe("generateHooks", () => {
     const scriptPath = join(projectDir, `.omh/hooks/${safeId}.sh`);
     expect(result.generatedFiles).toContain(scriptPath);
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: [{ type: "command", command: `bash "${join(projectDir, `.omh/hooks/${safeId}.sh`)}"` }] },
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash '${join(projectDir, `.omh/hooks/${safeId}.sh`)}'` }] },
     ]);
     // Ensure no file was written outside the hooks dir
     const content = await readFile(scriptPath, "utf8");
@@ -221,8 +221,8 @@ describe("generateHooks", () => {
     expect(result.generatedFiles).toContain(file1);
     expect(result.generatedFiles).toContain(file2);
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: [{ type: "command", command: `bash "${join(projectDir, ".omh/hooks/hook.sh")}"` }] },
-      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash "${join(projectDir, ".omh/hooks/hook-1.sh")}"` }] },
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/hook.sh")}'` }] },
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/hook-1.sh")}'` }] },
     ]);
   });
 
@@ -318,8 +318,8 @@ describe("generateHooks", () => {
     // Check hooksConfig contains both hooks
     expect(result.hooksConfig["PreToolUse"]).toHaveLength(2);
     const commands = result.hooksConfig["PreToolUse"].map(h => h.hooks[0].command);
-    expect(commands).toContain(`bash "${join(projectDir, ".omh/hooks/myhook.sh")}"`);
-    expect(commands).toContain(`bash "${join(projectDir, ".omh/hooks/myhook-1.sh")}"`);
+    expect(commands).toContain(`bash '${join(projectDir, ".omh/hooks/myhook.sh")}'`);
+    expect(commands).toContain(`bash '${join(projectDir, ".omh/hooks/myhook-1.sh")}'`);
 
   });
 
@@ -343,11 +343,128 @@ describe("generateHooks", () => {
     expect(result.generatedFiles).toContain(file1);
     expect(result.generatedFiles).toContain(file2);
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: [{ type: "command", command: `bash "${join(projectDir, ".omh/hooks/myhook.sh")}"` }] },
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/myhook.sh")}'` }] },
     ]);
     expect(result.hooksConfig["PostToolUse"]).toEqual([
-      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash "${join(projectDir, ".omh/hooks/myhook-1.sh")}"` }] },
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/myhook-1.sh")}'` }] },
     ]);
+  });
+});
+
+describe("shell injection defense", () => {
+  let projectDir: string;
+  let differentDir: string;
+
+  beforeEach(async () => {
+    // mkdtemp template ends with random suffix; embed shell metacharacter ($)
+    // in a real subdirectory so the rendered bash script must escape it.
+    const base = await mkdtemp(join(tmpdir(), "omh-shellesc-"));
+    projectDir = join(base, "with$dollar dir");
+    await (await import("node:fs/promises")).mkdir(projectDir, { recursive: true });
+    differentDir = await mkdtemp(join(tmpdir(), "omh-shellesc-cwd-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+    await rm(differentDir, { recursive: true, force: true });
+  });
+
+  it("logger writes to the literal path even when projectDir contains $ and spaces", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          {
+            id: "esc-test",
+            matcher: "Bash",
+            inline:
+              '#!/bin/bash\nset -euo pipefail\n_log_event "allow" "ok"\nexit 0',
+          },
+        ],
+        postToolUse: [],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+    const scriptPath = result.generatedFiles[0];
+
+    // Invoke bash directly with scriptPath as argv to avoid the shell
+    // re-expanding $dollar in our test driver. The defended path is the
+    // generated script body, not how we run it.
+    const { spawn } = await import("node:child_process");
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn("bash", [scriptPath], {
+        cwd: differentDir,
+        env: { ...process.env, dollar: "EXPANDED-WRONG" },
+      });
+      child.stdin.end();
+      let stderr = "";
+      child.stderr.on("data", (b: Buffer) => {
+        stderr += b.toString();
+      });
+      child.on("close", (code) =>
+        code === 0 ? resolve() : reject(new Error(`exit ${code}: ${stderr}`)),
+      );
+    });
+
+    // events.jsonl must land under the literal projectDir, not at a path
+    // produced by shell expansion of $dollar.
+    const eventsPath = join(projectDir, ".omh/state/events.jsonl");
+    await expect(access(eventsPath)).resolves.toBeUndefined();
+  });
+
+  it("emits hooksConfig commands wrapped in single quotes", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [{ id: "g", matcher: "Bash", inline: "#!/bin/bash\nexit 0" }],
+        postToolUse: [],
+      },
+    });
+    const result = await generateHooks({ projectDir, config });
+    const cmd = result.hooksConfig.PreToolUse[0].hooks[0].command;
+    expect(cmd).toMatch(/^bash '.*'$/);
+    expect(cmd).toContain("with$dollar");
+  });
+});
+
+describe("manifest validation (path traversal defense)", () => {
+  let projectDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "omh-manifest-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  it("ignores manifest entries containing path separators or '..'", async () => {
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    await mkdir(join(projectDir, ".omh"), { recursive: true });
+    // Pre-seed a manifest with a malicious traversal entry; if cleanup
+    // honored it, we'd try to unlink ../etc-victim.txt.
+    await writeFile(
+      join(projectDir, ".omh/manifest.json"),
+      JSON.stringify({
+        generatedAt: "x",
+        hooks: [
+          "../etc-victim.txt",
+          "../../passwd",
+          "/abs/path.sh",
+          "valid-name.sh",
+        ],
+      }),
+      "utf8",
+    );
+    // Place a sentinel file outside the hooks dir that the malicious entry
+    // would resolve to (relative path joined with hooksDir).
+    const sentinel = join(projectDir, "etc-victim.txt");
+    await writeFile(sentinel, "do-not-delete", "utf8");
+
+    // Now run a fresh sync with no hooks. The cleanup pass must NOT touch
+    // the sentinel file because the manifest entry should be filtered out.
+    await generateHooks({ projectDir, config: makeMergedConfig() });
+
+    await expect(access(sentinel)).resolves.toBeUndefined();
   });
 });
 
@@ -489,7 +606,7 @@ describe("wrapWithLogger", () => {
   it("produces absolute _OMH_STATE_DIR when projectDir is provided", () => {
     const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
     const result = wrapWithLogger(script, "PreToolUse", "/tmp/my-project");
-    expect(result).toContain('_OMH_STATE_DIR="/tmp/my-project/.omh/state"');
+    expect(result).toContain(`_OMH_STATE_DIR='/tmp/my-project/.omh/state'`);
   });
 
   it("EXIT trap logs 'error' instead of 'allow' when script exits non-zero", () => {
@@ -504,7 +621,7 @@ describe("wrapWithLogger", () => {
   it("keeps relative _OMH_STATE_DIR when projectDir is omitted", () => {
     const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
     const result = wrapWithLogger(script, "PreToolUse");
-    expect(result).toContain('_OMH_STATE_DIR=".omh/state"');
+    expect(result).toContain(`_OMH_STATE_DIR='.omh/state'`);
   });
 });
 

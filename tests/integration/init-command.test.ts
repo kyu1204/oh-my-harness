@@ -71,18 +71,18 @@ describe("initCommand", () => {
   it("generates hook scripts", async () => {
     await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
 
-    const hooksDir = path.join(tmpDir, ".claude", "hooks");
+    const hooksDir = path.join(tmpDir, ".omh", "hooks");
     const files = await fs.readdir(hooksDir);
     expect(files.length).toBeGreaterThan(0);
     // base preset has base-command-guard and base-test-before-commit hooks
     expect(files).toContain("base-command-guard.sh");
   });
 
-  it("updates .gitignore with .claude/hooks/ entry", async () => {
+  it("updates .gitignore with .omh/state/ entry", async () => {
     await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
 
     const gitignore = await fs.readFile(path.join(tmpDir, ".gitignore"), "utf-8");
-    expect(gitignore).toContain(".claude/hooks/");
+    expect(gitignore).toContain(".omh/state/");
   });
 
   it("--preset flag uses existing preset flow", async () => {

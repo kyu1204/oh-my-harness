@@ -185,7 +185,7 @@ describe("generate() error paths", () => {
 
 describe("readEvents error paths", () => {
   it("returns empty array when events file contains completely corrupted binary-like data", async () => {
-    const stateDir = join(tmpDir, ".claude/hooks/.state");
+    const stateDir = join(tmpDir, ".omh/state");
     await mkdir(stateDir, { recursive: true });
     // Write non-JSON content that mimics corruption
     await writeFile(
@@ -198,7 +198,7 @@ describe("readEvents error paths", () => {
   });
 
   it("returns only valid events from a partially corrupted file", async () => {
-    const stateDir = join(tmpDir, ".claude/hooks/.state");
+    const stateDir = join(tmpDir, ".omh/state");
     await mkdir(stateDir, { recursive: true });
 
     const validEvent = JSON.stringify({
@@ -223,7 +223,7 @@ describe("readEvents error paths", () => {
   });
 
   it("throws when appendEvent target directory is read-only", async () => {
-    const stateDir = join(tmpDir, ".claude/hooks/.state");
+    const stateDir = join(tmpDir, ".omh/state");
     await mkdir(stateDir, { recursive: true });
     // Make the state directory read-only so appendFile fails
     await chmod(stateDir, 0o444);

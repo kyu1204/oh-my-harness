@@ -89,4 +89,38 @@ describe("doctorCommand", () => {
     expect(result.healthy).toBe(true);
     expect(result.exitCode).toBe(0);
   });
+
+  it("verifies AGENTS.md exists for Codex compatibility", async () => {
+    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    const result = await doctorCommand({ projectDir: tmpDir });
+    expect(result.checks.agentsMd).toBe(true);
+  });
+
+  it("reports unhealthy when AGENTS.md is missing", async () => {
+    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    await fs.rm(path.join(tmpDir, "AGENTS.md"));
+    const result = await doctorCommand({ projectDir: tmpDir });
+    expect(result.checks.agentsMd).toBe(false);
+    expect(result.healthy).toBe(false);
+  });
+
+  it("verifies .codex/hooks.json and config.toml exist for Codex emitter", async () => {
+    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    const result = await doctorCommand({ projectDir: tmpDir });
+    expect(result.checks.codexConfig).toBe(true);
+  });
+
+  it("verifies hook scripts under .omh/hooks are executable", async () => {
+    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    const result = await doctorCommand({ projectDir: tmpDir });
+    expect(result.checks.hooksExecutable).toBe(true);
+
+    // Drop X bit on one script and re-check
+    const hookFiles = await fs.readdir(path.join(tmpDir, ".omh/hooks"));
+    const sh = hookFiles.find((f) => f.endsWith(".sh"))!;
+    await fs.chmod(path.join(tmpDir, ".omh/hooks", sh), 0o644);
+
+    const after = await doctorCommand({ projectDir: tmpDir });
+    expect(after.checks.hooksExecutable).toBe(false);
+  });
 });

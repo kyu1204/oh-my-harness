@@ -1,11 +1,12 @@
 import { mkdir, writeFile, chmod, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import type { MergedConfig } from "../core/preset-types.js";
+import { OMH_HOOKS_DIR, OMH_STATE_DIR, OMH_MANIFEST, OMH_EVENTS_FILE } from "../utils/paths.js";
 
 function buildLoggerSnippet(event: string, projectDir?: string): string {
   const stateDir = projectDir
-    ? `${projectDir}/.claude/hooks/.state`
-    : ".claude/hooks/.state";
+    ? `${projectDir}/${OMH_STATE_DIR}`
+    : OMH_STATE_DIR;
   return `# --- oh-my-harness event logger ---
 _OMH_STATE_DIR="${stateDir}"
 mkdir -p "$_OMH_STATE_DIR" 2>/dev/null || true
@@ -14,10 +15,16 @@ _OMH_EVENT="${event}"
 _OMH_LOGGED=0
 _log_event() {
   _OMH_LOGGED=1
-  local decision="\${1:-allow}" reason="\${2:-}"
-  printf '{"ts":"%s","event":"%s","hook":"%s","decision":"%s","reason":"%s"}\\n' \\
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_OMH_EVENT" "$_OMH_HOOK_NAME" "$decision" "$reason" \\
-    >> "$_OMH_STATE_DIR/events.jsonl"
+  local decision="\${1:-allow}" reason="\${2:-}" meta="\${3:-}"
+  if [ -n "$meta" ]; then
+    printf '{"ts":"%s","event":"%s","hook":"%s","decision":"%s","reason":"%s","meta":%s}\\n' \\
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_OMH_EVENT" "$_OMH_HOOK_NAME" "$decision" "$reason" "$meta" \\
+      >> "$_OMH_STATE_DIR/${OMH_EVENTS_FILE}"
+  else
+    printf '{"ts":"%s","event":"%s","hook":"%s","decision":"%s","reason":"%s"}\\n' \\
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_OMH_EVENT" "$_OMH_HOOK_NAME" "$decision" "$reason" \\
+      >> "$_OMH_STATE_DIR/${OMH_EVENTS_FILE}"
+  fi
 }
 trap '_OMH_EXIT_CODE=$?; if [ "$_OMH_LOGGED" -eq 0 ]; then if [ "$_OMH_EXIT_CODE" -ne 0 ]; then _log_event "error" "hook exited with code $_OMH_EXIT_CODE"; else _log_event "allow"; fi; fi' EXIT
 # --- end logger ---`;
@@ -96,7 +103,7 @@ async function writeHookManifest(manifestPath: string, hooks: string[]): Promise
 
 export async function generateHooks(options: GenerateHooksOptions): Promise<HooksOutput> {
   const { projectDir, config } = options;
-  const hooksDir = join(projectDir, ".claude/hooks");
+  const hooksDir = join(projectDir, OMH_HOOKS_DIR);
 
   const eventMap: Array<[string, typeof config.hooks.preToolUse]> = [
     ["PreToolUse", config.hooks.preToolUse],
@@ -114,7 +121,8 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
   await mkdir(hooksDir, { recursive: true });
 
   // Read previous manifest to clean up stale hook files
-  const manifestPath = join(hooksDir, "oh-my-harness-manifest.json");
+  const manifestPath = join(projectDir, OMH_MANIFEST);
+  await mkdir(join(projectDir, OMH_STATE_DIR), { recursive: true });
   const previousHooks = await readPreviousHookNames(manifestPath);
 
   if (allHooks.length === 0) {

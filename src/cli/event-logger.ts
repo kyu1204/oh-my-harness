@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { OMH_STATE_DIR, OMH_EVENTS_FILE } from "../utils/paths.js";
 
 export interface HookEvent {
   ts: string;
@@ -8,10 +9,11 @@ export interface HookEvent {
   decision: "block" | "allow" | "error";
   reason?: string;
   tool?: string;
+  meta?: Record<string, unknown>;
 }
 
-const STATE_DIR = ".claude/hooks/.state";
-const EVENTS_FILE = "events.jsonl";
+const STATE_DIR = OMH_STATE_DIR;
+const EVENTS_FILE = OMH_EVENTS_FILE;
 
 export async function appendEvent(
   projectDir: string,

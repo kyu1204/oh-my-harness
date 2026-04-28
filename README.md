@@ -70,22 +70,28 @@ omh stats         # TUI analytics dashboard
 └── config.json                        # AI provider config (global, not per-project)
 
 your-project/
-├── CLAUDE.md                          # TDD rules, coding standards
+├── CLAUDE.md                          # Claude Code instructions (TDD rules, standards)
+├── AGENTS.md                          # Codex CLI instructions (same managed sections)
 ├── harness.yaml                       # Your harness config (source of truth)
-└── .claude/
-    ├── settings.json                  # Hook configs, permissions
-    ├── hooks/
-    │   ├── catalog-branch-guard.sh    # Blocks commits on merged branches
-    │   ├── catalog-tdd-guard.sh       # Enforces test-first workflow
-    │   ├── catalog-commit-test-gate.sh # Tests must pass before commit
-    │   ├── catalog-path-guard.sh      # Protects build outputs
-    │   ├── catalog-command-guard.sh   # Blocks dangerous commands
-    │   ├── catalog-lint-on-save.sh    # Auto-lint on save
-    │   ├── catalog-auto-pr.sh         # Auto-create PR after push
-    │   └── .state/
-    │       ├── events.jsonl           # Hook event log (for analytics)
-    │       └── edit-history.json      # TDD guard state
-    └── oh-my-harness.json             # Active preset tracking
+├── .omh/                              # Single source of truth — hooks + state
+│   ├── hooks/
+│   │   ├── catalog-branch-guard.sh    # Blocks commits on merged branches
+│   │   ├── catalog-tdd-guard.sh       # Enforces test-first workflow
+│   │   ├── catalog-commit-test-gate.sh # Tests must pass before commit
+│   │   ├── catalog-path-guard.sh      # Protects build outputs
+│   │   ├── catalog-command-guard.sh   # Blocks dangerous commands
+│   │   ├── catalog-lint-on-save.sh    # Auto-lint on save
+│   │   └── catalog-auto-pr.sh         # Auto-create PR after push
+│   ├── state/                         # gitignored — log/runtime data
+│   │   ├── events.jsonl               # Unified hook event log (powers omh stats)
+│   │   └── tdd-edits.json             # TDD guard working state
+│   └── manifest.json                  # Generated-files manifest
+├── .claude/
+│   ├── settings.json                  # Claude permissions + hooks → .omh/hooks/*.sh
+│   └── oh-my-harness.json             # Active preset tracking
+└── .codex/
+    ├── config.toml                    # [features] codex_hooks = true
+    └── hooks.json                     # Codex hooks → .omh/hooks/*.sh (same scripts)
 ```
 
 ---
@@ -397,8 +403,9 @@ oh-my-harness/
 - [x] Multi-provider AI support — Claude API, OpenAI, Gemini
 - [x] Interactive model selection per provider
 - [x] GitHub star prompt — first-time only
+- [x] Codex emitter — `AGENTS.md` + `.codex/hooks.json` + `.codex/config.toml`
+- [x] Unified `.omh/` layout — single source of truth for hooks & state across runtimes
 - [ ] Cursor (`.cursor/rules/`) emitter
-- [ ] Codex (`AGENTS.md`) emitter
 - [ ] GitHub Copilot emitter
 - [ ] Community preset registry
 - [ ] `omh modify "change X"` — NL config editing

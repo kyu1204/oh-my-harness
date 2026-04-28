@@ -75,7 +75,7 @@ describe("syncCommand", () => {
 
     await syncCommand({ projectDir: tmpDir });
 
-    const hooksDir = path.join(tmpDir, ".claude", "hooks");
+    const hooksDir = path.join(tmpDir, ".omh", "hooks");
     const files = await fs.readdir(hooksDir);
     expect(files.length).toBeGreaterThan(0);
     expect(files.some((f) => f.endsWith(".sh"))).toBe(true);
@@ -89,7 +89,7 @@ describe("syncCommand", () => {
 
     await syncCommand({ projectDir: tmpDir });
 
-    const hooksDir = path.join(tmpDir, ".claude", "hooks");
+    const hooksDir = path.join(tmpDir, ".omh", "hooks");
     const files = await fs.readdir(hooksDir);
     const shFile = files.find((f) => f.endsWith(".sh"))!;
     const scriptContent = await fs.readFile(path.join(hooksDir, shFile), "utf-8");

@@ -241,7 +241,7 @@ afterEach(async () => {
 describe("loadStatsData", () => {
   it("events.jsonl + harness.yaml 통합 로드", async () => {
     // Write events.jsonl
-    const stateDir = path.join(tmpDir, ".claude/hooks/.state");
+    const stateDir = path.join(tmpDir, ".omh/state");
     await fs.mkdir(stateDir, { recursive: true });
     const events: HookEvent[] = [
       { ts: "2024-01-01T10:00:00.000Z", event: "PreToolUse", hook: "catalog-command-guard.sh", decision: "block", reason: "blocked" },

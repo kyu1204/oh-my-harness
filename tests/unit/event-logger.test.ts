@@ -31,7 +31,7 @@ describe("appendEvent", () => {
 
     await appendEvent(tmpDir, event);
 
-    const stateDir = path.join(tmpDir, ".claude/hooks/.state");
+    const stateDir = path.join(tmpDir, ".omh/state");
     const filePath = path.join(stateDir, "events.jsonl");
     const content = await fs.readFile(filePath, "utf-8");
     const lines = content.trim().split("\n");
@@ -87,7 +87,7 @@ describe("readEvents", () => {
   });
 
   it("잘못된 JSON 줄 무시 (graceful)", async () => {
-    const stateDir = path.join(tmpDir, ".claude/hooks/.state");
+    const stateDir = path.join(tmpDir, ".omh/state");
     await fs.mkdir(stateDir, { recursive: true });
     const filePath = path.join(stateDir, "events.jsonl");
 
@@ -115,7 +115,7 @@ describe("readEvents", () => {
   });
 
   it("'error' decision 이벤트도 정상 파싱", async () => {
-    const stateDir = path.join(tmpDir, ".claude/hooks/.state");
+    const stateDir = path.join(tmpDir, ".omh/state");
     await fs.mkdir(stateDir, { recursive: true });
     const filePath = path.join(stateDir, "events.jsonl");
 
@@ -136,7 +136,7 @@ describe("readEvents", () => {
   });
 
   it("필수 필드 누락된 JSON은 무시 (런타임 검증)", async () => {
-    const stateDir = path.join(tmpDir, ".claude/hooks/.state");
+    const stateDir = path.join(tmpDir, ".omh/state");
     await fs.mkdir(stateDir, { recursive: true });
     const filePath = path.join(stateDir, "events.jsonl");
 

@@ -45,7 +45,7 @@ describe("tdd-guard execution", () => {
     scriptPath = join(tmpDir, "catalog-tdd-guard.sh");
     await writeFile(scriptPath, wrapped, { mode: 0o755 });
     // Ensure state dir exists
-    await mkdir(join(tmpDir, ".claude/hooks/.state"), { recursive: true });
+    await mkdir(join(tmpDir, ".omh/state"), { recursive: true });
   });
 
   afterEach(async () => {
@@ -73,7 +73,7 @@ describe("tdd-guard execution", () => {
     "allows source file edit when test file was recorded in edit-history",
     async () => {
       // Write edit-history with a test file pre-recorded
-      const historyPath = join(tmpDir, ".claude/hooks/.state/edit-history.json");
+      const historyPath = join(tmpDir, ".omh/state/tdd-edits.json");
       await writeFile(
         historyPath,
         JSON.stringify({ edits: ["tests/unit/event-logger.test.ts"] }),
@@ -116,7 +116,7 @@ describe("tdd-guard execution", () => {
   it.runIf(hasJq())(
     "allows test file edit and records it in edit-history",
     async () => {
-      const historyPath = join(tmpDir, ".claude/hooks/.state/edit-history.json");
+      const historyPath = join(tmpDir, ".omh/state/tdd-edits.json");
       // Start with empty history
       await writeFile(historyPath, JSON.stringify({ edits: [] }));
 
@@ -142,7 +142,7 @@ describe("tdd-guard execution", () => {
   it.runIf(hasJq())(
     "blocks second source edit after first passed — test record consumed",
     async () => {
-      const historyPath = join(tmpDir, ".claude/hooks/.state/edit-history.json");
+      const historyPath = join(tmpDir, ".omh/state/tdd-edits.json");
       // Turn 1: record test file
       await writeFile(historyPath, JSON.stringify({ edits: ["tests/unit/event-logger.test.ts"] }));
 
@@ -200,7 +200,7 @@ describe("tdd-guard execution (Kotlin/JVM params)", () => {
     const wrapped = wrapWithLogger(rendered, "PreToolUse");
     scriptPath = join(tmpDir, "catalog-tdd-guard.sh");
     await writeFile(scriptPath, wrapped, { mode: 0o755 });
-    await mkdir(join(tmpDir, ".claude/hooks/.state"), { recursive: true });
+    await mkdir(join(tmpDir, ".omh/state"), { recursive: true });
   });
 
   afterEach(async () => {
@@ -210,7 +210,7 @@ describe("tdd-guard execution (Kotlin/JVM params)", () => {
   it.runIf(hasJq())(
     "allows Kotlin source edit when JVM-style test file (IoViewTest.kt) was recorded",
     async () => {
-      const historyPath = join(tmpDir, ".claude/hooks/.state/edit-history.json");
+      const historyPath = join(tmpDir, ".omh/state/tdd-edits.json");
       await writeFile(
         historyPath,
         JSON.stringify({ edits: ["app/src/test/java/com/example/IoViewTest.kt"] }),

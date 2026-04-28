@@ -35,9 +35,9 @@ case "\$FILE_PATH" in
   *.json|*.yaml|*.yml|*.md|*.sh|*.css|*.html|*.svg|*.png|*.jpg) exit 0 ;;
 esac
 
-# edit-history 상태 파일
-STATE_DIR=".claude/hooks/.state"
-HISTORY_FILE="\$STATE_DIR/edit-history.json"
+# edit-history 상태 파일 (logger wrapper가 _OMH_STATE_DIR 를 export)
+STATE_DIR="\${_OMH_STATE_DIR:-.omh/state}"
+HISTORY_FILE="\$STATE_DIR/tdd-edits.json"
 mkdir -p "\$STATE_DIR" 2>/dev/null || true
 
 TEST_RE='{{{testPattern}}}'

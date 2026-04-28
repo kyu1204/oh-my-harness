@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { HookEntry, BuildingBlock } from "../catalog/types.js";
 import { applyDefaults } from "../catalog/template-engine.js";
+import { OMH_HOOKS_DIR, OMH_STATE_DIR, OMH_TDD_STATE_FILE } from "../utils/paths.js";
 
 export interface HookInput {
   tool_name: string;
@@ -184,7 +185,7 @@ export function generateBlockTestCases(
     });
     const hookScript = matchedHook
       ? matchedHook.command.replace(/^bash\s+/, "").replace(/^"|"$/g, "")
-      : `.claude/hooks/catalog-${block.id}.sh`;
+      : `${OMH_HOOKS_DIR}/catalog-${block.id}.sh`;
 
     switch (block.id) {
       case "path-guard": {
@@ -286,7 +287,7 @@ export function generateBlockTestCases(
       }
 
       case "tdd-guard": {
-        const stateFile = ".claude/hooks/.state/edit-history.json";
+        const stateFile = `${OMH_STATE_DIR}/${OMH_TDD_STATE_FILE}`;
         const srcPat = (params.srcPattern as string) ?? "\\.(ts|tsx|js|jsx)$";
         const testPat = (params.testPattern as string) ?? "\\.(test|spec)\\.(ts|tsx|js|jsx)$";
         // Derive sample file extensions from patterns

@@ -142,6 +142,39 @@ some_other_flag = true
     expect(third).toContain("some_other_flag = true");
     expect(third).toContain("codex_hooks = true");
   });
+
+  it("does NOT duplicate codex_hooks when user already set it without marker", () => {
+    // Edge case: user manually enabled the flag, perhaps from a guide,
+    // before running omh init. We must replace the existing key with our
+    // marker block, not add a second one.
+    const existing = `[features]
+codex_hooks = true
+some_other_flag = true
+`;
+    const result = buildCodexConfigToml(existing);
+
+    // Only one codex_hooks key in the whole file
+    const codexLines = result.match(/codex_hooks\s*=/g) ?? [];
+    expect(codexLines).toHaveLength(1);
+    // Must be inside our managed marker
+    expect(result).toMatch(
+      /# >>> oh-my-harness >>>\ncodex_hooks = true\n# <<< oh-my-harness <<</,
+    );
+    // User's other key preserved
+    expect(result).toContain("some_other_flag = true");
+  });
+
+  it("upgrades existing codex_hooks=false to true via marker replacement", () => {
+    const existing = `[features]
+codex_hooks = false
+`;
+    const result = buildCodexConfigToml(existing);
+
+    const codexLines = result.match(/codex_hooks\s*=/g) ?? [];
+    expect(codexLines).toHaveLength(1);
+    expect(result).toContain("codex_hooks = true");
+    expect(result).not.toContain("codex_hooks = false");
+  });
 });
 
 describe("generateCodexConfig", () => {

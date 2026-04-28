@@ -62,58 +62,77 @@ export async function migrateLegacyState(projectDir: string): Promise<MigrationR
 
   const legacyState = path.join(projectDir, LEGACY_STATE_DIR);
   const newState = path.join(projectDir, OMH_STATE_DIR);
+  const legacyManifest = path.join(projectDir, LEGACY_MANIFEST);
+  const newManifest = path.join(projectDir, OMH_MANIFEST);
 
-  if (!(await pathExists(legacyState))) {
+  const hasLegacyState = await pathExists(legacyState);
+  const hasLegacyManifest = await pathExists(legacyManifest);
+
+  // Nothing legacy to migrate.
+  if (!hasLegacyState && !hasLegacyManifest) {
     return report;
   }
 
   await fs.mkdir(path.join(projectDir, OMH_DIR), { recursive: true });
-  await fs.mkdir(newState, { recursive: true });
 
-  // events.jsonl — copy if new doesn't exist
-  const legacyEvents = path.join(legacyState, OMH_EVENTS_FILE);
-  const newEvents = path.join(newState, OMH_EVENTS_FILE);
-  if (await pathExists(legacyEvents)) {
-    if (!(await pathExists(newEvents))) {
-      await fs.copyFile(legacyEvents, newEvents);
-      report.migrated.push("events.jsonl");
-      cleanupTargets.add(legacyEvents);
-    } else {
-      report.skipped.push("events.jsonl (destination exists)");
+  if (hasLegacyState) {
+    await fs.mkdir(newState, { recursive: true });
+
+    // events.jsonl — copy if new doesn't exist
+    const legacyEvents = path.join(legacyState, OMH_EVENTS_FILE);
+    const newEvents = path.join(newState, OMH_EVENTS_FILE);
+    if (await pathExists(legacyEvents)) {
+      if (!(await pathExists(newEvents))) {
+        await fs.copyFile(legacyEvents, newEvents);
+        report.migrated.push("events.jsonl");
+        cleanupTargets.add(legacyEvents);
+      } else {
+        report.skipped.push("events.jsonl (destination exists)");
+      }
+    }
+
+    // edit-history.json → tdd-edits.json
+    const legacyTdd = path.join(legacyState, LEGACY_TDD_FILE);
+    const newTdd = path.join(newState, OMH_TDD_STATE_FILE);
+    if (await pathExists(legacyTdd)) {
+      if (!(await pathExists(newTdd))) {
+        await fs.copyFile(legacyTdd, newTdd);
+        report.migrated.push(`${LEGACY_TDD_FILE} → ${OMH_TDD_STATE_FILE}`);
+        cleanupTargets.add(legacyTdd);
+      } else {
+        report.skipped.push(`${LEGACY_TDD_FILE} (destination exists)`);
+      }
+    }
+
+    // config-audit.log → append into events.jsonl as ConfigChange entries
+    const legacyAuditLog = path.join(legacyState, LEGACY_CONFIG_AUDIT_LOG);
+    if (await pathExists(legacyAuditLog)) {
+      const raw = await fs.readFile(legacyAuditLog, "utf8");
+      const lines = raw.split("\n").map(configAuditToEvent).filter((l): l is string => l !== null);
+      if (lines.length > 0) {
+        // Guarantee a JSONL boundary newline before appending. If newEvents
+        // exists but its last byte isn't \n (truncation, manual edit), the
+        // first absorbed entry would otherwise glue onto the last record
+        // and break parsing for the whole file.
+        let prefix = "";
+        if (await pathExists(newEvents)) {
+          const existing = await fs.readFile(newEvents, "utf8");
+          if (existing.length > 0 && !existing.endsWith("\n")) {
+            prefix = "\n";
+          }
+        }
+        await fs.appendFile(newEvents, prefix + lines.join("\n") + "\n", "utf8");
+        report.migrated.push(`${LEGACY_CONFIG_AUDIT_LOG} → events.jsonl (${lines.length} entries)`);
+        cleanupTargets.add(legacyAuditLog);
+      } else {
+        report.skipped.push(`${LEGACY_CONFIG_AUDIT_LOG} (no valid lines)`);
+      }
     }
   }
 
-  // edit-history.json → tdd-edits.json
-  const legacyTdd = path.join(legacyState, LEGACY_TDD_FILE);
-  const newTdd = path.join(newState, OMH_TDD_STATE_FILE);
-  if (await pathExists(legacyTdd)) {
-    if (!(await pathExists(newTdd))) {
-      await fs.copyFile(legacyTdd, newTdd);
-      report.migrated.push(`${LEGACY_TDD_FILE} → ${OMH_TDD_STATE_FILE}`);
-      cleanupTargets.add(legacyTdd);
-    } else {
-      report.skipped.push(`${LEGACY_TDD_FILE} (destination exists)`);
-    }
-  }
-
-  // config-audit.log → append into events.jsonl as ConfigChange entries
-  const legacyAuditLog = path.join(legacyState, LEGACY_CONFIG_AUDIT_LOG);
-  if (await pathExists(legacyAuditLog)) {
-    const raw = await fs.readFile(legacyAuditLog, "utf8");
-    const lines = raw.split("\n").map(configAuditToEvent).filter((l): l is string => l !== null);
-    if (lines.length > 0) {
-      await fs.appendFile(newEvents, lines.join("\n") + "\n", "utf8");
-      report.migrated.push(`${LEGACY_CONFIG_AUDIT_LOG} → events.jsonl (${lines.length} entries)`);
-      cleanupTargets.add(legacyAuditLog);
-    } else {
-      report.skipped.push(`${LEGACY_CONFIG_AUDIT_LOG} (no valid lines)`);
-    }
-  }
-
-  // manifest
-  const legacyManifest = path.join(projectDir, LEGACY_MANIFEST);
-  const newManifest = path.join(projectDir, OMH_MANIFEST);
-  if (await pathExists(legacyManifest)) {
+  // Manifest migration runs whether or not the .state dir exists — a user
+  // who synced but never fired a hook still has manifest at the legacy path.
+  if (hasLegacyManifest) {
     if (!(await pathExists(newManifest))) {
       await fs.copyFile(legacyManifest, newManifest);
       report.migrated.push("manifest.json");

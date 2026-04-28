@@ -163,6 +163,8 @@ More user content.
 
     const posAlpha = result.indexOf("<!-- oh-my-harness:start:alpha -->");
     const posBeta = result.indexOf("<!-- oh-my-harness:start:beta -->");
+    expect(posAlpha).toBeGreaterThan(-1);
+    expect(posBeta).toBeGreaterThan(-1);
     expect(posBeta).toBeLessThan(posAlpha);
   });
 

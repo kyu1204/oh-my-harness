@@ -128,6 +128,55 @@ describe("migrateLegacyState", () => {
     expect(manifest.hooks).toEqual(["a.sh"]);
   });
 
+  it("migrates a legacy manifest even when legacy .state directory is absent", async () => {
+    // User synced but no hooks ever fired → no .state dir, but manifest exists.
+    await fs.mkdir(path.join(tmpDir, ".claude/hooks"), { recursive: true });
+    await fs.writeFile(
+      path.join(tmpDir, ".claude/hooks/oh-my-harness-manifest.json"),
+      JSON.stringify({ generatedAt: "x", hooks: ["foo.sh"] }),
+      "utf8",
+    );
+
+    const report = await migrateLegacyState(tmpDir);
+
+    const moved = JSON.parse(
+      await fs.readFile(path.join(tmpDir, ".omh/manifest.json"), "utf8"),
+    );
+    expect(moved.hooks).toEqual(["foo.sh"]);
+    expect(report.migrated).toContain("manifest.json");
+  });
+
+  it("inserts a separator newline if existing events.jsonl is missing trailing newline", async () => {
+    const newState = path.join(tmpDir, ".omh/state");
+    const legacyState = path.join(tmpDir, ".claude/hooks/.state");
+    await fs.mkdir(newState, { recursive: true });
+    await fs.mkdir(legacyState, { recursive: true });
+    // Pre-existing newEvents WITHOUT trailing newline (corrupted/edited state)
+    await fs.writeFile(
+      path.join(newState, "events.jsonl"),
+      '{"ts":"2026-01-01T00:00:00Z","event":"PreToolUse","hook":"x.sh","decision":"allow"}',
+      "utf8",
+    );
+    // Legacy config-audit.log to be absorbed
+    await fs.writeFile(
+      path.join(legacyState, "config-audit.log"),
+      '{"ts":"2026-01-02T00:00:00Z","source":"x","file":"y"}\n',
+      "utf8",
+    );
+
+    await migrateLegacyState(tmpDir);
+
+    const events = await fs.readFile(path.join(newState, "events.jsonl"), "utf8");
+    // Every non-empty line MUST be valid JSON (no glued records)
+    for (const line of events.split("\n")) {
+      if (!line.trim()) continue;
+      expect(() => JSON.parse(line)).not.toThrow();
+    }
+    // Two distinct entries
+    const entries = events.split("\n").filter((l) => l.trim());
+    expect(entries).toHaveLength(2);
+  });
+
   it("is idempotent: running twice does not duplicate events", async () => {
     const legacyState = path.join(tmpDir, ".claude/hooks/.state");
     await fs.mkdir(legacyState, { recursive: true });

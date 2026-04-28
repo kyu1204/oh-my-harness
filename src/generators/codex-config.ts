@@ -59,7 +59,9 @@ export function buildCodexHooks(hooksOutput: HooksOutput): {
 }
 
 const MARKER_RE = new RegExp(`${CONFIG_MARKER_START}[\\s\\S]*?${CONFIG_MARKER_END}\\n?`);
-const FEATURES_HEADER_RE = /^\[features\]\s*$/m;
+const FEATURES_HEADER_RE = /^\[features\]\s*\n?/m;
+const NEXT_TABLE_RE = /^\[[^\]]+\]\s*$/m;
+const CODEX_HOOKS_LINE_RE = /^[ \t]*codex_hooks\s*=\s*(?:true|false)[ \t]*\n?/m;
 
 const INLINE_BLOCK =
   `${CONFIG_MARKER_START}\n` +
@@ -72,6 +74,32 @@ const STANDALONE_BLOCK =
   `codex_hooks = true\n` +
   `${CONFIG_MARKER_END}\n`;
 
+function injectIntoExistingFeatures(toml: string): string {
+  const headerMatch = toml.match(FEATURES_HEADER_RE);
+  if (!headerMatch || headerMatch.index === undefined) return toml;
+
+  const headerStart = headerMatch.index;
+  const headerEnd = headerStart + headerMatch[0].length;
+
+  // Find next table header (or EOF) to bound the [features] body.
+  const rest = toml.slice(headerEnd);
+  const nextHeader = rest.match(NEXT_TABLE_RE);
+  const bodyLen = nextHeader && nextHeader.index !== undefined ? nextHeader.index : rest.length;
+  const body = rest.slice(0, bodyLen);
+  const after = rest.slice(bodyLen);
+
+  let newBody: string;
+  if (CODEX_HOOKS_LINE_RE.test(body)) {
+    // User already declared codex_hooks (with or without trailing keys).
+    // Replace that single line with our marker block to avoid duplicate keys.
+    newBody = body.replace(CODEX_HOOKS_LINE_RE, `${INLINE_BLOCK}\n`);
+  } else {
+    newBody = `${INLINE_BLOCK}\n${body}`;
+  }
+
+  return toml.slice(0, headerStart) + headerMatch[0] + newBody + after;
+}
+
 export function buildCodexConfigToml(existing: string): string {
   // Step 1: strip any prior managed marker block so we can re-place it
   // correctly without leaving stale duplicates behind.
@@ -83,13 +111,10 @@ export function buildCodexConfigToml(existing: string): string {
   }
 
   // Step 3: user already declared [features] elsewhere in the file. We must
-  // NOT add a second [features] header (TOML v1.0 forbids redefining tables).
-  // Inject our key inside the existing table.
+  // NOT add a second [features] header (TOML v1.0 forbids redefining tables)
+  // and we must NOT introduce a duplicate codex_hooks key (also invalid).
   if (FEATURES_HEADER_RE.test(stripped)) {
-    return stripped.replace(
-      FEATURES_HEADER_RE,
-      (match) => `${match}\n${INLINE_BLOCK}`,
-    );
+    return injectIntoExistingFeatures(stripped);
   }
 
   // Step 4: user content but no [features] yet → append our standalone block.

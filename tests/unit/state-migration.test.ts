@@ -177,6 +177,34 @@ describe("migrateLegacyState", () => {
     expect(entries).toHaveLength(2);
   });
 
+  it("skips non-object JSON lines in config-audit.log instead of crashing", async () => {
+    // JSON.parse("null") succeeds with null; .ts access on null throws.
+    // A single bad line must NOT abort the whole migration.
+    const legacyState = path.join(tmpDir, ".claude/hooks/.state");
+    await fs.mkdir(legacyState, { recursive: true });
+    await fs.writeFile(
+      path.join(legacyState, "config-audit.log"),
+      [
+        "null",
+        "42",
+        "[1, 2]",
+        '"a string"',
+        '{"ts":"2026-01-01T00:00:00Z","source":"x","file":"y"}',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    await expect(migrateLegacyState(tmpDir)).resolves.toBeDefined();
+
+    const events = await fs.readFile(path.join(tmpDir, ".omh/state/events.jsonl"), "utf8");
+    const entries = events.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+    // Only the well-formed audit object survived; the four non-object lines
+    // were skipped without aborting the run.
+    expect(entries).toHaveLength(1);
+    expect(entries[0].meta.source).toBe("x");
+  });
+
   it("is idempotent: running twice does not duplicate events", async () => {
     const legacyState = path.join(tmpDir, ".claude/hooks/.state");
     await fs.mkdir(legacyState, { recursive: true });

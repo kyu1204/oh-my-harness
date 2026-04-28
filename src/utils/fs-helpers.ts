@@ -4,8 +4,11 @@ export async function pathExists(p: string): Promise<boolean> {
   try {
     await fs.access(p);
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return false;
+    // Permission/IO errors must NOT masquerade as "missing" — that would
+    // silently skip migration steps for files that actually exist.
+    throw err;
   }
 }
 

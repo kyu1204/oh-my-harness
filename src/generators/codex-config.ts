@@ -90,7 +90,11 @@ export function buildCodexConfigToml(existing: string): string {
     }
   }
 
-  const features = (data.features as Record<string, unknown> | undefined) ?? {};
+  // `features` may be missing, a scalar (e.g. `features = true`), or an
+  // array — only treat it as an existing table when it actually is one.
+  const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+    v !== null && typeof v === "object" && !Array.isArray(v);
+  const features = isPlainObject(data.features) ? data.features : {};
   features.codex_hooks = true;
   data.features = features;
 

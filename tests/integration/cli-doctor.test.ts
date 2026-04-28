@@ -110,6 +110,18 @@ describe("doctorCommand", () => {
     expect(result.checks.codexConfig).toBe(true);
   });
 
+  it("reports unhealthy when .codex/hooks.json is invalid JSON", async () => {
+    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    // Simulate a merge conflict / hand-edit corrupting hooks.json
+    await fs.writeFile(path.join(tmpDir, ".codex", "hooks.json"), "<<< not json", "utf-8");
+
+    const result = await doctorCommand({ projectDir: tmpDir });
+
+    expect(result.checks.codexConfig).toBe(false);
+    expect(result.healthy).toBe(false);
+    expect(result.messages.some((m) => m.includes("hooks.json") || m.includes("invalid"))).toBe(true);
+  });
+
   it("verifies hook scripts under .omh/hooks are executable", async () => {
     await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
     const result = await doctorCommand({ projectDir: tmpDir });

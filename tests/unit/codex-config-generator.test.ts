@@ -193,6 +193,23 @@ some_other_flag = true # keep this
     const parsed = parse(result) as { features?: { codex_hooks?: unknown } };
     expect(parsed.features?.codex_hooks).toBe(true);
   });
+
+  it("does NOT throw when existing `features` is a scalar boolean", () => {
+    // Edge case: user wrote `features = true` at top level (valid TOML).
+    // Earlier code tried to assign codex_hooks onto a boolean → TypeError.
+    const existing = `features = true\n`;
+    expect(() => buildCodexConfigToml(existing)).not.toThrow();
+    const result = buildCodexConfigToml(existing);
+    const parsed = parse(result) as { features?: { codex_hooks?: unknown } };
+    expect(parsed.features?.codex_hooks).toBe(true);
+  });
+
+  it("overwrites a non-table `features` value (array) with a proper table", () => {
+    const existing = `features = [1, 2, 3]\n`;
+    const result = buildCodexConfigToml(existing);
+    const parsed = parse(result) as { features?: { codex_hooks?: unknown } };
+    expect(parsed.features?.codex_hooks).toBe(true);
+  });
 });
 
 describe("generateCodexConfig", () => {

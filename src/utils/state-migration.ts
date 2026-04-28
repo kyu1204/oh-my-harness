@@ -23,16 +23,21 @@ interface ParsedConfigAudit {
 function configAuditToEvent(line: string): string | null {
   const trimmed = line.trim();
   if (!trimmed) return null;
-  let parsed: ParsedConfigAudit;
+  let parsed: unknown;
   try {
-    parsed = JSON.parse(trimmed) as ParsedConfigAudit;
+    parsed = JSON.parse(trimmed);
   } catch {
     return null;
   }
-  if (!parsed.ts) return null;
-  const meta = { source: parsed.source ?? "unknown", file: parsed.file ?? "unknown" };
+  // Valid JSON like `null`, `42`, `["x"]` parses successfully but is not an
+  // audit record — skip silently so a single malformed line can't abort the
+  // entire .map().filter() chain in the caller.
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const audit = parsed as ParsedConfigAudit;
+  if (!audit.ts) return null;
+  const meta = { source: audit.source ?? "unknown", file: audit.file ?? "unknown" };
   return JSON.stringify({
-    ts: parsed.ts,
+    ts: audit.ts,
     event: "ConfigChange",
     hook: "catalog-config-audit.sh",
     decision: "allow",

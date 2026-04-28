@@ -80,11 +80,11 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<Doctor
     messages.push("FAIL: AGENTS.md not found.");
   }
 
-  // 5. .codex/hooks.json + .codex/config.toml
+  // 5. .codex/hooks.json + .codex/config.toml — both must exist AND parse.
   const codexHooksPath = path.join(projectDir, ".codex", "hooks.json");
   const codexTomlPath = path.join(projectDir, ".codex", "config.toml");
   try {
-    await fs.access(codexHooksPath);
+    JSON.parse(await fs.readFile(codexHooksPath, "utf-8"));
     const tomlRaw = await fs.readFile(codexTomlPath, "utf-8");
     const parsed = parse(tomlRaw) as { features?: { codex_hooks?: unknown } };
     if (parsed.features?.codex_hooks !== true) {
@@ -96,7 +96,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<Doctor
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
       messages.push("FAIL: .codex/hooks.json or .codex/config.toml not found.");
     } else {
-      messages.push("FAIL: .codex/config.toml invalid or unreadable.");
+      messages.push("FAIL: .codex/hooks.json or .codex/config.toml is invalid or unreadable.");
     }
   }
 

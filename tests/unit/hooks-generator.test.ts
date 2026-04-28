@@ -351,6 +351,81 @@ describe("generateHooks", () => {
   });
 });
 
+describe("logger meta validation (executed)", () => {
+  let projectDir: string;
+  let differentDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "oh-my-harness-meta-"));
+    differentDir = await mkdtemp(join(tmpdir(), "oh-my-harness-meta-cwd-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+    await rm(differentDir, { recursive: true, force: true });
+  });
+
+  it("falls back to no-meta when caller passes invalid JSON for meta", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          {
+            id: "bad-meta",
+            matcher: "Bash",
+            inline:
+              '#!/bin/bash\nset -euo pipefail\nINPUT=$(cat)\n_log_event "allow" "" "this is not json"\nexit 0',
+          },
+        ],
+        postToolUse: [],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+    const scriptPath = result.generatedFiles[0];
+    await execFileAsync("bash", ["-c", `echo '{}' | bash "${scriptPath}"`], {
+      cwd: differentDir,
+      env: { ...process.env },
+      timeout: 5000,
+    });
+
+    const eventsPath = join(projectDir, ".omh/state/events.jsonl");
+    const raw = await readFile(eventsPath, "utf8");
+    const lines = raw.trim().split("\n").filter(Boolean);
+    expect(lines).toHaveLength(1);
+    const parsed = JSON.parse(lines[0]);
+    expect(parsed.decision).toBe("allow");
+    expect(parsed.meta).toBeUndefined();
+  });
+
+  it("includes valid JSON meta when caller passes a serialized object", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          {
+            id: "good-meta",
+            matcher: "Bash",
+            inline:
+              '#!/bin/bash\nset -euo pipefail\nINPUT=$(cat)\n_log_event "allow" "" \'{"k":"v"}\'\nexit 0',
+          },
+        ],
+        postToolUse: [],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+    const scriptPath = result.generatedFiles[0];
+    await execFileAsync("bash", ["-c", `echo '{}' | bash "${scriptPath}"`], {
+      cwd: differentDir,
+      env: { ...process.env },
+      timeout: 5000,
+    });
+
+    const raw = await readFile(join(projectDir, ".omh/state/events.jsonl"), "utf8");
+    const parsed = JSON.parse(raw.trim().split("\n").filter(Boolean)[0]);
+    expect(parsed.meta).toEqual({ k: "v" });
+  });
+});
+
 describe("wrapWithLogger", () => {
   it("inserts logger after INPUT=$(cat)", () => {
     const script = "#!/bin/bash\nset -euo pipefail\nINPUT=$(cat)\nexit 0";

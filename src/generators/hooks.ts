@@ -16,6 +16,13 @@ _OMH_LOGGED=0
 _log_event() {
   _OMH_LOGGED=1
   local decision="\${1:-allow}" reason="\${2:-}" meta="\${3:-}"
+  # The third arg, if provided, MUST be a serialized JSON value. Validate
+  # with jq to prevent a malformed caller from corrupting events.jsonl
+  # (event-logger.ts silently drops unparseable lines, which would cause
+  # event loss). On invalid input, fall back to logging without meta.
+  if [ -n "$meta" ] && ! echo "$meta" | jq -e . >/dev/null 2>&1; then
+    meta=""
+  fi
   if [ -n "$meta" ]; then
     printf '{"ts":"%s","event":"%s","hook":"%s","decision":"%s","reason":"%s","meta":%s}\\n' \\
       "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_OMH_EVENT" "$_OMH_HOOK_NAME" "$decision" "$reason" "$meta" \\

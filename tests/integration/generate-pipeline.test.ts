@@ -59,7 +59,7 @@ describe("generate() pipeline", () => {
 
     const result = await generate({ projectDir: tmpDir, config });
 
-    const scriptPath = join(tmpDir, ".claude/hooks/cmd-guard.sh");
+    const scriptPath = join(tmpDir, ".omh/hooks/cmd-guard.sh");
     const scriptStat = await stat(scriptPath);
     // Check executable bit (owner execute = 0o100)
     expect(scriptStat.mode & 0o111).toBeGreaterThan(0);
@@ -114,7 +114,7 @@ describe("generate() pipeline", () => {
     expect(occurrences).toBe(1);
   });
 
-  it("adds .claude/hooks/.state/ to .gitignore when hooks are present", async () => {
+  it("adds .omh/state/ to .gitignore when hooks are present", async () => {
     const config: MergedConfig = {
       presets: ["test-preset"],
       variables: {},
@@ -135,6 +135,6 @@ describe("generate() pipeline", () => {
     await generate({ projectDir: tmpDir, config });
 
     const gitignore = await readFile(join(tmpDir, ".gitignore"), "utf-8");
-    expect(gitignore).toContain(".claude/hooks/.state/");
+    expect(gitignore).toContain(".omh/state/");
   });
 });

@@ -126,7 +126,7 @@ describe("getRegisteredHooks", () => {
         PreToolUse: [
           {
             matcher: "Edit",
-            hooks: [{ type: "command", command: "bash .claude/hooks/file-guard.sh" }],
+            hooks: [{ type: "command", command: "bash .omh/hooks/file-guard.sh" }],
           },
         ],
       },
@@ -140,7 +140,7 @@ describe("getRegisteredHooks", () => {
     expect(hooks).toHaveLength(1);
     expect(hooks[0].event).toBe("PreToolUse");
     expect(hooks[0].matcher).toBe("Edit");
-    expect(hooks[0].command).toBe("bash .claude/hooks/file-guard.sh");
+    expect(hooks[0].command).toBe("bash .omh/hooks/file-guard.sh");
   });
 
   it("extracts PostToolUse hooks from settings.json", async () => {
@@ -149,7 +149,7 @@ describe("getRegisteredHooks", () => {
         PostToolUse: [
           {
             matcher: "Bash",
-            hooks: [{ type: "command", command: "bash .claude/hooks/command-guard.sh" }],
+            hooks: [{ type: "command", command: "bash .omh/hooks/command-guard.sh" }],
           },
         ],
       },
@@ -170,13 +170,13 @@ describe("getRegisteredHooks", () => {
         PreToolUse: [
           {
             matcher: "Edit",
-            hooks: [{ type: "command", command: "bash .claude/hooks/file-guard.sh" }],
+            hooks: [{ type: "command", command: "bash .omh/hooks/file-guard.sh" }],
           },
         ],
         PostToolUse: [
           {
             matcher: "Bash",
-            hooks: [{ type: "command", command: "bash .claude/hooks/command-guard.sh" }],
+            hooks: [{ type: "command", command: "bash .omh/hooks/command-guard.sh" }],
           },
         ],
       },
@@ -196,7 +196,7 @@ describe("getRegisteredHooks", () => {
         PreToolUse: [
           {
             matcher: "Edit",
-            hooks: [{ type: "other", command: "bash .claude/hooks/file-guard.sh" }],
+            hooks: [{ type: "other", command: "bash .omh/hooks/file-guard.sh" }],
           },
         ],
       },
@@ -215,7 +215,7 @@ describe("getRegisteredHooks", () => {
       hooks: {
         PreToolUse: [
           {
-            hooks: [{ type: "command", command: "bash .claude/hooks/file-guard.sh" }],
+            hooks: [{ type: "command", command: "bash .omh/hooks/file-guard.sh" }],
           },
         ],
       },
@@ -256,7 +256,7 @@ describe("runTestCase", () => {
     const testCase: TestCase = {
       name: "missing script test",
       category: "path-guard",
-      hookScript: ".claude/hooks/nonexistent.sh",
+      hookScript: ".omh/hooks/nonexistent.sh",
       input: { tool_name: "Edit", tool_input: { file_path: "test.ts" } },
       expectation: "block",
     };
@@ -268,7 +268,7 @@ describe("runTestCase", () => {
   });
 
   it("returns passed true when script decision matches expectation", async () => {
-    const scriptDir = path.join(tmpDir, ".claude", "hooks");
+    const scriptDir = path.join(tmpDir, ".omh", "hooks");
     await fs.mkdir(scriptDir, { recursive: true });
     const scriptPath = path.join(scriptDir, "block-guard.sh");
     await fs.writeFile(
@@ -280,7 +280,7 @@ describe("runTestCase", () => {
     const testCase: TestCase = {
       name: "block test",
       category: "path-guard",
-      hookScript: ".claude/hooks/block-guard.sh",
+      hookScript: ".omh/hooks/block-guard.sh",
       input: { tool_name: "Edit", tool_input: { file_path: "dist/test.js" } },
       expectation: "block",
     };
@@ -292,7 +292,7 @@ describe("runTestCase", () => {
   });
 
   it("returns passed false with error message when decision mismatches", async () => {
-    const scriptDir = path.join(tmpDir, ".claude", "hooks");
+    const scriptDir = path.join(tmpDir, ".omh", "hooks");
     await fs.mkdir(scriptDir, { recursive: true });
     const scriptPath = path.join(scriptDir, "allow-guard.sh");
     await fs.writeFile(scriptPath, `#!/bin/bash\nexit 0`, { mode: 0o755 });
@@ -300,7 +300,7 @@ describe("runTestCase", () => {
     const testCase: TestCase = {
       name: "allow but expect block",
       category: "path-guard",
-      hookScript: ".claude/hooks/allow-guard.sh",
+      hookScript: ".omh/hooks/allow-guard.sh",
       input: { tool_name: "Edit", tool_input: { file_path: "dist/test.js" } },
       expectation: "block",
     };
@@ -312,7 +312,7 @@ describe("runTestCase", () => {
   });
 
   it("includes reason from hook output in result", async () => {
-    const scriptDir = path.join(tmpDir, ".claude", "hooks");
+    const scriptDir = path.join(tmpDir, ".omh", "hooks");
     await fs.mkdir(scriptDir, { recursive: true });
     const scriptPath = path.join(scriptDir, "reason-guard.sh");
     await fs.writeFile(
@@ -324,7 +324,7 @@ describe("runTestCase", () => {
     const testCase: TestCase = {
       name: "reason test",
       category: "path-guard",
-      hookScript: ".claude/hooks/reason-guard.sh",
+      hookScript: ".omh/hooks/reason-guard.sh",
       input: { tool_name: "Edit", tool_input: { file_path: "dist/test.js" } },
       expectation: "block",
     };
@@ -337,7 +337,7 @@ describe("runTestCase", () => {
     const testCase: TestCase = {
       name: "missing test",
       category: "path-guard",
-      hookScript: ".claude/hooks/missing.sh",
+      hookScript: ".omh/hooks/missing.sh",
       input: { tool_name: "Edit", tool_input: { file_path: "test.ts" } },
       expectation: "block",
     };
@@ -347,7 +347,7 @@ describe("runTestCase", () => {
   });
 
   it("calls setup before and teardown after running the hook", async () => {
-    const scriptDir = path.join(tmpDir, ".claude", "hooks");
+    const scriptDir = path.join(tmpDir, ".omh", "hooks");
     await fs.mkdir(scriptDir, { recursive: true });
     const scriptPath = path.join(scriptDir, "allow-guard.sh");
     await fs.writeFile(scriptPath, `#!/bin/bash\nexit 0`, { mode: 0o755 });
@@ -356,7 +356,7 @@ describe("runTestCase", () => {
     const testCase: TestCase = {
       name: "setup teardown test",
       category: "path-guard",
-      hookScript: ".claude/hooks/allow-guard.sh",
+      hookScript: ".omh/hooks/allow-guard.sh",
       input: { tool_name: "Edit", tool_input: { file_path: "src/index.ts" } },
       expectation: "allow",
       setup: async () => { callOrder.push("setup"); },
@@ -372,7 +372,7 @@ describe("runTestCase", () => {
     const testCase: TestCase = {
       name: "teardown on error test",
       category: "path-guard",
-      hookScript: ".claude/hooks/nonexistent-will-fail.sh",
+      hookScript: ".omh/hooks/nonexistent-will-fail.sh",
       input: { tool_name: "Edit", tool_input: { file_path: "src/index.ts" } },
       expectation: "allow",
       setup: async () => { callOrder.push("setup"); },
@@ -398,16 +398,16 @@ describe("generateBlockTestCases", () => {
   it("uses registered hook path when provided", () => {
     const entries = [{ block: "path-guard", params: { blockedPaths: ["dist/"] } }];
     const registeredHooks = [
-      { event: "PreToolUse", matcher: "Edit|Write", command: "bash .claude/hooks/harness-file-guard.sh" },
+      { event: "PreToolUse", matcher: "Edit|Write", command: "bash .omh/hooks/harness-file-guard.sh" },
     ];
     const cases = generateBlockTestCases(entries, builtinBlocks, undefined, registeredHooks);
-    expect(cases[0].hookScript).toBe(".claude/hooks/harness-file-guard.sh");
+    expect(cases[0].hookScript).toBe(".omh/hooks/harness-file-guard.sh");
   });
 
   it("falls back to catalog- prefix when no registered hook matches", () => {
     const entries = [{ block: "path-guard", params: { blockedPaths: ["dist/"] } }];
     const cases = generateBlockTestCases(entries, builtinBlocks);
-    expect(cases[0].hookScript).toBe(".claude/hooks/catalog-path-guard.sh");
+    expect(cases[0].hookScript).toBe(".omh/hooks/catalog-path-guard.sh");
   });
 
   it("generates block/allow cases for command-guard with patterns params", () => {

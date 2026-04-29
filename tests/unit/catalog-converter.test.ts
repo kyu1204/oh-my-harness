@@ -145,11 +145,11 @@ describe("convertHookEntries", () => {
     expect(result.errors).toHaveLength(0);
     const command = result.hooksConfig["PreToolUse"][0].command;
     expect(command).not.toContain(projectDir);
-    expect(command).toBe(".claude/hooks/tdd-guard.sh");
+    expect(command).toBe(".omh/hooks/tdd-guard.sh");
 
     // scripts map key should also use relative path
     const scriptKeys = [...result.scripts.keys()];
-    expect(scriptKeys[0]).toBe(".claude/hooks/tdd-guard.sh");
+    expect(scriptKeys[0]).toBe(".omh/hooks/tdd-guard.sh");
   });
 
   it("allows duplicate block ids with different params (multi-instance)", async () => {

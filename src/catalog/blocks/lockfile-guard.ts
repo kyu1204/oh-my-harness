@@ -27,8 +27,9 @@ BASENAME=$(basename "$FILE_PATH")
 LOCKFILES=({{#each lockfiles}}"{{{this}}}" {{/each}})
 for LOCKFILE in "\${LOCKFILES[@]}"; do
   if [[ "$BASENAME" == "$LOCKFILE" ]]; then
-    _log_event "block" "oh-my-harness: direct edits to lockfile $BASENAME are blocked. Use the package manager instead."
-    echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: direct edits to lockfile $BASENAME are blocked. Use the package manager instead.\\"}"
+    REASON="oh-my-harness: direct edits to lockfile $BASENAME are blocked. Use the package manager instead."
+    _log_event "block" "$REASON"
+    _emit_decision "block" "$REASON"
     exit 0
   fi
 done

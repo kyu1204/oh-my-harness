@@ -57,7 +57,7 @@ describe("generateHooks", () => {
     const result = await generateHooks({ projectDir, config });
 
     expect(result.generatedFiles).toHaveLength(1);
-    const scriptPath = join(projectDir, ".claude/hooks/command-guard.sh");
+    const scriptPath = join(projectDir, ".omh/hooks/command-guard.sh");
     const content = await readFile(scriptPath, "utf8");
     expect(content).toContain("#!/bin/bash");
     expect(content).toContain("exit 0");
@@ -75,7 +75,7 @@ describe("generateHooks", () => {
 
     await generateHooks({ projectDir, config });
 
-    const scriptPath = join(projectDir, ".claude/hooks/command-guard.sh");
+    const scriptPath = join(projectDir, ".omh/hooks/command-guard.sh");
     const fileStat = await stat(scriptPath);
     // Check owner execute bit (0o100)
     expect(fileStat.mode & 0o111).toBeGreaterThan(0);
@@ -99,10 +99,10 @@ describe("generateHooks", () => {
     expect(result.hooksConfig).toHaveProperty("PostToolUse");
 
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/command-guard.sh")}"` }] },
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/command-guard.sh")}'` }] },
     ]);
     expect(result.hooksConfig["PostToolUse"]).toEqual([
-      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/lint-on-save.sh")}"` }] },
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/lint-on-save.sh")}'` }] },
     ]);
   });
 
@@ -118,7 +118,7 @@ describe("generateHooks", () => {
     });
 
     const result = await generateHooks({ projectDir, config: makeMergedConfig() });
-    const manifestPath = join(projectDir, ".claude/hooks/oh-my-harness-manifest.json");
+    const manifestPath = join(projectDir, ".omh/manifest.json");
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 
     expect(result).toEqual({ hooksConfig: {}, generatedFiles: [] });
@@ -126,10 +126,10 @@ describe("generateHooks", () => {
   });
 
   it("throws when an existing hooks manifest cannot be parsed", async () => {
-    const hooksDir = join(projectDir, ".claude/hooks");
+    const omhDir = join(projectDir, ".omh");
     const { mkdir, writeFile } = await import("node:fs/promises");
-    await mkdir(hooksDir, { recursive: true });
-    await writeFile(join(hooksDir, "oh-my-harness-manifest.json"), "{not-json", "utf8");
+    await mkdir(omhDir, { recursive: true });
+    await writeFile(join(omhDir, "manifest.json"), "{not-json", "utf8");
 
     await expect(generateHooks({ projectDir, config: makeMergedConfig() })).rejects.toThrow();
   });
@@ -148,7 +148,7 @@ describe("generateHooks", () => {
 
     await generateHooks({ projectDir, config });
 
-    const manifestPath = join(projectDir, ".claude/hooks/oh-my-harness-manifest.json");
+    const manifestPath = join(projectDir, ".omh/manifest.json");
     const manifestContent = await readFile(manifestPath, "utf8");
     const manifest = JSON.parse(manifestContent);
 
@@ -172,8 +172,8 @@ describe("generateHooks", () => {
 
     expect(result.hooksConfig["PreToolUse"]).toHaveLength(2);
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/guard-bash.sh")}"` }] },
-      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/guard-edit.sh")}"` }] },
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/guard-bash.sh")}'` }] },
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/guard-edit.sh")}'` }] },
     ]);
   });
 
@@ -191,10 +191,10 @@ describe("generateHooks", () => {
 
     // Sanitized id: only alphanumeric, hyphens, underscores remain
     const safeId = "etcpasswd";
-    const scriptPath = join(projectDir, `.claude/hooks/${safeId}.sh`);
+    const scriptPath = join(projectDir, `.omh/hooks/${safeId}.sh`);
     expect(result.generatedFiles).toContain(scriptPath);
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: [{ type: "command", command: `bash "${join(projectDir, `.claude/hooks/${safeId}.sh`)}"` }] },
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash '${join(projectDir, `.omh/hooks/${safeId}.sh`)}'` }] },
     ]);
     // Ensure no file was written outside the hooks dir
     const content = await readFile(scriptPath, "utf8");
@@ -215,14 +215,14 @@ describe("generateHooks", () => {
 
     const result = await generateHooks({ projectDir, config });
 
-    const file1 = join(projectDir, ".claude/hooks/hook.sh");
-    const file2 = join(projectDir, ".claude/hooks/hook-1.sh");
+    const file1 = join(projectDir, ".omh/hooks/hook.sh");
+    const file2 = join(projectDir, ".omh/hooks/hook-1.sh");
 
     expect(result.generatedFiles).toContain(file1);
     expect(result.generatedFiles).toContain(file2);
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/hook.sh")}"` }] },
-      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/hook-1.sh")}"` }] },
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/hook.sh")}'` }] },
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/hook-1.sh")}'` }] },
     ]);
   });
 
@@ -258,10 +258,10 @@ describe("generateHooks", () => {
 
     expect(result.generatedFiles).toHaveLength(2);
     expect(result.generatedFiles).toContain(
-      join(projectDir, ".claude/hooks/command-guard.sh")
+      join(projectDir, ".omh/hooks/command-guard.sh")
     );
     expect(result.generatedFiles).toContain(
-      join(projectDir, ".claude/hooks/lint-on-save.sh")
+      join(projectDir, ".omh/hooks/lint-on-save.sh")
     );
   });
 
@@ -277,7 +277,7 @@ describe("generateHooks", () => {
 
     await generateHooks({ projectDir, config });
 
-    const scriptPath = join(projectDir, ".claude/hooks/command-guard.sh");
+    const scriptPath = join(projectDir, ".omh/hooks/command-guard.sh");
     const content = await readFile(scriptPath, "utf8");
     expect(content).toContain("_OMH_STATE_DIR");
     expect(content).toContain("_log_event");
@@ -302,8 +302,8 @@ describe("generateHooks", () => {
     expect(result.generatedFiles).toHaveLength(2);
 
     // Check that files exist and have different names
-    const file1 = join(projectDir, ".claude/hooks/myhook.sh");
-    const file2 = join(projectDir, ".claude/hooks/myhook-1.sh");
+    const file1 = join(projectDir, ".omh/hooks/myhook.sh");
+    const file2 = join(projectDir, ".omh/hooks/myhook-1.sh");
 
     const content1 = await readFile(file1, "utf8");
     const content2 = await readFile(file2, "utf8");
@@ -318,8 +318,8 @@ describe("generateHooks", () => {
     // Check hooksConfig contains both hooks
     expect(result.hooksConfig["PreToolUse"]).toHaveLength(2);
     const commands = result.hooksConfig["PreToolUse"].map(h => h.hooks[0].command);
-    expect(commands).toContain(`bash "${join(projectDir, ".claude/hooks/myhook.sh")}"`);
-    expect(commands).toContain(`bash "${join(projectDir, ".claude/hooks/myhook-1.sh")}"`);
+    expect(commands).toContain(`bash '${join(projectDir, ".omh/hooks/myhook.sh")}'`);
+    expect(commands).toContain(`bash '${join(projectDir, ".omh/hooks/myhook-1.sh")}'`);
 
   });
 
@@ -337,17 +337,313 @@ describe("generateHooks", () => {
 
     const result = await generateHooks({ projectDir, config });
 
-    const file1 = join(projectDir, ".claude/hooks/myhook.sh");
-    const file2 = join(projectDir, ".claude/hooks/myhook-1.sh");
+    const file1 = join(projectDir, ".omh/hooks/myhook.sh");
+    const file2 = join(projectDir, ".omh/hooks/myhook-1.sh");
 
     expect(result.generatedFiles).toContain(file1);
     expect(result.generatedFiles).toContain(file2);
     expect(result.hooksConfig["PreToolUse"]).toEqual([
-      { matcher: "Bash", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/myhook.sh")}"` }] },
+      { matcher: "Bash", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/myhook.sh")}'` }] },
     ]);
     expect(result.hooksConfig["PostToolUse"]).toEqual([
-      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash "${join(projectDir, ".claude/hooks/myhook-1.sh")}"` }] },
+      { matcher: "Edit|Write", hooks: [{ type: "command", command: `bash '${join(projectDir, ".omh/hooks/myhook-1.sh")}'` }] },
     ]);
+  });
+});
+
+describe("shell injection defense", () => {
+  let projectDir: string;
+  let differentDir: string;
+
+  beforeEach(async () => {
+    // mkdtemp template ends with random suffix; embed shell metacharacter ($)
+    // in a real subdirectory so the rendered bash script must escape it.
+    const base = await mkdtemp(join(tmpdir(), "omh-shellesc-"));
+    projectDir = join(base, "with$dollar dir");
+    await (await import("node:fs/promises")).mkdir(projectDir, { recursive: true });
+    differentDir = await mkdtemp(join(tmpdir(), "omh-shellesc-cwd-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+    await rm(differentDir, { recursive: true, force: true });
+  });
+
+  it("logger writes to the literal path even when projectDir contains $ and spaces", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          {
+            id: "esc-test",
+            matcher: "Bash",
+            inline:
+              '#!/bin/bash\nset -euo pipefail\n_log_event "allow" "ok"\nexit 0',
+          },
+        ],
+        postToolUse: [],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+    const scriptPath = result.generatedFiles[0];
+
+    // Invoke bash directly with scriptPath as argv to avoid the shell
+    // re-expanding $dollar in our test driver. The defended path is the
+    // generated script body, not how we run it.
+    const { spawn } = await import("node:child_process");
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn("bash", [scriptPath], {
+        cwd: differentDir,
+        env: { ...process.env, dollar: "EXPANDED-WRONG" },
+      });
+      child.stdin.end();
+      let stderr = "";
+      child.stderr.on("data", (b: Buffer) => {
+        stderr += b.toString();
+      });
+      child.on("close", (code) =>
+        code === 0 ? resolve() : reject(new Error(`exit ${code}: ${stderr}`)),
+      );
+    });
+
+    // events.jsonl must land under the literal projectDir, not at a path
+    // produced by shell expansion of $dollar.
+    const eventsPath = join(projectDir, ".omh/state/events.jsonl");
+    await expect(access(eventsPath)).resolves.toBeUndefined();
+  });
+
+  it("emits hooksConfig commands wrapped in single quotes", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [{ id: "g", matcher: "Bash", inline: "#!/bin/bash\nexit 0" }],
+        postToolUse: [],
+      },
+    });
+    const result = await generateHooks({ projectDir, config });
+    const cmd = result.hooksConfig.PreToolUse[0].hooks[0].command;
+    expect(cmd).toMatch(/^bash '.*'$/);
+    expect(cmd).toContain("with$dollar");
+  });
+});
+
+describe("manifest validation (path traversal defense)", () => {
+  let projectDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "omh-manifest-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  it("ignores manifest entries containing path separators or '..'", async () => {
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    await mkdir(join(projectDir, ".omh"), { recursive: true });
+    // Pre-seed a manifest with a malicious traversal entry; if cleanup
+    // honored it, we'd try to unlink ../etc-victim.txt.
+    await writeFile(
+      join(projectDir, ".omh/manifest.json"),
+      JSON.stringify({
+        generatedAt: "x",
+        hooks: [
+          "../etc-victim.txt",
+          "../../passwd",
+          "/abs/path.sh",
+          "valid-name.sh",
+        ],
+      }),
+      "utf8",
+    );
+    // Place a sentinel file outside the hooks dir that the malicious entry
+    // would resolve to (relative path joined with hooksDir).
+    const sentinel = join(projectDir, "etc-victim.txt");
+    await writeFile(sentinel, "do-not-delete", "utf8");
+
+    // Now run a fresh sync with no hooks. The cleanup pass must NOT touch
+    // the sentinel file because the manifest entry should be filtered out.
+    await generateHooks({ projectDir, config: makeMergedConfig() });
+
+    await expect(access(sentinel)).resolves.toBeUndefined();
+  });
+});
+
+describe("logger JSON escaping (executed)", () => {
+  let projectDir: string;
+  let differentDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "omh-jsonesc-"));
+    differentDir = await mkdtemp(join(tmpdir(), "omh-jsonesc-cwd-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+    await rm(differentDir, { recursive: true, force: true });
+  });
+
+  it("escapes quotes/newlines/backslashes in reason via jq", async () => {
+    // Pre-jq impl injected $reason via printf %s and broke JSONL when the
+    // reason contained these characters; event-logger.ts then silently
+    // dropped the line, losing the event entirely.
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          {
+            id: "hard-reason",
+            matcher: "Bash",
+            inline:
+              '#!/bin/bash\nset -euo pipefail\nREASON=$\'He said "hi"\\nand \\\\left\'\n_log_event "block" "$REASON"\nexit 0',
+          },
+        ],
+        postToolUse: [],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+    const scriptPath = result.generatedFiles[0];
+    const { spawn } = await import("node:child_process");
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn("bash", [scriptPath], { cwd: differentDir });
+      child.stdin.end();
+      child.on("close", (code) =>
+        code === 0 ? resolve() : reject(new Error(`exit ${code}`)),
+      );
+    });
+
+    const raw = await readFile(join(projectDir, ".omh/state/events.jsonl"), "utf8");
+    const lines = raw.trim().split("\n").filter(Boolean);
+    expect(lines).toHaveLength(1);
+    const parsed = JSON.parse(lines[0]);
+    expect(parsed.decision).toBe("block");
+    expect(parsed.reason).toBe('He said "hi"\nand \\left');
+  });
+});
+
+describe("_emit_decision (executed)", () => {
+  let projectDir: string;
+  let differentDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "omh-emitdec-"));
+    differentDir = await mkdtemp(join(tmpdir(), "omh-emitdec-cwd-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+    await rm(differentDir, { recursive: true, force: true });
+  });
+
+  it("emits valid JSON decision even when reason has quotes/newlines", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          {
+            id: "decision-test",
+            matcher: "Bash",
+            inline:
+              '#!/bin/bash\nset -euo pipefail\nREASON=$\'O\\\'Brien said "no"\\nrejected\'\n_emit_decision "block" "$REASON"\nexit 0',
+          },
+        ],
+        postToolUse: [],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+    const scriptPath = result.generatedFiles[0];
+    const { spawn } = await import("node:child_process");
+    const stdoutP = new Promise<string>((resolve, reject) => {
+      const child = spawn("bash", [scriptPath], { cwd: differentDir });
+      let stdout = "";
+      child.stdout.on("data", (b: Buffer) => {
+        stdout += b.toString();
+      });
+      child.stdin.end();
+      child.on("close", (code) =>
+        code === 0 ? resolve(stdout) : reject(new Error(`exit ${code}`)),
+      );
+    });
+    const stdout = await stdoutP;
+
+    // Whatever the script printed must be parseable JSON with the right fields.
+    const parsed = JSON.parse(stdout.trim());
+    expect(parsed.decision).toBe("block");
+    expect(parsed.reason).toBe(`O'Brien said "no"\nrejected`);
+  });
+});
+
+describe("logger meta validation (executed)", () => {
+  let projectDir: string;
+  let differentDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "oh-my-harness-meta-"));
+    differentDir = await mkdtemp(join(tmpdir(), "oh-my-harness-meta-cwd-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+    await rm(differentDir, { recursive: true, force: true });
+  });
+
+  it("falls back to no-meta when caller passes invalid JSON for meta", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          {
+            id: "bad-meta",
+            matcher: "Bash",
+            inline:
+              '#!/bin/bash\nset -euo pipefail\nINPUT=$(cat)\n_log_event "allow" "" "this is not json"\nexit 0',
+          },
+        ],
+        postToolUse: [],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+    const scriptPath = result.generatedFiles[0];
+    await execFileAsync("bash", ["-c", `echo '{}' | bash "${scriptPath}"`], {
+      cwd: differentDir,
+      env: { ...process.env },
+      timeout: 5000,
+    });
+
+    const eventsPath = join(projectDir, ".omh/state/events.jsonl");
+    const raw = await readFile(eventsPath, "utf8");
+    const lines = raw.trim().split("\n").filter(Boolean);
+    expect(lines).toHaveLength(1);
+    const parsed = JSON.parse(lines[0]);
+    expect(parsed.decision).toBe("allow");
+    expect(parsed.meta).toBeUndefined();
+  });
+
+  it("includes valid JSON meta when caller passes a serialized object", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          {
+            id: "good-meta",
+            matcher: "Bash",
+            inline:
+              '#!/bin/bash\nset -euo pipefail\nINPUT=$(cat)\n_log_event "allow" "" \'{"k":"v"}\'\nexit 0',
+          },
+        ],
+        postToolUse: [],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+    const scriptPath = result.generatedFiles[0];
+    await execFileAsync("bash", ["-c", `echo '{}' | bash "${scriptPath}"`], {
+      cwd: differentDir,
+      env: { ...process.env },
+      timeout: 5000,
+    });
+
+    const raw = await readFile(join(projectDir, ".omh/state/events.jsonl"), "utf8");
+    const parsed = JSON.parse(raw.trim().split("\n").filter(Boolean)[0]);
+    expect(parsed.meta).toEqual({ k: "v" });
   });
 });
 
@@ -401,7 +697,9 @@ describe("wrapWithLogger", () => {
   it("logger snippet includes event field in JSON output", () => {
     const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
     const result = wrapWithLogger(script);
-    expect(result).toContain('"event"');
+    // jq-based assembly: the filter must reference the event field.
+    expect(result).toMatch(/event:\$event/);
+    expect(result).toContain("--arg event");
   });
 
   it("handles #!/usr/bin/env bash shebang", () => {
@@ -414,7 +712,7 @@ describe("wrapWithLogger", () => {
   it("produces absolute _OMH_STATE_DIR when projectDir is provided", () => {
     const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
     const result = wrapWithLogger(script, "PreToolUse", "/tmp/my-project");
-    expect(result).toContain('_OMH_STATE_DIR="/tmp/my-project/.claude/hooks/.state"');
+    expect(result).toContain(`_OMH_STATE_DIR='/tmp/my-project/.omh/state'`);
   });
 
   it("EXIT trap logs 'error' instead of 'allow' when script exits non-zero", () => {
@@ -429,7 +727,7 @@ describe("wrapWithLogger", () => {
   it("keeps relative _OMH_STATE_DIR when projectDir is omitted", () => {
     const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
     const result = wrapWithLogger(script, "PreToolUse");
-    expect(result).toContain('_OMH_STATE_DIR=".claude/hooks/.state"');
+    expect(result).toContain(`_OMH_STATE_DIR='.omh/state'`);
   });
 });
 
@@ -457,8 +755,8 @@ describe("generateHooks — stale hook cleanup on sync", () => {
     });
     await generateHooks({ projectDir, config: configBefore });
 
-    const tddScript = join(projectDir, ".claude/hooks/tdd-guard.sh");
-    const branchScript = join(projectDir, ".claude/hooks/branch-guard.sh");
+    const tddScript = join(projectDir, ".omh/hooks/tdd-guard.sh");
+    const branchScript = join(projectDir, ".omh/hooks/branch-guard.sh");
 
     // Verify both files exist
     await expect(stat(tddScript)).resolves.toBeDefined();
@@ -492,7 +790,7 @@ describe("generateHooks — stale hook cleanup on sync", () => {
     });
     await generateHooks({ projectDir, config: configBefore });
 
-    const tddScript = join(projectDir, ".claude/hooks/tdd-guard.sh");
+    const tddScript = join(projectDir, ".omh/hooks/tdd-guard.sh");
     await expect(stat(tddScript)).resolves.toBeDefined();
 
     // Second sync: no hooks
@@ -665,7 +963,7 @@ describe("generateHooks — cwd-independence", () => {
     });
 
     // events.jsonl should be under projectDir, NOT under differentDir
-    const eventsPath = join(projectDir, ".claude/hooks/.state/events.jsonl");
+    const eventsPath = join(projectDir, ".omh/state/events.jsonl");
     await expect(access(eventsPath)).resolves.toBeUndefined();
 
     const events = await readFile(eventsPath, "utf8");
@@ -673,7 +971,7 @@ describe("generateHooks — cwd-independence", () => {
     expect(events).toContain('"reason":"test"');
 
     // Verify nothing was written under differentDir
-    const wrongEventsPath = join(differentDir, ".claude/hooks/.state/events.jsonl");
+    const wrongEventsPath = join(differentDir, ".omh/state/events.jsonl");
     await expect(access(wrongEventsPath)).rejects.toThrow();
   });
 });

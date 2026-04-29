@@ -102,7 +102,7 @@ exit 0`;
     runHookScript(scriptPath, '{"tool_name":"Bash"}');
 
     // Verify raw JSONL is valid and has all required fields
-    const eventsFile = join(tmpDir, ".claude/hooks/.state/events.jsonl");
+    const eventsFile = join(tmpDir, ".omh/state/events.jsonl");
     const raw = await readFile(eventsFile, "utf-8");
     const parsed = JSON.parse(raw.trim());
 

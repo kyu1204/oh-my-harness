@@ -1,6 +1,7 @@
 import type { HookEntry } from "./types.js";
 import type { CatalogRegistry } from "./registry.js";
 import { renderTemplate, validateParams, applyDefaults } from "./template-engine.js";
+import { OMH_HOOKS_DIR } from "../utils/paths.js";
 
 export interface HookConfigEntry {
   type: "command";
@@ -51,7 +52,7 @@ export async function convertHookEntries(
     const count = blockInstanceCount.get(entry.block) ?? 0;
     blockInstanceCount.set(entry.block, count + 1);
     const scriptName = count === 0 ? `${entry.block}.sh` : `${entry.block}-${count}.sh`;
-    const scriptPath = `.claude/hooks/${scriptName}`;
+    const scriptPath = `${OMH_HOOKS_DIR}/${scriptName}`;
     scripts.set(scriptPath, scriptContent);
 
     const hookEntry: HookConfigEntry = {

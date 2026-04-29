@@ -36,7 +36,10 @@ describe("sqlGuard block", () => {
     expect(sqlGuard.template).toContain("tr '[:upper:]' '[:lower:]'");
   });
 
-  it("does not contain _log_event wrapper", () => {
-    expect(sqlGuard.template).not.toContain("_log_event");
+  it("logs the block via _log_event for omh stats parity with other guards", () => {
+    // sql-guard previously omitted _log_event so its blocks were invisible
+    // in events.jsonl / omh stats. Now consistent with all other guards.
+    expect(sqlGuard.template).toContain('_log_event "block" "$REASON"');
+    expect(sqlGuard.template).toContain('_emit_decision "block" "$REASON"');
   });
 });

@@ -92,7 +92,7 @@ describe("removeCommand", () => {
     await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
     await addCommand("nextjs", { projectDir: tmpDir, presetsDir: PRESETS_DIR });
 
-    const hooksDir = path.join(tmpDir, ".claude", "hooks");
+    const hooksDir = path.join(tmpDir, ".omh", "hooks");
     const filesBefore = await fs.readdir(hooksDir);
     // nextjs adds its own hook scripts on top of _base hooks
     const nextjsHooksBefore = filesBefore.filter((f) => f.startsWith("nextjs-"));

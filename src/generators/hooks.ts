@@ -1,23 +1,64 @@
 import { mkdir, writeFile, chmod, readFile, unlink } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import type { MergedConfig } from "../core/preset-types.js";
+import { OMH_HOOKS_DIR, OMH_STATE_DIR, OMH_MANIFEST, OMH_EVENTS_FILE } from "../utils/paths.js";
+
+// Wrap a path/value in bash single quotes, escaping any embedded single
+// quotes. Single-quoted strings are not subject to shell expansion, so this
+// is safe for paths containing $, backticks, double quotes, etc.
+function shellSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
 
 function buildLoggerSnippet(event: string, projectDir?: string): string {
   const stateDir = projectDir
-    ? `${projectDir}/.claude/hooks/.state`
-    : ".claude/hooks/.state";
+    ? `${projectDir}/${OMH_STATE_DIR}`
+    : OMH_STATE_DIR;
   return `# --- oh-my-harness event logger ---
-_OMH_STATE_DIR="${stateDir}"
+_OMH_STATE_DIR=${shellSingleQuote(stateDir)}
 mkdir -p "$_OMH_STATE_DIR" 2>/dev/null || true
 _OMH_HOOK_NAME="$(basename "$0")"
 _OMH_EVENT="${event}"
 _OMH_LOGGED=0
 _log_event() {
+  # Build the JSONL record entirely through jq so every string field is
+  # JSON-escaped (quotes, backslashes, newlines, unicode). The previous
+  # printf+%s approach corrupted the line whenever reason or any other
+  # field contained these characters, and event-logger.ts silently drops
+  # unparseable lines, causing event loss.
   _OMH_LOGGED=1
-  local decision="\${1:-allow}" reason="\${2:-}"
-  printf '{"ts":"%s","event":"%s","hook":"%s","decision":"%s","reason":"%s"}\\n' \\
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_OMH_EVENT" "$_OMH_HOOK_NAME" "$decision" "$reason" \\
-    >> "$_OMH_STATE_DIR/events.jsonl"
+  local decision="\${1:-allow}" reason="\${2:-}" meta="\${3:-}"
+  local ts
+  ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  # Meta must be a serialized JSON value (object/array/scalar); fall back
+  # to no-meta when invalid so a buggy caller can't drop the event entirely.
+  if [ -n "$meta" ] && ! echo "$meta" | jq -e . >/dev/null 2>&1; then
+    meta=""
+  fi
+  if [ -n "$meta" ]; then
+    jq -cn \\
+      --arg ts "$ts" --arg event "$_OMH_EVENT" --arg hook "$_OMH_HOOK_NAME" \\
+      --arg decision "$decision" --arg reason "$reason" --argjson meta "$meta" \\
+      '{ts:$ts,event:$event,hook:$hook,decision:$decision,reason:$reason,meta:$meta}' \\
+      >> "$_OMH_STATE_DIR/${OMH_EVENTS_FILE}"
+  else
+    jq -cn \\
+      --arg ts "$ts" --arg event "$_OMH_EVENT" --arg hook "$_OMH_HOOK_NAME" \\
+      --arg decision "$decision" --arg reason "$reason" \\
+      '{ts:$ts,event:$event,hook:$hook,decision:$decision,reason:$reason}' \\
+      >> "$_OMH_STATE_DIR/${OMH_EVENTS_FILE}"
+  fi
+}
+
+# Emit a Claude/Codex hook decision JSON to stdout with all fields safely
+# escaped. Catalog blocks should call this rather than handcrafting JSON
+# via echo "{...}" — a file name or pattern containing a quote, backslash,
+# or newline would otherwise produce invalid JSON that the runtime cannot
+# parse as a block decision.
+_emit_decision() {
+  local decision="\${1:-block}" reason="\${2:-}"
+  jq -cn --arg decision "$decision" --arg reason "$reason" \\
+    '{decision:$decision,reason:$reason}'
 }
 trap '_OMH_EXIT_CODE=$?; if [ "$_OMH_LOGGED" -eq 0 ]; then if [ "$_OMH_EXIT_CODE" -ne 0 ]; then _log_event "error" "hook exited with code $_OMH_EXIT_CODE"; else _log_event "allow"; fi; fi' EXIT
 # --- end logger ---`;
@@ -66,8 +107,15 @@ function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
 async function readPreviousHookNames(manifestPath: string): Promise<string[]> {
   try {
     const manifestRaw = await readFile(manifestPath, "utf8");
-    const manifest = JSON.parse(manifestRaw) as { hooks?: string[] };
-    return manifest.hooks ?? [];
+    const manifest = JSON.parse(manifestRaw) as { hooks?: unknown };
+    if (!Array.isArray(manifest.hooks)) return [];
+    // The manifest is on-disk input — a malicious or hand-edited entry like
+    // "../../etc/hosts" would otherwise become an unlink target. Allow only
+    // bare basenames to defend against path traversal during cleanup.
+    return manifest.hooks.filter(
+      (name): name is string =>
+        typeof name === "string" && name.length > 0 && basename(name) === name,
+    );
   } catch (err) {
     if (isErrnoException(err) && err.code === "ENOENT") {
       return [];
@@ -96,7 +144,7 @@ async function writeHookManifest(manifestPath: string, hooks: string[]): Promise
 
 export async function generateHooks(options: GenerateHooksOptions): Promise<HooksOutput> {
   const { projectDir, config } = options;
-  const hooksDir = join(projectDir, ".claude/hooks");
+  const hooksDir = join(projectDir, OMH_HOOKS_DIR);
 
   const eventMap: Array<[string, typeof config.hooks.preToolUse]> = [
     ["PreToolUse", config.hooks.preToolUse],
@@ -114,7 +162,8 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
   await mkdir(hooksDir, { recursive: true });
 
   // Read previous manifest to clean up stale hook files
-  const manifestPath = join(hooksDir, "oh-my-harness-manifest.json");
+  const manifestPath = join(projectDir, OMH_MANIFEST);
+  await mkdir(join(projectDir, OMH_STATE_DIR), { recursive: true });
   const previousHooks = await readPreviousHookNames(manifestPath);
 
   if (allHooks.length === 0) {
@@ -126,41 +175,45 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
     return { hooksConfig: {}, generatedFiles: [] };
   }
 
-  const generatedFiles: string[] = [];
-  const hooksConfig: Record<string, Array<{ matcher: string; hooks: HookCommand[] }>> = {};
   const usedScriptNames = new Set<string>();
+  const planned: Array<{ event: string; matcher: string; scriptPath: string; wrappedScript: string }> = [];
 
   for (const hook of allHooks) {
-    if (!hook.inline) {
-      continue;
-    }
+    if (!hook.inline) continue;
 
     const safeId = hook.id.replace(/[^a-zA-Z0-9_-]/g, "") || "hook";
     let scriptName = `${safeId}.sh`;
-    // Prevent collisions within the same event using numeric suffix
     if (usedScriptNames.has(scriptName)) {
       let counter = 1;
-      while (usedScriptNames.has(`${safeId}-${counter}.sh`)) {
-        counter++;
-      }
+      while (usedScriptNames.has(`${safeId}-${counter}.sh`)) counter++;
       scriptName = `${safeId}-${counter}.sh`;
     }
     usedScriptNames.add(scriptName);
 
-    const scriptPath = join(hooksDir, scriptName);
-    const wrappedScript = wrapWithLogger(hook.inline, hook.event, projectDir);
-    await writeFile(scriptPath, wrappedScript, "utf8");
-    await chmod(scriptPath, 0o755);
-    generatedFiles.push(scriptPath);
-
-    const entry = {
+    planned.push({
+      event: hook.event,
       matcher: hook.matcher,
-      hooks: [{ type: "command" as const, command: `bash "${scriptPath}"` }],
-    };
-    if (!hooksConfig[hook.event]) {
-      hooksConfig[hook.event] = [];
-    }
-    hooksConfig[hook.event].push(entry);
+      scriptPath: join(hooksDir, scriptName),
+      wrappedScript: wrapWithLogger(hook.inline, hook.event, projectDir),
+    });
+  }
+
+  // Independent IO across hooks — parallelize.
+  await Promise.all(
+    planned.map(async (p) => {
+      await writeFile(p.scriptPath, p.wrappedScript, "utf8");
+      await chmod(p.scriptPath, 0o755);
+    }),
+  );
+
+  const generatedFiles = planned.map((p) => p.scriptPath);
+  const hooksConfig: Record<string, Array<{ matcher: string; hooks: HookCommand[] }>> = {};
+  for (const p of planned) {
+    if (!hooksConfig[p.event]) hooksConfig[p.event] = [];
+    hooksConfig[p.event].push({
+      matcher: p.matcher,
+      hooks: [{ type: "command", command: `bash ${shellSingleQuote(p.scriptPath)}` }],
+    });
   }
 
   // Remove stale hook files from previous sync that are no longer generated

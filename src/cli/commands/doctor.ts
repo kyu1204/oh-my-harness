@@ -1,5 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { parse } from "smol-toml";
+import { OMH_HOOKS_DIR } from "../../utils/paths.js";
 
 export interface DoctorOptions {
   projectDir?: string;
@@ -11,7 +13,9 @@ export interface DoctorResult {
   checks: {
     stateFile: boolean;
     claudeMd: boolean;
+    agentsMd: boolean;
     settingsJson: boolean;
+    codexConfig: boolean;
     hooksExecutable: boolean;
   };
   messages: string[];
@@ -24,7 +28,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<Doctor
   const checks = {
     stateFile: false,
     claudeMd: false,
+    agentsMd: false,
     settingsJson: false,
+    codexConfig: false,
     hooksExecutable: false,
   };
 
@@ -65,8 +71,37 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<Doctor
     }
   }
 
-  // 4. Check hook scripts exist and are executable
-  const hooksDir = path.join(projectDir, ".claude", "hooks");
+  // 4. AGENTS.md (Codex)
+  const agentsMdPath = path.join(projectDir, "AGENTS.md");
+  try {
+    await fs.access(agentsMdPath);
+    checks.agentsMd = true;
+  } catch {
+    messages.push("FAIL: AGENTS.md not found.");
+  }
+
+  // 5. .codex/hooks.json + .codex/config.toml — both must exist AND parse.
+  const codexHooksPath = path.join(projectDir, ".codex", "hooks.json");
+  const codexTomlPath = path.join(projectDir, ".codex", "config.toml");
+  try {
+    JSON.parse(await fs.readFile(codexHooksPath, "utf-8"));
+    const tomlRaw = await fs.readFile(codexTomlPath, "utf-8");
+    const parsed = parse(tomlRaw) as { features?: { codex_hooks?: unknown } };
+    if (parsed.features?.codex_hooks !== true) {
+      messages.push("FAIL: .codex/config.toml missing [features] codex_hooks = true.");
+    } else {
+      checks.codexConfig = true;
+    }
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      messages.push("FAIL: .codex/hooks.json or .codex/config.toml not found.");
+    } else {
+      messages.push("FAIL: .codex/hooks.json or .codex/config.toml is invalid or unreadable.");
+    }
+  }
+
+  // 6. Check hook scripts exist and are executable
+  const hooksDir = path.join(projectDir, OMH_HOOKS_DIR);
   try {
     const files = await fs.readdir(hooksDir);
     const scripts = files.filter((f) => f.endsWith(".sh"));

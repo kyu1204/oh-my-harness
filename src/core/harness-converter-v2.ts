@@ -53,7 +53,7 @@ export async function harnessToMergedConfigV2(
     }
 
     for (const entry of entries) {
-      // Find the block id from the script path: .claude/hooks/<block-id>.sh
+      // Find the block id from the script path: <hooks-dir>/<block-id>.sh
       const blockId = entry.command.replace(/.*\/(.+)\.sh$/, "$1");
       const hookDef: HookDefinition = {
         id: `catalog-${blockId}`,

@@ -74,7 +74,7 @@ describe("testCommand", () => {
 
   it("runs tests and returns results for registered hooks with matching scripts", async () => {
     // Set up settings.json with a lockfile-guard hook
-    const hooksDir = path.join(tmpDir, ".claude", "hooks");
+    const hooksDir = path.join(tmpDir, ".omh", "hooks");
     await fs.mkdir(hooksDir, { recursive: true });
 
     // Write a lockfile-guard script that blocks package-lock.json
@@ -96,7 +96,7 @@ fi
         PreToolUse: [
           {
             matcher: "Edit",
-            hooks: [{ type: "command", command: "bash .claude/hooks/catalog-lockfile-guard.sh" }],
+            hooks: [{ type: "command", command: "bash .omh/hooks/catalog-lockfile-guard.sh" }],
           },
         ],
       },
@@ -147,8 +147,8 @@ fi
   });
 
   it("generates block-based test cases merged with enforcement cases without duplicates", async () => {
-    const hooksDir = path.join(tmpDir, ".claude", "hooks");
-    const stateDir = path.join(tmpDir, ".claude", "hooks", ".state");
+    const hooksDir = path.join(tmpDir, ".omh", "hooks");
+    const stateDir = path.join(tmpDir, ".omh", "state");
     await fs.mkdir(hooksDir, { recursive: true });
     await fs.mkdir(stateDir, { recursive: true });
 
@@ -164,7 +164,7 @@ if echo "$FILE_PATH" | grep -qE '\\.(test|spec)\\.(ts|tsx|js|jsx)$'; then
   exit 0
 fi
 if echo "$FILE_PATH" | grep -qE '\\.(ts|tsx|js|jsx)$'; then
-  HISTORY=".claude/hooks/.state/edit-history.json"
+  HISTORY=".omh/state/tdd-edits.json"
   if [[ ! -f "$HISTORY" ]]; then
     echo '{"decision":"block","reason":"TDD: write test first"}'
     exit 0
@@ -183,7 +183,7 @@ exit 0
         PreToolUse: [
           {
             matcher: "Edit",
-            hooks: [{ type: "command", command: "bash .claude/hooks/catalog-tdd-guard.sh" }],
+            hooks: [{ type: "command", command: "bash .omh/hooks/catalog-tdd-guard.sh" }],
           },
         ],
       },

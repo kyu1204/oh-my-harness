@@ -25,15 +25,17 @@ FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // 
 # Normalize path to prevent directory traversal attacks (e.g., ./foo/../dist/secret.js -> dist/secret.js)
 if command -v python3 >/dev/null 2>&1; then
   if ! NORMALIZED=$(python3 -c "import os,sys; print(os.path.normpath(sys.argv[1]))" "$FILE_PATH" 2>/dev/null); then
-    _log_event "block" "oh-my-harness: path normalization unavailable for non-canonical path"
-    echo "{\\"decision\\": \\\"block\\\", \\\"reason\\\": \\\"oh-my-harness: path normalization unavailable for non-canonical path\\\"}"
+    REASON="oh-my-harness: path normalization unavailable for non-canonical path"
+    _log_event "block" "$REASON"
+    _emit_decision "block" "$REASON"
     exit 0
   fi
 else
   case "$FILE_PATH" in
     /*|../*|*/../*|*/..|./*|*/./*|*/.)
-      _log_event "block" "oh-my-harness: path normalization unavailable for non-canonical path"
-      echo "{\\"decision\\": \\\"block\\\", \\\"reason\\\": \\\"oh-my-harness: path normalization unavailable for non-canonical path\\\"}"
+      REASON="oh-my-harness: path normalization unavailable for non-canonical path"
+      _log_event "block" "$REASON"
+      _emit_decision "block" "$REASON"
       exit 0
       ;;
   esac
@@ -43,21 +45,24 @@ BLOCKED_PATHS=({{#each blockedPaths}}"{{{this}}}" {{/each}})
 for BLOCKED in "\${BLOCKED_PATHS[@]}"; do
   if [[ "$BLOCKED" == */ ]]; then
     if [[ "$NORMALIZED" == "$BLOCKED"* || "$NORMALIZED" == *"/$BLOCKED"* ]]; then
-      _log_event "block" "oh-my-harness: file path matches blocked directory: $BLOCKED"
-      echo "{\\"decision\\": \\\"block\\\", \\\"reason\\\": \\\"oh-my-harness: file path matches blocked directory: $BLOCKED\\\"}"
+      REASON="oh-my-harness: file path matches blocked directory: $BLOCKED"
+      _log_event "block" "$REASON"
+      _emit_decision "block" "$REASON"
       exit 0
     fi
   elif [[ "$BLOCKED" == \\** ]]; then
     PATTERN="\${BLOCKED#\\*}"
     if [[ "$NORMALIZED" == *"$PATTERN" ]]; then
-      _log_event "block" "oh-my-harness: file path matches blocked pattern: $BLOCKED"
-      echo "{\\"decision\\": \\\"block\\\", \\\"reason\\\": \\\"oh-my-harness: file path matches blocked pattern: $BLOCKED\\\"}"
+      REASON="oh-my-harness: file path matches blocked pattern: $BLOCKED"
+      _log_event "block" "$REASON"
+      _emit_decision "block" "$REASON"
       exit 0
     fi
   else
     if [[ "$NORMALIZED" == "$BLOCKED" || "$NORMALIZED" == *"/$BLOCKED" ]]; then
-      _log_event "block" "oh-my-harness: file path matches blocked path: $BLOCKED"
-      echo "{\\"decision\\": \\\"block\\\", \\\"reason\\\": \\\"oh-my-harness: file path matches blocked path: $BLOCKED\\\"}"
+      REASON="oh-my-harness: file path matches blocked path: $BLOCKED"
+      _log_event "block" "$REASON"
+      _emit_decision "block" "$REASON"
       exit 0
     fi
   fi

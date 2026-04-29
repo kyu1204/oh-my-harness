@@ -240,7 +240,7 @@ describe("PreToolUse + PostToolUse mix", () => {
 
     await generateHooks({ projectDir: tmpDir, config });
 
-    const hooksDir = join(tmpDir, ".claude/hooks");
+    const hooksDir = join(tmpDir, ".omh/hooks");
     const preScript = await readFile(join(hooksDir, "command-guard.sh"), "utf-8");
     const postScript = await readFile(join(hooksDir, "lint-on-save.sh"), "utf-8");
 
@@ -416,7 +416,7 @@ describe("hooksConfig structure validation", () => {
         // Each hook has type: "command" and command string
         expect(hook.type).toBe("command");
         expect(typeof hook.command).toBe("string");
-        expect(hook.command).toMatch(/\.sh"?$/);
+        expect(hook.command).toMatch(/\.sh["']?$/);
       }
     }
   });
@@ -452,7 +452,7 @@ describe("script isolation", () => {
 
     await generateHooks({ projectDir: tmpDir, config });
 
-    const hooksDir = join(tmpDir, ".claude/hooks");
+    const hooksDir = join(tmpDir, ".omh/hooks");
 
     // Run command-guard alone — should not error
     const cgResult = runHookScript(
@@ -497,7 +497,7 @@ describe("script isolation", () => {
 
     await generateHooks({ projectDir: tmpDir, config });
 
-    const hooksDir = join(tmpDir, ".claude/hooks");
+    const hooksDir = join(tmpDir, ".omh/hooks");
     const cgScript = await readFile(join(hooksDir, "command-guard.sh"), "utf-8");
     const bgScript = await readFile(join(hooksDir, "branch-guard.sh"), "utf-8");
 

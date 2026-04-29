@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { OMH_STATE_DIR, OMH_EVENTS_FILE } from "../utils/paths.js";
 
 export interface HookEvent {
   ts: string;
@@ -8,23 +9,21 @@ export interface HookEvent {
   decision: "block" | "allow" | "error";
   reason?: string;
   tool?: string;
+  meta?: Record<string, unknown>;
 }
-
-const STATE_DIR = ".claude/hooks/.state";
-const EVENTS_FILE = "events.jsonl";
 
 export async function appendEvent(
   projectDir: string,
   hookEvent: HookEvent,
 ): Promise<void> {
-  const stateDir = path.join(projectDir, STATE_DIR);
+  const stateDir = path.join(projectDir, OMH_STATE_DIR);
   await fs.mkdir(stateDir, { recursive: true });
-  const filePath = path.join(stateDir, EVENTS_FILE);
+  const filePath = path.join(stateDir, OMH_EVENTS_FILE);
   await fs.appendFile(filePath, JSON.stringify(hookEvent) + "\n", "utf-8");
 }
 
 export async function readEvents(projectDir: string): Promise<HookEvent[]> {
-  const filePath = path.join(projectDir, STATE_DIR, EVENTS_FILE);
+  const filePath = path.join(projectDir, OMH_STATE_DIR, OMH_EVENTS_FILE);
   let content: string;
   try {
     content = await fs.readFile(filePath, "utf-8");

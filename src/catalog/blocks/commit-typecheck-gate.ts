@@ -19,8 +19,9 @@ COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 if echo "$COMMAND" | grep -qE "git commit"; then
   echo "oh-my-harness: Running {{{typecheckCommand}}} before commit..." >&2
   if ! {{{typecheckCommand}}} >&2 2>&1; then
-    _log_event "block" "oh-my-harness: pre-commit check failed"
-    echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: pre-commit check failed\\"}"
+    REASON="oh-my-harness: pre-commit check failed"
+    _log_event "block" "$REASON"
+    _emit_decision "block" "$REASON"
     exit 0
   fi
 fi

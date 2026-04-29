@@ -27,8 +27,9 @@ BASENAME=$(basename "$FILE_PATH")
 PATTERNS=({{#each patterns}}"{{{this}}}" {{/each}})
 for PATTERN in "\${PATTERNS[@]}"; do
   if [[ "$BASENAME" == $PATTERN ]]; then
-    _log_event "block" "oh-my-harness: file $BASENAME matches secret file pattern: $PATTERN"
-    echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: file $BASENAME matches secret file pattern: $PATTERN\\"}"
+    REASON="oh-my-harness: file $BASENAME matches secret file pattern: $PATTERN"
+    _log_event "block" "$REASON"
+    _emit_decision "block" "$REASON"
     exit 0
   fi
 done

@@ -468,6 +468,110 @@ describe("manifest validation (path traversal defense)", () => {
   });
 });
 
+describe("logger JSON escaping (executed)", () => {
+  let projectDir: string;
+  let differentDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "omh-jsonesc-"));
+    differentDir = await mkdtemp(join(tmpdir(), "omh-jsonesc-cwd-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+    await rm(differentDir, { recursive: true, force: true });
+  });
+
+  it("escapes quotes/newlines/backslashes in reason via jq", async () => {
+    // Pre-jq impl injected $reason via printf %s and broke JSONL when the
+    // reason contained these characters; event-logger.ts then silently
+    // dropped the line, losing the event entirely.
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          {
+            id: "hard-reason",
+            matcher: "Bash",
+            inline:
+              '#!/bin/bash\nset -euo pipefail\nREASON=$\'He said "hi"\\nand \\\\left\'\n_log_event "block" "$REASON"\nexit 0',
+          },
+        ],
+        postToolUse: [],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+    const scriptPath = result.generatedFiles[0];
+    const { spawn } = await import("node:child_process");
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn("bash", [scriptPath], { cwd: differentDir });
+      child.stdin.end();
+      child.on("close", (code) =>
+        code === 0 ? resolve() : reject(new Error(`exit ${code}`)),
+      );
+    });
+
+    const raw = await readFile(join(projectDir, ".omh/state/events.jsonl"), "utf8");
+    const lines = raw.trim().split("\n").filter(Boolean);
+    expect(lines).toHaveLength(1);
+    const parsed = JSON.parse(lines[0]);
+    expect(parsed.decision).toBe("block");
+    expect(parsed.reason).toBe('He said "hi"\nand \\left');
+  });
+});
+
+describe("_emit_decision (executed)", () => {
+  let projectDir: string;
+  let differentDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "omh-emitdec-"));
+    differentDir = await mkdtemp(join(tmpdir(), "omh-emitdec-cwd-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+    await rm(differentDir, { recursive: true, force: true });
+  });
+
+  it("emits valid JSON decision even when reason has quotes/newlines", async () => {
+    const config = makeMergedConfig({
+      hooks: {
+        preToolUse: [
+          {
+            id: "decision-test",
+            matcher: "Bash",
+            inline:
+              '#!/bin/bash\nset -euo pipefail\nREASON=$\'O\\\'Brien said "no"\\nrejected\'\n_emit_decision "block" "$REASON"\nexit 0',
+          },
+        ],
+        postToolUse: [],
+      },
+    });
+
+    const result = await generateHooks({ projectDir, config });
+    const scriptPath = result.generatedFiles[0];
+    const { spawn } = await import("node:child_process");
+    const stdoutP = new Promise<string>((resolve, reject) => {
+      const child = spawn("bash", [scriptPath], { cwd: differentDir });
+      let stdout = "";
+      child.stdout.on("data", (b: Buffer) => {
+        stdout += b.toString();
+      });
+      child.stdin.end();
+      child.on("close", (code) =>
+        code === 0 ? resolve(stdout) : reject(new Error(`exit ${code}`)),
+      );
+    });
+    const stdout = await stdoutP;
+
+    // Whatever the script printed must be parseable JSON with the right fields.
+    const parsed = JSON.parse(stdout.trim());
+    expect(parsed.decision).toBe("block");
+    expect(parsed.reason).toBe(`O'Brien said "no"\nrejected`);
+  });
+});
+
 describe("logger meta validation (executed)", () => {
   let projectDir: string;
   let differentDir: string;
@@ -593,7 +697,9 @@ describe("wrapWithLogger", () => {
   it("logger snippet includes event field in JSON output", () => {
     const script = "#!/bin/bash\nINPUT=$(cat)\nexit 0";
     const result = wrapWithLogger(script);
-    expect(result).toContain('"event"');
+    // jq-based assembly: the filter must reference the event field.
+    expect(result).toMatch(/event:\$event/);
+    expect(result).toContain("--arg event");
   });
 
   it("handles #!/usr/bin/env bash shebang", () => {

@@ -21,8 +21,9 @@ if echo "$COMMAND" | grep -qE "git commit|git push"; then
   [[ -z "$BRANCH" ]] && exit 0
   MAIN='{{mainBranch}}'
   if [[ "$BRANCH" == "$MAIN" ]] || [[ "$BRANCH" == "master" && "$MAIN" == "main" ]]; then
-    _log_event "block" "oh-my-harness: direct commits to $BRANCH are blocked. Create a feature branch."
-    echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: direct commits to $BRANCH are blocked. Create a feature branch.\\"}"
+    REASON="oh-my-harness: direct commits to $BRANCH are blocked. Create a feature branch."
+    _log_event "block" "$REASON"
+    _emit_decision "block" "$REASON"
     exit 0
   fi
   MERGED=0
@@ -39,8 +40,9 @@ if echo "$COMMAND" | grep -qE "git commit|git push"; then
     fi
   fi
   if [[ "$MERGED" -eq 1 ]]; then
-    _log_event "block" "oh-my-harness: branch $BRANCH has already been merged to $MAIN. Create a new branch."
-    echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: branch $BRANCH has already been merged to $MAIN. Create a new branch.\\"}"
+    REASON="oh-my-harness: branch $BRANCH has already been merged to $MAIN. Create a new branch."
+    _log_event "block" "$REASON"
+    _emit_decision "block" "$REASON"
     exit 0
   fi
 fi

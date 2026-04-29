@@ -28,7 +28,7 @@ PATTERNS=({{#each patterns}}"{{{this}}}" {{/each}})
 for PATTERN in "\${PATTERNS[@]}"; do
   PATTERN_LOWER=$(echo "$PATTERN" | tr '[:upper:]' '[:lower:]')
   if echo "$COMMAND_LOWER" | grep -qF -- "$PATTERN_LOWER"; then
-    echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: SQL command matches blocked pattern: $PATTERN\\"}"
+    _emit_decision "block" "oh-my-harness: SQL command matches blocked pattern: $PATTERN"
     exit 0
   fi
 done

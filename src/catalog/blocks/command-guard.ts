@@ -27,8 +27,9 @@ NORMALIZED_CMD=$(printf '%s' "$COMMAND" | tr '[:space:]' ' ' | tr -s ' ')
 PATTERNS=({{#each patterns}}"{{{this}}}" {{/each}})
 for PATTERN in "\${PATTERNS[@]}"; do
   if echo "$NORMALIZED_CMD" | grep -qF -- "$PATTERN"; then
-    _log_event "block" "oh-my-harness: command matches blocked pattern: $PATTERN"
-    echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: command matches blocked pattern: $PATTERN\\"}"
+    REASON="oh-my-harness: command matches blocked pattern: $PATTERN"
+    _log_event "block" "$REASON"
+    _emit_decision "block" "$REASON"
     exit 0
   fi
 done

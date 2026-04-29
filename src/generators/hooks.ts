@@ -21,24 +21,44 @@ _OMH_HOOK_NAME="$(basename "$0")"
 _OMH_EVENT="${event}"
 _OMH_LOGGED=0
 _log_event() {
+  # Build the JSONL record entirely through jq so every string field is
+  # JSON-escaped (quotes, backslashes, newlines, unicode). The previous
+  # printf+%s approach corrupted the line whenever reason or any other
+  # field contained these characters, and event-logger.ts silently drops
+  # unparseable lines, causing event loss.
   _OMH_LOGGED=1
   local decision="\${1:-allow}" reason="\${2:-}" meta="\${3:-}"
-  # The third arg, if provided, MUST be a serialized JSON value. Validate
-  # with jq to prevent a malformed caller from corrupting events.jsonl
-  # (event-logger.ts silently drops unparseable lines, which would cause
-  # event loss). On invalid input, fall back to logging without meta.
+  local ts
+  ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  # Meta must be a serialized JSON value (object/array/scalar); fall back
+  # to no-meta when invalid so a buggy caller can't drop the event entirely.
   if [ -n "$meta" ] && ! echo "$meta" | jq -e . >/dev/null 2>&1; then
     meta=""
   fi
   if [ -n "$meta" ]; then
-    printf '{"ts":"%s","event":"%s","hook":"%s","decision":"%s","reason":"%s","meta":%s}\\n' \\
-      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_OMH_EVENT" "$_OMH_HOOK_NAME" "$decision" "$reason" "$meta" \\
+    jq -cn \\
+      --arg ts "$ts" --arg event "$_OMH_EVENT" --arg hook "$_OMH_HOOK_NAME" \\
+      --arg decision "$decision" --arg reason "$reason" --argjson meta "$meta" \\
+      '{ts:$ts,event:$event,hook:$hook,decision:$decision,reason:$reason,meta:$meta}' \\
       >> "$_OMH_STATE_DIR/${OMH_EVENTS_FILE}"
   else
-    printf '{"ts":"%s","event":"%s","hook":"%s","decision":"%s","reason":"%s"}\\n' \\
-      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_OMH_EVENT" "$_OMH_HOOK_NAME" "$decision" "$reason" \\
+    jq -cn \\
+      --arg ts "$ts" --arg event "$_OMH_EVENT" --arg hook "$_OMH_HOOK_NAME" \\
+      --arg decision "$decision" --arg reason "$reason" \\
+      '{ts:$ts,event:$event,hook:$hook,decision:$decision,reason:$reason}' \\
       >> "$_OMH_STATE_DIR/${OMH_EVENTS_FILE}"
   fi
+}
+
+# Emit a Claude/Codex hook decision JSON to stdout with all fields safely
+# escaped. Catalog blocks should call this rather than handcrafting JSON
+# via echo "{...}" — a file name or pattern containing a quote, backslash,
+# or newline would otherwise produce invalid JSON that the runtime cannot
+# parse as a block decision.
+_emit_decision() {
+  local decision="\${1:-block}" reason="\${2:-}"
+  jq -cn --arg decision "$decision" --arg reason "$reason" \\
+    '{decision:$decision,reason:$reason}'
 }
 trap '_OMH_EXIT_CODE=$?; if [ "$_OMH_LOGGED" -eq 0 ]; then if [ "$_OMH_EXIT_CODE" -ne 0 ]; then _log_event "error" "hook exited with code $_OMH_EXIT_CODE"; else _log_event "allow"; fi; fi' EXIT
 # --- end logger ---`;

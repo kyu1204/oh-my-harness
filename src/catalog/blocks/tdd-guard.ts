@@ -65,9 +65,10 @@ fi
 # 대응 테스트 파일 확인 — 확장자 제거
 BASENAME=$(basename "\$FILE_PATH" | sed -E 's/\\.[^.]+$//')
 
+REASON="oh-my-harness: TDD — \${BASENAME} 에 대응하는 테스트 파일을 먼저 수정하세요"
 if [[ ! -f "\$HISTORY_FILE" ]]; then
-  _log_event "block" "oh-my-harness: TDD — \${BASENAME} 에 대응하는 테스트 파일을 먼저 수정하세요"
-  echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: TDD — \${BASENAME} 에 대응하는 테스트 파일을 먼저 수정하세요\\"}"
+  _log_event "block" "\$REASON"
+  _emit_decision "block" "\$REASON"
   exit 0
 fi
 
@@ -91,8 +92,8 @@ if [[ "\$DECISION" == "allow" ]]; then
   exit 0
 fi
 
-_log_event "block" "oh-my-harness: TDD — \${BASENAME} 에 대응하는 테스트 파일을 먼저 수정하세요"
-echo "{\\"decision\\": \\"block\\", \\"reason\\": \\"oh-my-harness: TDD — \${BASENAME} 에 대응하는 테스트 파일을 먼저 수정하세요\\"}"
+_log_event "block" "\$REASON"
+_emit_decision "block" "\$REASON"
 exit 0`,
   tags: ["tdd", "workflow", "quality"],
 };

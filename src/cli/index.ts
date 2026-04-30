@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const pkg = require("../../package.json") as { version: string };
+const pkg = require("../../package.json") as { name: string; version: string };
 
 export function createCli(): Command {
   const program = new Command();
@@ -11,6 +11,19 @@ export function createCli(): Command {
     .name("oh-my-harness")
     .description("AI code agent harness configuration tool")
     .version(pkg.version);
+
+  program
+    .command("update")
+    .description("Check for and install the latest version of oh-my-harness")
+    .option("-y, --yes", "Skip confirmation prompt")
+    .option("--dry-run", "Print the update command without running it")
+    .action(async (options: { yes?: boolean; dryRun?: boolean }) => {
+      const { updateCommand } = await import("./commands/update.js");
+      const result = await updateCommand(pkg.version, options);
+      if (result.exitCode !== 0) {
+        process.exitCode = result.exitCode;
+      }
+    });
 
   program
     .command("init [description...]")

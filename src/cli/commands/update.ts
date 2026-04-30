@@ -80,7 +80,7 @@ export async function updateCommand(
     };
   }
 
-  if (!options.yes && process.stdout.isTTY) {
+  if (!options.yes && process.stdout.isTTY && process.stdin.isTTY) {
     const { confirm } = await import("@inquirer/prompts");
     const proceed = await confirm({
       message: `Run "${info.updateCommand}"?`,

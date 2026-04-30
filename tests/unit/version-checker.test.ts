@@ -65,6 +65,32 @@ describe("fetchLatestVersion", () => {
     expect(calledUrl).toBe("https://example.com/bar/latest");
   });
 
+  it("URL-encodes scoped package names", async () => {
+    let calledUrl = "";
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
+      calledUrl = String(url);
+      return {
+        ok: true,
+        json: async () => ({ version: "1.0.0" }),
+      } as unknown as Response;
+    });
+    await fetchLatestVersion("@scope/pkg");
+    expect(calledUrl).toContain("%40scope%2Fpkg");
+  });
+
+  it("normalizes registry trailing slash", async () => {
+    let calledUrl = "";
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
+      calledUrl = String(url);
+      return {
+        ok: true,
+        json: async () => ({ version: "1.0.0" }),
+      } as unknown as Response;
+    });
+    await fetchLatestVersion("foo", { registry: "https://example.com/" });
+    expect(calledUrl).toBe("https://example.com/foo/latest");
+  });
+
   it("aborts on timeout", async () => {
     globalThis.fetch = vi.fn(async (_url, opts: RequestInit | undefined) => {
       return new Promise<Response>((_resolve, reject) => {

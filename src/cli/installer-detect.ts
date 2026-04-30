@@ -16,14 +16,30 @@ export interface InstallerInfo {
 
 const PKG = "oh-my-harness";
 
-const COMMANDS: Record<Exclude<Installer, "unknown">, string> = {
-  npm: `npm install -g ${PKG}@latest`,
-  pnpm: `pnpm add -g ${PKG}@latest`,
-  yarn: `yarn global add ${PKG}@latest`,
-  bun: `bun add -g ${PKG}@latest`,
-  volta: `volta install ${PKG}`,
-  npx: `npm install -g ${PKG}@latest`,
-};
+function parseYarnMajor(ua: string): number | null {
+  const match = ua.match(/yarn\/(\d+)/);
+  if (!match) return null;
+  const major = Number.parseInt(match[1], 10);
+  return Number.isFinite(major) ? major : null;
+}
+
+function yarnInfo(ua: string): InstallerInfo {
+  const major = parseYarnMajor(ua);
+  if (major !== null && major >= 2) {
+    return {
+      installer: "yarn",
+      updateCommand: `yarn dlx ${PKG}@latest`,
+      isEphemeral: false,
+      notes:
+        "Yarn 2+ removed `yarn global` — `yarn dlx` runs the package on demand. Install globally with npm if you want a persistent binary.",
+    };
+  }
+  return {
+    installer: "yarn",
+    updateCommand: `yarn global add ${PKG}@latest`,
+    isEphemeral: false,
+  };
+}
 
 export function detectInstaller(
   env: NodeJS.ProcessEnv = process.env,
@@ -34,7 +50,7 @@ export function detectInstaller(
   if (ua.includes("npx") || execPath.includes("npx")) {
     return {
       installer: "npx",
-      updateCommand: COMMANDS.npx,
+      updateCommand: `npm install -g ${PKG}@latest`,
       isEphemeral: true,
       notes: "Detected npx run — install globally to keep updates persistent.",
     };
@@ -43,7 +59,7 @@ export function detectInstaller(
   if (env.VOLTA_HOME) {
     return {
       installer: "volta",
-      updateCommand: COMMANDS.volta,
+      updateCommand: `volta install ${PKG}`,
       isEphemeral: false,
     };
   }
@@ -51,35 +67,31 @@ export function detectInstaller(
   if (ua.includes("pnpm/")) {
     return {
       installer: "pnpm",
-      updateCommand: COMMANDS.pnpm,
+      updateCommand: `pnpm add -g ${PKG}@latest`,
       isEphemeral: false,
     };
   }
   if (ua.includes("yarn/")) {
-    return {
-      installer: "yarn",
-      updateCommand: COMMANDS.yarn,
-      isEphemeral: false,
-    };
+    return yarnInfo(ua);
   }
   if (ua.includes("bun/")) {
     return {
       installer: "bun",
-      updateCommand: COMMANDS.bun,
+      updateCommand: `bun add -g ${PKG}@latest`,
       isEphemeral: false,
     };
   }
   if (ua.includes("npm/")) {
     return {
       installer: "npm",
-      updateCommand: COMMANDS.npm,
+      updateCommand: `npm install -g ${PKG}@latest`,
       isEphemeral: false,
     };
   }
 
   return {
     installer: "npm",
-    updateCommand: COMMANDS.npm,
+    updateCommand: `npm install -g ${PKG}@latest`,
     isEphemeral: false,
   };
 }

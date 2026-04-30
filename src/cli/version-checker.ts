@@ -10,11 +10,15 @@ export async function fetchLatestVersion(
   options: FetchOptions = {},
 ): Promise<string | null> {
   const timeout = options.timeoutMs ?? 10_000;
-  const registry = options.registry ?? NPM_REGISTRY;
+  const rawRegistry = options.registry ?? NPM_REGISTRY;
+  const registry = rawRegistry.endsWith("/")
+    ? rawRegistry.slice(0, -1)
+    : rawRegistry;
+  const encodedPkg = encodeURIComponent(pkgName);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   try {
-    const res = await fetch(`${registry}/${pkgName}/latest`, {
+    const res = await fetch(`${registry}/${encodedPkg}/latest`, {
       signal: controller.signal,
       headers: { accept: "application/json" },
     });

@@ -110,6 +110,21 @@ describe("doctorCommand", () => {
     expect(result.checks.codexConfig).toBe(true);
   });
 
+  it("reports unhealthy when Codex /goal feature flag is missing", async () => {
+    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    await fs.writeFile(
+      path.join(tmpDir, ".codex", "config.toml"),
+      "[features]\ncodex_hooks = true\n",
+      "utf-8",
+    );
+
+    const result = await doctorCommand({ projectDir: tmpDir });
+
+    expect(result.checks.codexConfig).toBe(false);
+    expect(result.healthy).toBe(false);
+    expect(result.messages.some((m) => m.includes("goals = true"))).toBe(true);
+  });
+
   it("reports unhealthy when .codex/hooks.json is invalid JSON", async () => {
     await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
     // Simulate a merge conflict / hand-edit corrupting hooks.json

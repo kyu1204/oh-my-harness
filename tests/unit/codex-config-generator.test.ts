@@ -79,24 +79,26 @@ describe("buildCodexHooks", () => {
 });
 
 describe("buildCodexConfigToml", () => {
-  it("creates a fresh config.toml with [features] codex_hooks=true", () => {
+  it("creates a fresh config.toml with required [features] flags", () => {
     const result = buildCodexConfigToml("");
-    const parsed = parse(result) as { features?: { codex_hooks?: unknown } };
+    const parsed = parse(result) as { features?: { codex_hooks?: unknown; goals?: unknown } };
     expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.features?.goals).toBe(true);
     expect(result).toMatch(/^# Managed by oh-my-harness/);
   });
 
-  it("preserves user tables and keys when adding [features] codex_hooks", () => {
+  it("preserves user tables and keys when adding required [features] flags", () => {
     const existing = `[mcp_servers.foo]
 command = "bar"
 args = ["--flag"]
 `;
     const result = buildCodexConfigToml(existing);
     const parsed = parse(result) as {
-      features?: { codex_hooks?: unknown };
+      features?: { codex_hooks?: unknown; goals?: unknown };
       mcp_servers?: { foo?: { command?: unknown; args?: unknown } };
     };
     expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.features?.goals).toBe(true);
     expect(parsed.mcp_servers?.foo?.command).toBe("bar");
     expect(parsed.mcp_servers?.foo?.args).toEqual(["--flag"]);
   });
@@ -116,11 +118,12 @@ command = "bar"
 `;
     const result = buildCodexConfigToml(existing);
     const parsed = parse(result) as {
-      features?: { codex_hooks?: unknown; some_other_flag?: unknown };
+      features?: { codex_hooks?: unknown; goals?: unknown; some_other_flag?: unknown };
       mcp_servers?: { foo?: { command?: unknown } };
     };
     // Single [features] table containing both keys
     expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.features?.goals).toBe(true);
     expect(parsed.features?.some_other_flag).toBe(true);
     // User's other tables preserved
     expect(parsed.mcp_servers?.foo?.command).toBe("bar");
@@ -133,9 +136,10 @@ some_other_flag = true
 `;
     const result = buildCodexConfigToml(existing);
     const parsed = parse(result) as {
-      features?: { codex_hooks?: unknown; some_other_flag?: unknown };
+      features?: { codex_hooks?: unknown; goals?: unknown; some_other_flag?: unknown };
     };
     expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.features?.goals).toBe(true);
     expect(parsed.features?.some_other_flag).toBe(true);
     // Only one TOML-level assignment of the key (parser would have rejected
     // the file if there were two, but verify the rendered output too).
@@ -148,9 +152,22 @@ some_other_flag = true
 codex_hooks = false
 `;
     const result = buildCodexConfigToml(existing);
-    const parsed = parse(result) as { features?: { codex_hooks?: unknown } };
+    const parsed = parse(result) as { features?: { codex_hooks?: unknown; goals?: unknown } };
     expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.features?.goals).toBe(true);
     expect(result).not.toContain("codex_hooks = false");
+  });
+
+  it("upgrades existing goals=false to true", () => {
+    const existing = `[features]
+codex_hooks = true
+goals = false
+`;
+    const result = buildCodexConfigToml(existing);
+    const parsed = parse(result) as { features?: { codex_hooks?: unknown; goals?: unknown } };
+    expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.features?.goals).toBe(true);
+    expect(result).not.toContain("goals = false");
   });
 
   it("handles [[array-table]] and other table forms without corrupting them", () => {
@@ -165,10 +182,11 @@ name = "second"
 `;
     const result = buildCodexConfigToml(existing);
     const parsed = parse(result) as {
-      features?: { codex_hooks?: unknown };
+      features?: { codex_hooks?: unknown; goals?: unknown };
       mcp_servers?: Array<{ name?: unknown }>;
     };
     expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.features?.goals).toBe(true);
     expect(parsed.mcp_servers).toHaveLength(2);
     expect(parsed.mcp_servers?.[0].name).toBe("first");
     expect(parsed.mcp_servers?.[1].name).toBe("second");
@@ -181,9 +199,10 @@ some_other_flag = true # keep this
 `;
     const result = buildCodexConfigToml(existing);
     const parsed = parse(result) as {
-      features?: { codex_hooks?: unknown; some_other_flag?: unknown };
+      features?: { codex_hooks?: unknown; goals?: unknown; some_other_flag?: unknown };
     };
     expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.features?.goals).toBe(true);
     expect(parsed.features?.some_other_flag).toBe(true);
   });
 
@@ -201,15 +220,17 @@ some_other_flag = true # keep this
     const existing = `features = true\n`;
     expect(() => buildCodexConfigToml(existing)).not.toThrow();
     const result = buildCodexConfigToml(existing);
-    const parsed = parse(result) as { features?: { codex_hooks?: unknown } };
+    const parsed = parse(result) as { features?: { codex_hooks?: unknown; goals?: unknown } };
     expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.features?.goals).toBe(true);
   });
 
   it("overwrites a non-table `features` value (array) with a proper table", () => {
     const existing = `features = [1, 2, 3]\n`;
     const result = buildCodexConfigToml(existing);
-    const parsed = parse(result) as { features?: { codex_hooks?: unknown } };
+    const parsed = parse(result) as { features?: { codex_hooks?: unknown; goals?: unknown } };
     expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.features?.goals).toBe(true);
   });
 });
 
@@ -246,8 +267,9 @@ describe("generateCodexConfig", () => {
     expect(hooksJson.hooks.PreToolUse[0].matcher).toBe("Bash");
 
     const toml = await fs.readFile(path.join(tmpDir, ".codex/config.toml"), "utf8");
-    const parsed = parse(toml) as { features?: { codex_hooks?: unknown } };
+    const parsed = parse(toml) as { features?: { codex_hooks?: unknown; goals?: unknown } };
     expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.features?.goals).toBe(true);
   });
 
   it("preserves existing config.toml structure outside [features]", async () => {
@@ -263,11 +285,12 @@ describe("generateCodexConfig", () => {
 
     const toml = await fs.readFile(path.join(codexDir, "config.toml"), "utf8");
     const parsed = parse(toml) as {
-      features?: { codex_hooks?: unknown };
+      features?: { codex_hooks?: unknown; goals?: unknown };
       mcp_servers?: { foo?: { command?: unknown } };
     };
     expect(parsed.mcp_servers?.foo?.command).toBe("bar");
     expect(parsed.features?.codex_hooks).toBe(true);
+    expect(parsed.features?.goals).toBe(true);
   });
 
   it("emits empty hooks.json when no hooks present", async () => {

@@ -34,19 +34,37 @@ export const lintOnSave: BuildingBlock = {
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null)
-[[ -z "$FILE_PATH" ]] && exit 0
-PATTERN='{{{filePattern}}}'
-BASENAME=$(basename "$FILE_PATH")
-if [[ "$BASENAME" == $PATTERN ]]; then
-  SCOPE='{{{scope}}}'
-  if [[ "\${SCOPE:-file}" == "module" ]]; then
-    echo "oh-my-harness: Running {{{command}}} ..." >&2
-    {{{command}}} >&2 || true
-  else
-    echo "oh-my-harness: Running {{{command}}} on $FILE_PATH..." >&2
-    {{{command}}} "$FILE_PATH" >&2 || true
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
+FILE_PATHS=()
+DIRECT_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null)
+[[ -n "$DIRECT_PATH" ]] && FILE_PATHS+=("$DIRECT_PATH")
+if [[ "$TOOL_NAME" == "apply_patch" ]]; then
+  PATCH_TEXT=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
+  if [[ -n "$PATCH_TEXT" ]]; then
+    while IFS= read -r _OMH_HEADER_PATH; do
+      [[ -n "$_OMH_HEADER_PATH" ]] && FILE_PATHS+=("$_OMH_HEADER_PATH")
+    done < <(printf '%s\\n' "$PATCH_TEXT" | sed -nE 's/^\\*\\*\\* (Add|Update) File: (.+)$/\\2/p')
   fi
 fi
+[[ \${#FILE_PATHS[@]} -eq 0 ]] && exit 0
+
+PATTERN='{{{filePattern}}}'
+SCOPE='{{{scope}}}'
+_OMH_RAN_MODULE=0
+for FILE_PATH in "\${FILE_PATHS[@]}"; do
+  BASENAME=$(basename "$FILE_PATH")
+  if [[ "$BASENAME" == $PATTERN ]]; then
+    if [[ "\${SCOPE:-file}" == "module" ]]; then
+      if [[ "$_OMH_RAN_MODULE" -eq 0 ]]; then
+        echo "oh-my-harness: Running {{{command}}} ..." >&2
+        {{{command}}} >&2 || true
+        _OMH_RAN_MODULE=1
+      fi
+    else
+      echo "oh-my-harness: Running {{{command}}} on $FILE_PATH..." >&2
+      {{{command}}} "$FILE_PATH" >&2 || true
+    fi
+  fi
+done
 exit 0`,
 };

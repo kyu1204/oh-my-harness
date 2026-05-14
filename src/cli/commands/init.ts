@@ -12,6 +12,7 @@ import type { ProjectFacts } from "../../detector/project-detector.js";
 import { harnessToMergedConfig } from "../../core/harness-converter.js";
 import { harnessToMergedConfigV2 } from "../../core/harness-converter-v2.js";
 import { createDefaultRegistry } from "../../catalog/registry.js";
+import { buildMinimalHarnessConfig, ensureHarnessYaml } from "../../core/harness-defaults.js";
 
 export interface InitOptions {
   yes?: boolean;
@@ -240,6 +241,12 @@ async function initWithPresets(
   const config = mergePresets(presetConfigs);
   const result = await generate({ projectDir, config });
 
+  // Emit a schema-conformant harness.yaml so subsequent `omh hook add`,
+  // `omh sync`, and `omh test` invocations operate on a single source of
+  // truth instead of failing on missing yaml.
+  const minimal = await buildMinimalHarnessConfig(projectDir, { presetNames });
+  const yamlInfo = await ensureHarnessYaml(projectDir, minimal);
+
   await writeHarnessState(projectDir, {
     presets: names,
     generatedAt: new Date().toISOString(),
@@ -250,6 +257,9 @@ async function initWithPresets(
   console.log("Generated files:");
   for (const f of result.files) {
     console.log(`  ${f}`);
+  }
+  if (yamlInfo.created) {
+    console.log(`  ${yamlInfo.path}`);
   }
 }
 
@@ -285,6 +295,10 @@ async function initWithPresetsLegacy(
   const config = mergePresets(presetConfigs);
   const result = await generate({ projectDir, config });
 
+  // Emit minimal harness.yaml (see initWithPresets for rationale).
+  const minimal = await buildMinimalHarnessConfig(projectDir, { presetNames });
+  const yamlInfo = await ensureHarnessYaml(projectDir, minimal);
+
   await writeHarnessState(projectDir, {
     presets: names,
     generatedAt: new Date().toISOString(),
@@ -295,5 +309,8 @@ async function initWithPresetsLegacy(
   console.log("Generated files:");
   for (const f of result.files) {
     console.log(`  ${f}`);
+  }
+  if (yamlInfo.created) {
+    console.log(`  ${yamlInfo.path}`);
   }
 }

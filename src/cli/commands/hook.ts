@@ -6,6 +6,7 @@ import * as clack from "@clack/prompts";
 import { createDefaultRegistry } from "../../catalog/registry.js";
 import type { HookEntry, ParamDefinition } from "../../catalog/types.js";
 import { syncCommand } from "./sync.js";
+import { buildMinimalHarnessConfig } from "../../core/harness-defaults.js";
 
 export interface HookAddOptions {
   yes?: boolean;
@@ -29,7 +30,12 @@ async function readHarnessYaml(projectDir: string): Promise<HarnessYamlWithHooks
   } catch (err) {
     const error = err as NodeJS.ErrnoException;
     if (error.code === "ENOENT") {
-      return {};
+      // Bootstrap a schema-conformant skeleton on first use so that
+      // `omh hook add` works before the user has run `omh init`.
+      // stacks are populated from the deterministic project detector so the
+      // generated yaml is informative rather than empty.
+      const minimal = await buildMinimalHarnessConfig(projectDir);
+      return minimal as unknown as HarnessYamlWithHooks;
     }
     throw error;
   }

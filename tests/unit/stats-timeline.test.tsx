@@ -5,6 +5,17 @@ import { render } from "ink-testing-library";
 import { Timeline } from "../../src/cli/stats/components/Timeline.js";
 import type { StatsData, HourlyBucket } from "../../src/cli/stats/data.js";
 
+// ink emits ANSI color escapes when stdout is a TTY (local dev terminals) but
+// not in non-TTY environments like CI. Substring assertions against the raw
+// frame are therefore environment-dependent — e.g. `Block rate: 25%` becomes
+// `Block rate: \x1b[31m25%\x1b[39m` once the renderer wraps the number in a
+// colored <Text>. Strip ANSI before asserting so the same expectations hold
+// whether or not chalk decides to colorize.
+function stripAnsi(input: string): string {
+  // eslint-disable-next-line no-control-regex
+  return input.replace(/\x1b\[\d+m/g, "");
+}
+
 function makeHourlyBuckets(overrides: Partial<Record<number, { total: number; blockCount: number; allowCount: number }>> = {}): HourlyBucket[] {
   return Array.from({ length: 24 }, (_, hour) => ({
     hour,
@@ -35,35 +46,35 @@ describe("Timeline", () => {
   it("renders Events summary with total count", () => {
     const data = makeStatsData({ totalEvents: 42 });
     const { lastFrame } = render(React.createElement(Timeline, { data }));
-    const frame = lastFrame() ?? "";
+    const frame = stripAnsi(lastFrame() ?? "");
     expect(frame).toContain("Events: 42");
   });
 
   it("renders block rate percentage", () => {
     const data = makeStatsData({ blockRate: 25 });
     const { lastFrame } = render(React.createElement(Timeline, { data }));
-    const frame = lastFrame() ?? "";
+    const frame = stripAnsi(lastFrame() ?? "");
     expect(frame).toContain("Block rate: 25%");
   });
 
   it("renders peak hour in HH:00 format", () => {
     const data = makeStatsData({ peakHour: 9 });
     const { lastFrame } = render(React.createElement(Timeline, { data }));
-    const frame = lastFrame() ?? "";
+    const frame = stripAnsi(lastFrame() ?? "");
     expect(frame).toContain("Peak: 09:00");
   });
 
   it("renders date range label", () => {
     const data = makeStatsData({ dateRange: "today" });
     const { lastFrame } = render(React.createElement(Timeline, { data }));
-    const frame = lastFrame() ?? "";
+    const frame = stripAnsi(lastFrame() ?? "");
     expect(frame).toContain("Range: today");
   });
 
   it("shows No events recorded when all buckets are zero", () => {
     const data = makeStatsData({ totalEvents: 0 });
     const { lastFrame } = render(React.createElement(Timeline, { data }));
-    const frame = lastFrame() ?? "";
+    const frame = stripAnsi(lastFrame() ?? "");
     expect(frame).toContain("No events recorded");
   });
 
@@ -76,7 +87,7 @@ describe("Timeline", () => {
       }),
     });
     const { lastFrame } = render(React.createElement(Timeline, { data }));
-    const frame = lastFrame() ?? "";
+    const frame = stripAnsi(lastFrame() ?? "");
     expect(frame).toContain("14:00");
     expect(frame).toContain("10 events");
   });
@@ -90,7 +101,7 @@ describe("Timeline", () => {
       }),
     });
     const { lastFrame } = render(React.createElement(Timeline, { data }));
-    const frame = lastFrame() ?? "";
+    const frame = stripAnsi(lastFrame() ?? "");
     expect(frame).toContain("3 block");
   });
 
@@ -102,7 +113,7 @@ describe("Timeline", () => {
       }),
     });
     const { lastFrame } = render(React.createElement(Timeline, { data }));
-    const frame = lastFrame() ?? "";
+    const frame = stripAnsi(lastFrame() ?? "");
     // heatmap chars: ░ ▒ ▓ █
     const heatmapChars = (frame.match(/[░▒▓█]/g) ?? []);
     expect(heatmapChars.length).toBeGreaterThanOrEqual(24);

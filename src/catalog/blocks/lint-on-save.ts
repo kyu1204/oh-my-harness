@@ -42,6 +42,9 @@ if [[ "$TOOL_NAME" == "apply_patch" ]]; then
   PATCH_TEXT=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
   if [[ -n "$PATCH_TEXT" ]]; then
     while IFS= read -r _OMH_HEADER_PATH; do
+      # CRLF patches leave a trailing \\r since sed's $ matches before \\n
+      # only; strip it so filename pattern matching isn't bypassed.
+      _OMH_HEADER_PATH="\${_OMH_HEADER_PATH%$'\\r'}"
       [[ -n "$_OMH_HEADER_PATH" ]] && FILE_PATHS+=("$_OMH_HEADER_PATH")
     done < <(printf '%s\\n' "$PATCH_TEXT" | sed -nE 's/^\\*\\*\\* (Add|Update) File: (.+)$/\\2/p')
   fi

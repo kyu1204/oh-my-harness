@@ -377,4 +377,85 @@ describe("catalog block execution", () => {
     expect(result.decision).toBe("block");
     expect(result.reason).toContain(".env");
   });
+
+  // -------------------------------------------------------------------------
+  // CRLF-encoded apply_patch payloads. sed's `$` matches before `\n` only, so
+  // a CRLF patch would otherwise leave a trailing `\r` on every extracted
+  // path and silently bypass every file-targeted guard. Each guard must strip
+  // the carriage return before comparison.
+  // -------------------------------------------------------------------------
+
+  it("path-guard: blocks apply_patch when the patch uses CRLF line endings", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+    const rendered = renderTemplate(pathGuard.template, { blockedPaths: ["dist/"] });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "path-guard-apply-patch-crlf.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    const patch =
+      "*** Begin Patch\r\n*** Update File: dist/bundle.js\r\n@@\r\n-x\r\n+y\r\n*** End Patch\r\n";
+    const stdout = runScript(
+      scriptPath,
+      JSON.stringify({ tool_name: "apply_patch", tool_input: { command: patch } }),
+    );
+
+    const result = JSON.parse(stdout.trim());
+    expect(result.decision).toBe("block");
+    expect(result.reason).toContain("dist/");
+  });
+
+  it("lockfile-guard: blocks apply_patch with CRLF line endings against package-lock.json", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+    const rendered = renderTemplate(lockfileGuard.template, {
+      lockfiles: ["package-lock.json", "yarn.lock"],
+    });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "lockfile-guard-apply-patch-crlf.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    const patch =
+      "*** Begin Patch\r\n*** Update File: package-lock.json\r\n@@\r\n-}\r\n+}\r\n*** End Patch\r\n";
+    const stdout = runScript(
+      scriptPath,
+      JSON.stringify({ tool_name: "apply_patch", tool_input: { command: patch } }),
+    );
+
+    const result = JSON.parse(stdout.trim());
+    expect(result.decision).toBe("block");
+    expect(result.reason).toContain("package-lock.json");
+    // Belt-and-suspenders: the reason must not contain a literal CR — that
+    // would indicate the trailing \r leaked through to basename().
+    expect(result.reason).not.toContain("\r");
+  });
+
+  it("secret-file-guard: blocks apply_patch with CRLF line endings against .env", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+    const rendered = renderTemplate(secretFileGuard.template, {
+      patterns: [".env", "*.pem"],
+    });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "secret-file-guard-apply-patch-crlf.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    const patch =
+      "*** Begin Patch\r\n*** Add File: .env\r\n+API_KEY=hi\r\n*** End Patch\r\n";
+    const stdout = runScript(
+      scriptPath,
+      JSON.stringify({ tool_name: "apply_patch", tool_input: { command: patch } }),
+    );
+
+    const result = JSON.parse(stdout.trim());
+    expect(result.decision).toBe("block");
+    expect(result.reason).toContain(".env");
+    expect(result.reason).not.toContain("\r");
+  });
 });

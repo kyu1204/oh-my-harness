@@ -19,9 +19,15 @@ const CODEX_SUPPORTED_EVENTS = new Set([
 
 const CODEX_CONFIG_HEADER =
   "# Managed by oh-my-harness.\n" +
-  "# The codex_hooks=true entry under [features] is required.\n" +
+  "# The codex_hooks=true entry under [features] is required for Codex hooks.\n" +
+  "# The goals=true entry under [features] enables Codex /goal.\n" +
   "# Add your own tables (e.g. [mcp_servers.foo]) above or below freely.\n" +
   "# https://github.com/kyu1204/oh-my-harness\n\n";
+
+const REQUIRED_CODEX_FEATURES: Record<string, boolean> = {
+  codex_hooks: true,
+  goals: true,
+};
 
 function normalizeMatcher(matcher: string): string {
   if (!matcher) return matcher;
@@ -96,7 +102,9 @@ export function buildCodexConfigToml(existing: string): string {
   const isPlainObject = (v: unknown): v is Record<string, unknown> =>
     v !== null && typeof v === "object" && !Array.isArray(v);
   const features = isPlainObject(data.features) ? data.features : {};
-  features.codex_hooks = true;
+  for (const [feature, enabled] of Object.entries(REQUIRED_CODEX_FEATURES)) {
+    features[feature] = enabled;
+  }
   data.features = features;
 
   return CODEX_CONFIG_HEADER + stringify(data) + "\n";

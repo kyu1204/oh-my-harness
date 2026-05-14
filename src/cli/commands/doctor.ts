@@ -86,9 +86,11 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<Doctor
   try {
     JSON.parse(await fs.readFile(codexHooksPath, "utf-8"));
     const tomlRaw = await fs.readFile(codexTomlPath, "utf-8");
-    const parsed = parse(tomlRaw) as { features?: { codex_hooks?: unknown } };
+    const parsed = parse(tomlRaw) as { features?: { codex_hooks?: unknown; goals?: unknown } };
     if (parsed.features?.codex_hooks !== true) {
       messages.push("FAIL: .codex/config.toml missing [features] codex_hooks = true.");
+    } else if (parsed.features?.goals !== true) {
+      messages.push("FAIL: .codex/config.toml missing [features] goals = true.");
     } else {
       checks.codexConfig = true;
     }

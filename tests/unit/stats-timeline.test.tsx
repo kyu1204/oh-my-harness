@@ -9,11 +9,12 @@ import type { StatsData, HourlyBucket } from "../../src/cli/stats/data.js";
 // not in non-TTY environments like CI. Substring assertions against the raw
 // frame are therefore environment-dependent — e.g. `Block rate: 25%` becomes
 // `Block rate: \x1b[31m25%\x1b[39m` once the renderer wraps the number in a
-// colored <Text>. Strip ANSI before asserting so the same expectations hold
-// whether or not chalk decides to colorize.
+// colored <Text>. Strip every SGR sequence — single-parameter `\x1b[31m`,
+// compound `\x1b[1;31m`, and 256-color `\x1b[38;5;196m` alike — so the same
+// expectations hold whether or not chalk decides to colorize.
 function stripAnsi(input: string): string {
   // eslint-disable-next-line no-control-regex
-  return input.replace(/\x1b\[\d+m/g, "");
+  return input.replace(/\x1B\[[0-9;]*m/g, "");
 }
 
 function makeHourlyBuckets(overrides: Partial<Record<number, { total: number; blockCount: number; allowCount: number }>> = {}): HourlyBucket[] {

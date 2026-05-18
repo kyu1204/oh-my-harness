@@ -405,8 +405,7 @@ oh-my-harness/
 - [x] GitHub star prompt — first-time only
 - [x] Codex emitter — `AGENTS.md` + `.codex/hooks.json` + `.codex/config.toml`
 - [x] Unified `.omh/` layout — single source of truth for hooks & state across runtimes
-- [ ] Cursor (`.cursor/rules/`) emitter
-- [ ] GitHub Copilot emitter
+- [ ] PI emitter
 - [ ] Community preset registry
 - [ ] `omh modify "change X"` — NL config editing
 

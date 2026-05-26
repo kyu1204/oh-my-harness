@@ -55,9 +55,9 @@ npm run lint
 
 ## What to Contribute
 
-### Presets
+### harness.yaml Schema
 
-Add a new preset by creating a directory in `presets/` with a `preset.yaml`. No code changes needed — the registry auto-discovers it. See `presets/_base/` for reference.
+To add new fields to `harness.yaml`, update `src/core/harness-schema.ts` (Zod schema) and `src/core/merged-config.ts` (TypeScript interfaces). Regenerate docs if needed.
 
 ### Building Blocks
 

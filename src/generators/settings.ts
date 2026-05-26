@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { MergedConfig } from "../core/preset-types.js";
+import type { MergedConfig } from "../core/merged-config.js";
 import type { HooksOutput } from "./hooks.js";
 
 export interface GenerateSettingsOptions {

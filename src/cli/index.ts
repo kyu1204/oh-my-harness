@@ -27,28 +27,11 @@ export function createCli(): Command {
 
   program
     .command("init [description...]")
-    .description("Initialize harness (NL description or --preset)")
-    .option("-p, --preset <presets...>", "Use specific presets instead of NL")
+    .description("Initialize harness from a project description")
     .option("-y, --yes", "Skip confirmation prompts")
     .action(async (description: string[], options) => {
       const { initCommand } = await import("./commands/init.js");
       await initCommand(description, options);
-    });
-
-  program
-    .command("add <preset>")
-    .description("Add a preset to existing harness")
-    .action(async (preset: string) => {
-      const { addCommand } = await import("./commands/add.js");
-      await addCommand(preset);
-    });
-
-  program
-    .command("remove <preset>")
-    .description("Remove a preset from harness")
-    .action(async (preset: string) => {
-      const { removeCommand } = await import("./commands/remove.js");
-      await removeCommand(preset);
     });
 
   program

@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { MergedConfig } from "../core/preset-types.js";
+import type { MergedConfig } from "../core/merged-config.js";
 import { writeManagedMarkdown } from "./managed-md.js";
 
 export interface GenerateClaudeMdOptions {

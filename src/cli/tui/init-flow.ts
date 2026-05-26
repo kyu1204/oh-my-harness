@@ -7,36 +7,29 @@ import { checkDependencies } from "../deps-checker.js";
 import type { DepCheck } from "../deps-checker.js";
 import { checkReferencedTools } from "../tool-checker.js";
 import type { ToolCheck } from "../tool-checker.js";
-import { PresetRegistry } from "../../core/preset-registry.js";
-import { loadAndMergePresets, writeHarnessState } from "../commands/init.js";
-import { mergePresets } from "../../core/config-merger.js";
+import { writeHarnessState } from "../commands/init.js";
 import { generate } from "../../core/generator.js";
 import { generateHarnessConfig, createDefaultRunner } from "../../nl/parse-intent.js";
 import { hasProviderConfig } from "../../nl/config-store.js";
 import { runProviderSetup } from "./provider-setup.js";
-import { mergeEnforcementAndHooks } from "../../core/harness-converter.js";
+import { mergeEnforcementAndHooks } from "../../core/harness-converter-v2.js";
 import type { HarnessConfig } from "../../core/harness-schema.js";
 import { HarnessConfigSchema } from "../../core/harness-schema.js";
 import { detectProject } from "../../detector/project-detector.js";
 import { hasStarPromptBeenShown, markStarPromptShown, starRepo } from "../github-star.js";
 import type { ProjectFacts } from "../../detector/types.js";
 
-function getDefaultPresetsDir(): string {
-  return path.resolve(import.meta.dirname, "../../../presets");
-}
-
 export function formatDepResults(deps: DepCheck[]): string {
   if (deps.length === 0) return "";
-
   const lines: string[] = [];
   for (const dep of deps) {
     if (dep.installed) {
       const version = dep.version ? ` (${dep.version})` : "";
-      lines.push(`  ${chalk.green("\u2713")} ${dep.name}${chalk.dim(version)}`);
+      lines.push(`  ${chalk.green("✓")} ${dep.name}${chalk.dim(version)}`);
     } else if (dep.required) {
-      lines.push(`  ${chalk.red("\u2717")} ${dep.name} ${chalk.red("missing")} \u2014 ${dep.installHint}`);
+      lines.push(`  ${chalk.red("✗")} ${dep.name} ${chalk.red("missing")} — ${dep.installHint}`);
     } else {
-      lines.push(`  ${chalk.yellow("\u25CB")} ${dep.name} ${chalk.yellow("optional")} \u2014 ${dep.installHint}`);
+      lines.push(`  ${chalk.yellow("○")} ${dep.name} ${chalk.yellow("optional")} — ${dep.installHint}`);
     }
   }
   return lines.join("\n");
@@ -44,29 +37,20 @@ export function formatDepResults(deps: DepCheck[]): string {
 
 export function formatConfigSummary(config: HarnessConfig): string {
   const lines: string[] = [];
-
-  // Project info
   if (config.project.name) {
     lines.push(`  Project: ${chalk.cyan(config.project.name)}`);
   }
   const stackSummary = config.project.stacks
     .map((s) => `${s.name} (${s.framework}/${s.language})`)
     .join(", ");
-  if (stackSummary) {
-    lines.push(`  Stack: ${stackSummary}`);
-  }
-
-  // Rules
+  if (stackSummary) lines.push(`  Stack: ${stackSummary}`);
   if (config.rules.length > 0) {
     lines.push("");
     lines.push("  Rules:");
     for (let i = 0; i < config.rules.length; i++) {
-      const rule = config.rules[i];
-      lines.push(`    ${i + 1}. ${rule.title} (priority: ${rule.priority})`);
+      lines.push(`    ${i + 1}. ${config.rules[i].title} (priority: ${config.rules[i].priority})`);
     }
   }
-
-  // Hooks (merged from enforcement + explicit hooks)
   const allHooks = mergeEnforcementAndHooks(config);
   if (allHooks.length > 0) {
     lines.push("");
@@ -78,7 +62,6 @@ export function formatConfigSummary(config: HarnessConfig): string {
       lines.push(`    ${hook.block}${paramSummary ? ` (${paramSummary})` : ""}`);
     }
   }
-
   return lines.join("\n");
 }
 
@@ -94,29 +77,12 @@ export function formatProjectFacts(facts: ProjectFacts): string {
     ["Typecheck", facts.typecheckCommands],
     ["Blocked paths", facts.blockedPaths],
   ];
-
   for (const [label, values] of entries) {
     if (values.length > 0) {
       lines.push(`  ${chalk.bold(label)}: ${values.join(", ")}`);
     }
   }
-
   return lines.length > 0 ? lines.join("\n") : `  ${chalk.dim("No project signals detected")}`;
-}
-
-export function buildPresetExtends(
-  language: string,
-  framework: string | undefined,
-  packageManager: string | undefined,
-): string[] {
-  const result: string[] = ["_base", language];
-  if (framework && framework !== "none") {
-    result.push(framework);
-  }
-  if (packageManager) {
-    result.push(packageManager);
-  }
-  return result;
 }
 
 function handleCancel(value: unknown): void {
@@ -126,25 +92,18 @@ function handleCancel(value: unknown): void {
   }
 }
 
-export async function runInitTUI(options?: {
-  projectDir?: string;
-  presetsDir?: string;
-}): Promise<void> {
+export async function runInitTUI(options?: { projectDir?: string }): Promise<void> {
   const projectDir = options?.projectDir ?? process.cwd();
-  const presetsDir = options?.presetsDir ?? getDefaultPresetsDir();
 
-  // Step 1: Welcome Banner
   p.intro(
     `${chalk.bgCyan(chalk.black(" oh-my-harness "))} ${chalk.dim("Tame your AI coding agents")}`,
   );
 
-  // Step 2: Dependency Check
+  // Dependency Check
   const depSpinner = p.spinner();
   depSpinner.start("Checking dependencies...");
-
   const deps = await checkDependencies();
   depSpinner.stop("Dependencies checked");
-
   const depOutput = formatDepResults(deps);
   p.note(depOutput, "System Dependencies");
 
@@ -152,9 +111,7 @@ export async function runInitTUI(options?: {
   const claudeInstalled = deps.find((d) => d.name === "claude")?.installed ?? false;
 
   if (missingRequired.length > 0) {
-    p.log.error(
-      `Missing required dependencies: ${missingRequired.map((d) => d.name).join(", ")}`,
-    );
+    p.log.error(`Missing required dependencies: ${missingRequired.map((d) => d.name).join(", ")}`);
     const continueAnyway = await p.confirm({
       message: "Continue anyway? (some features may not work)",
       initialValue: false,
@@ -170,58 +127,29 @@ export async function runInitTUI(options?: {
     p.log.warn("claude CLI not installed. AI-powered mode will not be available.");
   }
 
-  // Step 2.5: Project Detection
+  // Project Detection
   const detectSpinner = p.spinner();
   detectSpinner.start("Detecting project type...");
-
   let projectFacts: ProjectFacts | undefined;
   try {
     const facts = await detectProject(projectDir);
-    const hasAnyFacts = facts.languages.length > 0 || facts.frameworks.length > 0;
-    if (hasAnyFacts) {
-      projectFacts = facts;
-    }
+    if (facts.languages.length > 0 || facts.frameworks.length > 0) projectFacts = facts;
     detectSpinner.stop("Project detected");
   } catch {
     detectSpinner.stop("Project detection skipped");
   }
+  if (projectFacts) p.note(formatProjectFacts(projectFacts), "Detected Project");
 
-  if (projectFacts) {
-    p.note(formatProjectFacts(projectFacts), "Detected Project");
-  }
+  // Mode Selection
+  type ModeValue = "nl" | "import";
+  const modeOptions: Array<{ value: ModeValue; label: string; hint?: string }> = [
+    claudeInstalled
+      ? { value: "nl", label: "Describe your project (AI-powered)" }
+      : { value: "nl", label: "Describe your project (AI-powered)", hint: "requires claude CLI" },
+    { value: "import", label: "Import existing harness.yaml" },
+  ];
 
-  // Step 3: Mode Selection
-  type ModeValue = "nl" | "preset" | "import";
-  const modeOptions: Array<{ value: ModeValue; label: string; hint?: string }> = [];
-
-  if (claudeInstalled) {
-    modeOptions.push({
-      value: "nl",
-      label: "Describe your project (AI-powered)",
-    });
-  } else {
-    modeOptions.push({
-      value: "nl",
-      label: "Describe your project (AI-powered)",
-      hint: "requires claude CLI",
-    });
-  }
-
-  modeOptions.push({
-    value: "preset",
-    label: "Choose from presets",
-  });
-
-  modeOptions.push({
-    value: "import",
-    label: "Import existing harness.yaml",
-  });
-
-  const mode = await p.select({
-    message: "How would you like to configure your harness?",
-    options: modeOptions,
-  });
-
+  const mode = await p.select({ message: "How would you like to configure your harness?", options: modeOptions });
   handleCancel(mode);
 
   if (mode === "nl" && !claudeInstalled) {
@@ -232,36 +160,29 @@ export async function runInitTUI(options?: {
   }
 
   let harnessConfig: HarnessConfig | undefined;
-  let presetNames: string[] | undefined;
 
   if (mode === "nl") {
-    // Step 4a: NL Mode — check provider config
     const hasConfig = await hasProviderConfig();
     if (!hasConfig) {
       p.log.info("No AI provider configured yet. Let's set one up.");
       const providerConfig = await runProviderSetup();
       if (!providerConfig) {
-        p.cancel("Provider setup cancelled. Use preset mode instead.");
+        p.cancel("Provider setup cancelled.");
         process.exit(0);
       }
     }
 
     const runner = await createDefaultRunner();
-
     const description = await p.text({
       message: "Describe your project:",
       placeholder: "e.g., Next.js e-commerce app with Stripe and Tailwind",
-      validate: (value) => {
-        if (!value || !value.trim()) return "Please enter a project description";
-      },
+      validate: (value) => { if (!value || !value.trim()) return "Please enter a project description"; },
     });
     handleCancel(description);
 
     const genSpinner = p.spinner();
     genSpinner.start("Generating harness configuration...");
-
     try {
-      // Load catalog blocks so LLM knows available building blocks + validation
       const { createDefaultRegistry } = await import("../../catalog/registry.js");
       const catalogRegistry = await createDefaultRegistry();
       const catalogBlocks = catalogRegistry.list().map((b) => ({
@@ -274,160 +195,20 @@ export async function runInitTUI(options?: {
     } catch (err) {
       genSpinner.stop("Generation failed");
       p.log.error(`Failed to generate config: ${(err as Error).message}`);
-      p.cancel("Try again or use preset mode.");
+      p.cancel("Try again.");
       process.exit(1);
     }
 
-    // Show summary
-    const summary = formatConfigSummary(harnessConfig);
-    p.note(summary, "Generated Configuration");
-
-    const confirmed = await p.confirm({
-      message: "Proceed with this configuration?",
-      initialValue: true,
-    });
+    p.note(formatConfigSummary(harnessConfig), "Generated Configuration");
+    const confirmed = await p.confirm({ message: "Proceed with this configuration?", initialValue: true });
     handleCancel(confirmed);
-    if (!confirmed) {
-      p.cancel("Aborted.");
-      process.exit(0);
-    }
-  } else if (mode === "preset") {
-    // Step 4b: Preset Mode — 3-step interactive language/framework/PM selection
-    p.log.info(`${chalk.dim("_base preset is always included automatically.")}`);
-
-    // Step 4b-1: Language
-    const language = await p.select({
-      message: "Choose your language",
-      options: [
-        { value: "python", label: "Python" },
-        { value: "typescript", label: "TypeScript" },
-        { value: "javascript", label: "JavaScript" },
-        { value: "rust", label: "Rust" },
-        { value: "go", label: "Go" },
-        { value: "java", label: "Java" },
-        { value: "ruby", label: "Ruby" },
-        { value: "php", label: "PHP" },
-        { value: "swift", label: "Swift" },
-        { value: "dart", label: "Dart" },
-        { value: "csharp", label: "C#" },
-        { value: "elixir", label: "Elixir" },
-        { value: "scala", label: "Scala" },
-        { value: "zig", label: "Zig" },
-        { value: "cpp", label: "C/C++" },
-      ],
-    });
-    handleCancel(language);
-
-    // Framework options per language
-    type FrameworkOption = { value: string; label: string };
-    const frameworkOptions: Record<string, FrameworkOption[]> = {
-      python: [
-        { value: "django", label: "Django" },
-        { value: "fastapi", label: "FastAPI" },
-        { value: "flask", label: "Flask" },
-        { value: "none", label: "None" },
-      ],
-      typescript: [
-        { value: "nextjs", label: "Next.js" },
-        { value: "react", label: "React" },
-        { value: "vue", label: "Vue" },
-        { value: "express", label: "Express" },
-        { value: "none", label: "None" },
-      ],
-      javascript: [
-        { value: "nextjs", label: "Next.js" },
-        { value: "react", label: "React" },
-        { value: "vue", label: "Vue" },
-        { value: "express", label: "Express" },
-        { value: "none", label: "None" },
-      ],
-      java: [
-        { value: "springboot", label: "Spring Boot" },
-        { value: "none", label: "None" },
-      ],
-      ruby: [
-        { value: "rails", label: "Rails" },
-        { value: "none", label: "None" },
-      ],
-      php: [
-        { value: "laravel", label: "Laravel" },
-        { value: "none", label: "None" },
-      ],
-      go: [
-        { value: "gin", label: "Gin" },
-        { value: "none", label: "None" },
-      ],
-      rust: [
-        { value: "actix", label: "Actix" },
-        { value: "none", label: "None" },
-      ],
-      dart: [
-        { value: "flutter", label: "Flutter" },
-        { value: "none", label: "None" },
-      ],
-      elixir: [
-        { value: "phoenix", label: "Phoenix" },
-        { value: "none", label: "None" },
-      ],
-    };
-
-    // Step 4b-2: Framework (only for languages with options)
-    let framework: string | undefined;
-    const fwOptions = frameworkOptions[language as string];
-    if (fwOptions && fwOptions.length > 1) {
-      const fw = await p.select({
-        message: "Choose your framework",
-        options: fwOptions,
-      });
-      handleCancel(fw);
-      framework = fw as string;
-    }
-
-    // Package manager options per language
-    type PmOption = { value: string; label: string };
-    const pmOptions: Record<string, PmOption[]> = {
-      python: [
-        { value: "uv", label: "uv" },
-        { value: "pipenv", label: "pipenv" },
-        { value: "pip", label: "pip" },
-      ],
-      typescript: [
-        { value: "pnpm", label: "pnpm" },
-        { value: "npm", label: "npm" },
-        { value: "yarn", label: "yarn" },
-      ],
-      javascript: [
-        { value: "pnpm", label: "pnpm" },
-        { value: "npm", label: "npm" },
-        { value: "yarn", label: "yarn" },
-      ],
-      java: [
-        { value: "gradle", label: "gradle" },
-        { value: "maven", label: "maven" },
-      ],
-    };
-
-    // Step 4b-3: Package Manager (only for languages with multiple options)
-    let packageManager: string | undefined;
-    const pmOpts = pmOptions[language as string];
-    if (pmOpts && pmOpts.length > 1) {
-      const pm = await p.select({
-        message: "Choose your package manager",
-        options: pmOpts,
-      });
-      handleCancel(pm);
-      packageManager = pm as string;
-    }
-
-    presetNames = buildPresetExtends(language as string, framework, packageManager);
-  } else if (mode === "import") {
-    // Step 4c: Import Mode
+    if (!confirmed) { p.cancel("Aborted."); process.exit(0); }
+  } else {
+    // Import mode
     const importPath = await p.text({
       message: "Path to harness.yaml:",
       placeholder: "./harness.yaml",
-      validate: (value) => {
-        if (!value || !value.trim()) return "Please enter a file path";
-      },
+      validate: (value) => { if (!value || !value.trim()) return "Please enter a file path"; },
     });
     handleCancel(importPath);
 
@@ -443,9 +224,7 @@ export async function runInitTUI(options?: {
       }
       harnessConfig = result.data;
       p.log.success("Imported harness.yaml successfully");
-
-      const summary = formatConfigSummary(harnessConfig);
-      p.note(summary, "Imported Configuration");
+      p.note(formatConfigSummary(harnessConfig), "Imported Configuration");
     } catch (err) {
       p.log.error(`Failed to read file: ${(err as Error).message}`);
       p.cancel("Check the file path and try again.");
@@ -453,21 +232,15 @@ export async function runInitTUI(options?: {
     }
   }
 
-  // Step 5: Missing Package Check
+  // Missing Tool Check
   if (harnessConfig) {
     const toolResults = await checkReferencedTools(harnessConfig);
     const missingTools = toolResults.filter((t) => !t.installed);
-
     if (missingTools.length > 0) {
       const toolLines = missingTools
-        .map(
-          (t) =>
-            `  ${chalk.yellow("\u26A0")} ${chalk.bold(t.name)} \u2014 Used in ${t.source}\n    ${chalk.dim("\u2192")} ${t.installCmd}`,
-        )
+        .map((t) => `  ${chalk.yellow("⚠")} ${chalk.bold(t.name)} — Used in ${t.source}\n    ${chalk.dim("→")} ${t.installCmd}`)
         .join("\n");
-
       p.note(toolLines, "Missing Tools");
-
       const installChoice = await p.select({
         message: "Install missing packages?",
         options: [
@@ -477,93 +250,52 @@ export async function runInitTUI(options?: {
         ],
       });
       handleCancel(installChoice);
-
-      if (installChoice === "all") {
-        for (const tool of missingTools) {
-          const installSpinner = p.spinner();
-          installSpinner.start(`Installing ${tool.name}...`);
-          try {
-            const { execFile: execFileCb } = await import("node:child_process");
-            const { promisify } = await import("node:util");
-            const execFileAsync = promisify(execFileCb);
-            const parts = tool.installCmd.split(" ");
-            await execFileAsync(parts[0], parts.slice(1), { cwd: projectDir });
-            installSpinner.stop(`${tool.name} installed`);
-          } catch {
-            installSpinner.stop(`Failed to install ${tool.name}`);
-            p.log.warn(`Could not install ${tool.name}. Run manually: ${tool.installCmd}`);
-          }
-        }
-      } else if (installChoice === "choose") {
-        const toInstall = await p.multiselect({
-          message: "Select packages to install:",
-          options: missingTools.map((t) => ({
-            value: t.name,
-            label: `${t.name} (${t.installCmd})`,
-          })),
-          required: false,
-        });
-        handleCancel(toInstall);
-
-        for (const name of toInstall as string[]) {
-          const tool = missingTools.find((t) => t.name === name);
-          if (!tool) continue;
-          const installSpinner = p.spinner();
-          installSpinner.start(`Installing ${tool.name}...`);
-          try {
-            const { execFile: execFileCb } = await import("node:child_process");
-            const { promisify } = await import("node:util");
-            const execFileAsync = promisify(execFileCb);
-            const parts = tool.installCmd.split(" ");
-            await execFileAsync(parts[0], parts.slice(1), { cwd: projectDir });
-            installSpinner.stop(`${tool.name} installed`);
-          } catch {
-            installSpinner.stop(`Failed to install ${tool.name}`);
-            p.log.warn(`Could not install ${tool.name}. Run manually: ${tool.installCmd}`);
-          }
+      const toInstall = installChoice === "all"
+        ? missingTools
+        : installChoice === "choose"
+          ? await (async () => {
+              const chosen = await p.multiselect({
+                message: "Select packages to install:",
+                options: missingTools.map((t) => ({ value: t.name, label: `${t.name} (${t.installCmd})` })),
+                required: false,
+              });
+              handleCancel(chosen);
+              return missingTools.filter((t) => (chosen as string[]).includes(t.name));
+            })()
+          : [];
+      for (const tool of toInstall as ToolCheck[]) {
+        const s = p.spinner();
+        s.start(`Installing ${tool.name}...`);
+        try {
+          const { execFile: execFileCb } = await import("node:child_process");
+          const { promisify } = await import("node:util");
+          const parts = tool.installCmd.split(" ");
+          await promisify(execFileCb)(parts[0], parts.slice(1), { cwd: projectDir });
+          s.stop(`${tool.name} installed`);
+        } catch {
+          s.stop(`Failed to install ${tool.name}`);
+          p.log.warn(`Could not install ${tool.name}. Run manually: ${tool.installCmd}`);
         }
       }
     }
   }
 
-  // Step 6: Generation
+  // Generation
   const genSpinner = p.spinner();
   genSpinner.start("Generating harness files...");
-
   const generatedFiles: string[] = [];
 
   try {
     if (harnessConfig) {
-      // NL or import mode: convert harness config to merged config via v2 (catalog pipeline)
       const { harnessToMergedConfigV2 } = await import("../../core/harness-converter-v2.js");
       const config = await harnessToMergedConfigV2(harnessConfig);
       const result = await generate({ projectDir, config });
       generatedFiles.push(...result.files);
-
-      // Save harness.yaml
       const harnessYamlPath = path.join(projectDir, "harness.yaml");
       await fs.writeFile(harnessYamlPath, yaml.dump(harnessConfig, { lineWidth: 120 }), "utf-8");
       generatedFiles.push(harnessYamlPath);
-
-      await writeHarnessState(projectDir, {
-        presets: ["harness"],
-        generatedAt: new Date().toISOString(),
-      });
-    } else if (presetNames) {
-      // Preset mode
-      const registry = new PresetRegistry();
-      await registry.discover(presetsDir);
-      const presetConfigs = await loadAndMergePresets(presetNames, registry);
-      const config = mergePresets(presetConfigs);
-      const result = await generate({ projectDir, config });
-      generatedFiles.push(...result.files);
-
-      await writeHarnessState(projectDir, {
-        presets: presetNames,
-        generatedAt: new Date().toISOString(),
-      });
+      await writeHarnessState(projectDir, { presets: ["harness"], generatedAt: new Date().toISOString() });
     }
-
     genSpinner.stop("Harness files generated");
   } catch (err) {
     genSpinner.stop("Generation failed");
@@ -572,54 +304,29 @@ export async function runInitTUI(options?: {
     process.exit(1);
   }
 
-  // Show generated files
   const fileList = generatedFiles
-    .map((f) => `  ${chalk.green("\u2713")} ${path.relative(projectDir, f)}`)
+    .map((f) => `  ${chalk.green("✓")} ${path.relative(projectDir, f)}`)
     .join("\n");
   p.note(fileList, "Generated Files");
 
-  // Step 7: Summary
-  const summaryLines: string[] = [];
-  summaryLines.push(`Generated ${generatedFiles.length} files in ${chalk.cyan(projectDir)}`);
-  summaryLines.push("");
-
-  if (harnessConfig) {
-    const activeHooks = mergeEnforcementAndHooks(harnessConfig);
-    if (activeHooks.length > 0) {
-      summaryLines.push("Active hooks:");
-      for (const hook of activeHooks) {
-        summaryLines.push(`  \u2022 ${hook.block}`);
-      }
-      summaryLines.push("");
-    }
-  }
-
-  summaryLines.push("Next steps:");
-  summaryLines.push("  1. Review harness.yaml to customize");
-  summaryLines.push("  2. Run oh-my-harness doctor to verify");
-  summaryLines.push("  3. Restart your Claude Code session");
-
+  const summaryLines = [
+    `Generated ${generatedFiles.length} files in ${chalk.cyan(projectDir)}`,
+    "",
+    "Next steps:",
+    "  1. Review harness.yaml to customize",
+    "  2. Run oh-my-harness doctor to verify",
+    "  3. Restart your Claude Code session",
+  ];
   p.note(summaryLines.join("\n"), "Harness configured successfully!");
 
-  // Step 8: GitHub Star Prompt (first time only)
   try {
     if (!(await hasStarPromptBeenShown())) {
-      const wantsStar = await p.confirm({
-        message: "Enjoying oh-my-harness? Star us on GitHub?",
-        initialValue: true,
-      });
-
-      // Mark shown regardless of cancel so the prompt never repeats
+      const wantsStar = await p.confirm({ message: "Enjoying oh-my-harness? Star us on GitHub?", initialValue: true });
       await markStarPromptShown();
-
       if (!p.isCancel(wantsStar) && wantsStar) {
         try {
           const ok = await starRepo();
-          if (ok) {
-            p.log.success("Thanks for the star!");
-          } else {
-            p.log.info("Star us anytime: https://github.com/kyu1204/oh-my-harness");
-          }
+          p.log[ok ? "success" : "info"](ok ? "Thanks for the star!" : "Star us anytime: https://github.com/kyu1204/oh-my-harness");
         } catch {
           p.log.info("Star us anytime: https://github.com/kyu1204/oh-my-harness");
         }

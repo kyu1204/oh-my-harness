@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import type { ClaudeMdSection } from "../core/preset-types.js";
+import type { ClaudeMdSection } from "../core/merged-config.js";
 import { extractManagedSections, removeManagedSection, upsertManagedSection } from "../utils/markdown.js";
 import { readFileOrDefault } from "../utils/fs-helpers.js";
 

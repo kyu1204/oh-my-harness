@@ -7,9 +7,8 @@ import { generateHooks, wrapWithLogger } from "../../src/generators/hooks.js";
 import { readEvents } from "../../src/cli/event-logger.js";
 import { renderTemplate } from "../../src/catalog/template-engine.js";
 import { builtinBlocks } from "../../src/catalog/blocks/index.js";
-import { harnessToMergedConfig } from "../../src/core/harness-converter.js";
 import { harnessToMergedConfigV2 } from "../../src/core/harness-converter-v2.js";
-import type { MergedConfig } from "../../src/core/preset-types.js";
+import type { MergedConfig } from "../../src/core/merged-config.js";
 import type { HarnessConfig } from "../../src/core/harness-schema.js";
 
 function getBlock(id: string) {
@@ -352,7 +351,7 @@ describe("enforcement auto-converted to catalog hooks", () => {
     expect(catalogHooks).toHaveLength(1);
   });
 
-  it("9. v1 returns empty hooks, v2 converts enforcement to catalog hooks", async () => {
+  it("9. v2 converts enforcement to catalog hooks", async () => {
     const harness = makeBaseHarness({
       enforcement: {
         preCommit: ["npm test"],
@@ -362,11 +361,7 @@ describe("enforcement auto-converted to catalog hooks", () => {
       },
     });
 
-    const v1 = harnessToMergedConfig(harness);
     const v2 = await harnessToMergedConfigV2(harness);
-
-    // v1 no longer generates inline enforcement hooks
-    expect(v1.hooks.preToolUse).toHaveLength(0);
 
     // v2 converts enforcement to catalog hooks
     const v2CatalogHooks = v2.hooks.preToolUse.filter((h) =>

@@ -1,6 +1,6 @@
 import { mkdir, writeFile, chmod, readFile, unlink } from "node:fs/promises";
 import { basename, join } from "node:path";
-import type { MergedConfig } from "../core/preset-types.js";
+import type { MergedConfig } from "../core/merged-config.js";
 import { OMH_HOOKS_DIR, OMH_STATE_DIR, OMH_MANIFEST, OMH_EVENTS_FILE } from "../utils/paths.js";
 
 // Wrap a path/value in bash single quotes, escaping any embedded single

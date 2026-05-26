@@ -8,7 +8,7 @@ import { checkHarnessCommands } from "../command-checker.js";
 import type { TestResult } from "../harness-tester.js";
 import type { CommandCheckResult } from "../command-checker.js";
 import { HarnessConfigSchema } from "../../core/harness-schema.js";
-import { mergeEnforcementAndHooks } from "../../core/harness-converter.js";
+import { mergeEnforcementAndHooks } from "../../core/harness-converter-v2.js";
 import { builtinBlocks } from "../../catalog/blocks/index.js";
 import type { HookEntry } from "../../catalog/types.js";
 

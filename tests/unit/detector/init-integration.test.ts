@@ -44,8 +44,6 @@ const validHarness = {
   permissions: { allow: [], deny: [] },
 };
 
-const PRESETS_DIR = path.resolve(import.meta.dirname, "../../../presets");
-
 let tmpDir: string;
 
 beforeEach(async () => {
@@ -81,7 +79,6 @@ describe("NL init flow + detectProject integration", () => {
     await initCommand([], {
       yes: true,
       projectDir: tmpDir,
-      presetsDir: PRESETS_DIR,
       nlRunner: mockRunner,
     });
 
@@ -109,7 +106,6 @@ describe("NL init flow + detectProject integration", () => {
     await initCommand([], {
       yes: true,
       projectDir: tmpDir,
-      presetsDir: PRESETS_DIR,
       nlRunner: mockRunner,
     });
 
@@ -130,8 +126,7 @@ describe("NL init flow + detectProject integration", () => {
       initCommand([], {
         yes: true,
         projectDir: tmpDir,
-        presetsDir: PRESETS_DIR,
-        nlRunner: mockRunner,
+          nlRunner: mockRunner,
       }),
     ).resolves.not.toThrow();
 
@@ -147,15 +142,4 @@ describe("NL init flow + detectProject integration", () => {
     }
   });
 
-  it("does not call detectProject for preset-based init", async () => {
-    const { initCommand } = await import("../../../src/cli/commands/init.js");
-
-    await initCommand(["_base"], {
-      yes: true,
-      projectDir: tmpDir,
-      presetsDir: PRESETS_DIR,
-    });
-
-    expect(mockDetectProject).not.toHaveBeenCalled();
-  });
 });

@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import yaml from "js-yaml";
 import { generate } from "../../core/generator.js";
-import { parseNaturalLanguage, generateHarnessConfig } from "../../nl/parse-intent.js";
+import { generateHarnessConfig } from "../../nl/parse-intent.js";
 import type { ClaudeRunner } from "../../nl/parse-intent.js";
 import { detectProject } from "../../detector/project-detector.js";
 import type { ProjectFacts } from "../../detector/project-detector.js";
@@ -13,6 +13,7 @@ export interface InitOptions {
   yes?: boolean;
   projectDir?: string;
   nlRunner?: ClaudeRunner;
+  description?: string;
 }
 
 export interface HarnessState {
@@ -42,17 +43,16 @@ export async function writeHarnessState(projectDir: string, state: HarnessState)
 }
 
 export async function initCommand(
-  _presetNames: string[],
+  descriptionParts: string[],
   options: InitOptions = {},
 ): Promise<void> {
   const projectDir = options.projectDir ?? process.cwd();
-
-  if (options.nlRunner) {
-    await initWithNL(projectDir, options);
-    return;
+  const inlineDescription = descriptionParts.join(" ").trim();
+  if (inlineDescription) {
+    options = { ...options, description: inlineDescription };
   }
 
-  if (options.yes) {
+  if (options.nlRunner || options.yes) {
     await initWithNL(projectDir, options);
     return;
   }
@@ -69,8 +69,8 @@ export async function initWithNL(
 ): Promise<void> {
   let description: string;
 
-  if (options.yes && options.nlRunner) {
-    description = "generate config";
+  if (options.yes && (options.description || options.nlRunner)) {
+    description = options.description ?? "generate config";
   } else if (!options.yes) {
     const { input } = await import("@inquirer/prompts");
     description = await input({

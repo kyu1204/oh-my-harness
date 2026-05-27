@@ -114,5 +114,11 @@ export function createCli(): Command {
       await hookRemoveCommand(blockId, options);
     });
 
+  program.on("command:*", () => {
+    console.error(`error: unknown command '${program.args[0]}'`);
+    console.error(`Run 'oh-my-harness --help' for a list of available commands.`);
+    process.exitCode = 1;
+  });
+
   return program;
 }

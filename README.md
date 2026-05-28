@@ -87,7 +87,7 @@ your-project/
 │   └── manifest.json                  # Generated-files manifest
 ├── .claude/
 │   ├── settings.json                  # Claude permissions + hooks → .omh/hooks/*.sh
-│   └── oh-my-harness.json             # Active preset tracking
+│   └── oh-my-harness.json             # Harness init/sync state
 └── .codex/
     ├── config.toml                    # [features] codex_hooks = true, goals = true
     └── hooks.json                     # Codex hooks → .omh/hooks/*.sh (same scripts)
@@ -101,7 +101,7 @@ your-project/
   ~/.omh/config.json   ┌─────────────────────┐
   ┌────────────────┐   │                     │
   │ • Claude CLI   │──▶│   NL Processing     │◀── "React + FastAPI
-  │ • Claude API   │   │   or --preset flag  │     TDD enforced"
+  │ • Claude API   │   │   (describe your    │     TDD enforced"
   │ • OpenAI API   │   │                     │
   │ • Gemini API   │   └────────┬────────────┘
   └────────────────┘            │
@@ -311,7 +311,7 @@ Keyboard: `1/2/3` views, `↑/↓` scroll, `d` date filter, `r` reload, `q` quit
 
 ## 📊 Stateful Hook Logging
 
-Every hook invocation is recorded in `.claude/hooks/.state/events.jsonl`:
+Every hook invocation is recorded in `.omh/state/events.jsonl`:
 
 ```jsonl
 {"ts":"2026-03-18T08:00:00Z","event":"PreToolUse","hook":"catalog-tdd-guard.sh","decision":"block","reason":"TDD — foo.test.* 테스트 파일을 먼저 수정하세요"}

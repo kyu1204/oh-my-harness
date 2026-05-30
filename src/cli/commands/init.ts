@@ -8,6 +8,7 @@ import { detectProject } from "../../detector/project-detector.js";
 import type { ProjectFacts } from "../../detector/project-detector.js";
 import { harnessToMergedConfigV2 } from "../../core/harness-converter-v2.js";
 import { createDefaultRegistry } from "../../catalog/registry.js";
+import { buildMinimalHarnessConfig, ensureHarnessYaml } from "../../core/harness-defaults.js";
 
 export interface InitOptions {
   yes?: boolean;

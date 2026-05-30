@@ -304,8 +304,16 @@ describe("generateHarnessConfig", () => {
     await expect(generateHarnessConfig("some app", mockRunner)).rejects.toThrow();
   });
 
-  it("throws when YAML is missing required schema fields", async () => {
-    const mockRunner: ClaudeRunner = async () => yaml.dump({ version: "1.0", project: {} });
+  it("throws when YAML has invalid stack shape (missing required name)", async () => {
+    // The top-level project/rules fields became defaulted in v1.1 to support
+    // the README hooks-only shape, so the negative case now lives inside the
+    // nested stack object where `name` is still required.
+    const mockRunner: ClaudeRunner = async () =>
+      yaml.dump({
+        version: "1.0",
+        project: { stacks: [{ framework: "nextjs", language: "typescript" }] },
+        rules: [],
+      });
     await expect(generateHarnessConfig("some app", mockRunner)).rejects.toThrow();
   });
 

@@ -11,7 +11,8 @@ export const HarnessConfigSchema = z.object({
   tags: z.array(z.string()).optional(),
   extends: z.array(z.string()).optional(), // stub — reserved for future marketplace composition
 
-  // Project info (from NL parsing)
+  // Project info (from NL parsing or preset detector). Optional so a minimal
+  // hooks-only harness.yaml (the shape shown in README) still validates.
   project: z.object({
     name: z.string().optional(),
     description: z.string().optional(),
@@ -22,8 +23,8 @@ export const HarnessConfigSchema = z.object({
       packageManager: z.string().optional(),
       testRunner: z.string().optional(),
       linter: z.string().optional(),
-    })),
-  }),
+    })).default([]),
+  }).default({ stacks: [] }),
 
   // Rules injected into CLAUDE.md
   rules: z.array(z.object({
@@ -31,7 +32,7 @@ export const HarnessConfigSchema = z.object({
     title: z.string(),
     content: z.string(),
     priority: z.number().default(50),
-  })),
+  })).default([]),
 
   // Enforcement hooks
   enforcement: z.object({

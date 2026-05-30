@@ -89,7 +89,7 @@ your-project/
 │   ├── settings.json                  # Claude permissions + hooks → .omh/hooks/*.sh
 │   └── oh-my-harness.json             # Harness init/sync state
 └── .codex/
-    ├── config.toml                    # [features] codex_hooks = true, goals = true
+    ├── config.toml                    # [features] hooks = true, goals = true
     └── hooks.json                     # Codex hooks → .omh/hooks/*.sh (same scripts)
 ```
 

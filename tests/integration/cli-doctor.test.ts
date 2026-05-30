@@ -31,7 +31,7 @@ async function setupInitializedProject(dir: string): Promise<void> {
   await fs.writeFile(path.join(dir, ".codex", "hooks.json"), JSON.stringify({}));
   await fs.writeFile(
     path.join(dir, ".codex", "config.toml"),
-    "[features]\ncodex_shell = true\ncodex_hooks = true\ngoals = true\n",
+    "[features]\ncodex_shell = true\nhooks = true\ngoals = true\n",
   );
   // Create a dummy hook script
   const hookScript = path.join(dir, ".omh", "hooks", "command-guard.sh");
@@ -136,7 +136,7 @@ describe("doctorCommand", () => {
     await setupInitializedProject(tmpDir);
     await fs.writeFile(
       path.join(tmpDir, ".codex", "config.toml"),
-      "[features]\ncodex_hooks = true\n",
+      "[features]\nhooks = true\n",
       "utf-8",
     );
 

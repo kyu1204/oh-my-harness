@@ -402,7 +402,7 @@ oh-my-harness/
 - [x] Codex emitter — `AGENTS.md` + `.codex/hooks.json` + `.codex/config.toml`
 - [x] Unified `.omh/` layout — single source of truth for hooks & state across runtimes
 - [ ] Cursor (`.cursor/rules/`) emitter
-- [ ] PI (Process Isolation) emitter — sandboxed tool execution
+- [ ] Pi ([pi.dev](https://pi.dev)) emitter — generate harness config for the Pi coding agent
 - [ ] `ask` mode — request approval before executing risky tools
 - [ ] Community harness.yaml registry — share and reuse configs
 - [ ] `omh modify "change X"` — NL config editing

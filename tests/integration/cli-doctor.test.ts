@@ -2,10 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { initCommand } from "../../src/cli/commands/init.js";
 import { doctorCommand } from "../../src/cli/commands/doctor.js";
-
-const PRESETS_DIR = path.resolve(import.meta.dirname, "../../presets");
 
 let tmpDir: string;
 
@@ -17,9 +14,34 @@ afterEach(async () => {
   await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
+async function setupInitializedProject(dir: string): Promise<void> {
+  await fs.mkdir(path.join(dir, ".claude"), { recursive: true });
+  await fs.mkdir(path.join(dir, ".codex"), { recursive: true });
+  await fs.mkdir(path.join(dir, ".omh", "hooks"), { recursive: true });
+  await fs.writeFile(
+    path.join(dir, ".claude", "oh-my-harness.json"),
+    JSON.stringify({ presets: ["harness"], generatedAt: new Date().toISOString() }),
+  );
+  await fs.writeFile(path.join(dir, "CLAUDE.md"), "# CLAUDE\n");
+  await fs.writeFile(
+    path.join(dir, ".claude", "settings.json"),
+    JSON.stringify({ permissions: { allow: [], deny: [] } }),
+  );
+  await fs.writeFile(path.join(dir, "AGENTS.md"), "# AGENTS\n");
+  await fs.writeFile(path.join(dir, ".codex", "hooks.json"), JSON.stringify({}));
+  await fs.writeFile(
+    path.join(dir, ".codex", "config.toml"),
+    "[features]\ncodex_shell = true\ncodex_hooks = true\ngoals = true\n",
+  );
+  // Create a dummy hook script
+  const hookScript = path.join(dir, ".omh", "hooks", "command-guard.sh");
+  await fs.writeFile(hookScript, "#!/bin/bash\n");
+  await fs.chmod(hookScript, 0o755);
+}
+
 describe("doctorCommand", () => {
   it("returns healthy when all files are present after init", async () => {
-    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    await setupInitializedProject(tmpDir);
 
     const result = await doctorCommand({ projectDir: tmpDir });
 
@@ -41,7 +63,7 @@ describe("doctorCommand", () => {
   });
 
   it("reports unhealthy when CLAUDE.md is missing", async () => {
-    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    await setupInitializedProject(tmpDir);
 
     // Remove CLAUDE.md after init
     await fs.rm(path.join(tmpDir, "CLAUDE.md"));
@@ -54,7 +76,7 @@ describe("doctorCommand", () => {
   });
 
   it("reports unhealthy when settings.json is missing", async () => {
-    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    await setupInitializedProject(tmpDir);
 
     // Remove settings.json after init
     await fs.rm(path.join(tmpDir, ".claude", "settings.json"));
@@ -84,20 +106,20 @@ describe("doctorCommand", () => {
   });
 
   it("returns exitCode 0 when healthy", async () => {
-    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    await setupInitializedProject(tmpDir);
     const result = await doctorCommand({ projectDir: tmpDir });
     expect(result.healthy).toBe(true);
     expect(result.exitCode).toBe(0);
   });
 
   it("verifies AGENTS.md exists for Codex compatibility", async () => {
-    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    await setupInitializedProject(tmpDir);
     const result = await doctorCommand({ projectDir: tmpDir });
     expect(result.checks.agentsMd).toBe(true);
   });
 
   it("reports unhealthy when AGENTS.md is missing", async () => {
-    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    await setupInitializedProject(tmpDir);
     await fs.rm(path.join(tmpDir, "AGENTS.md"));
     const result = await doctorCommand({ projectDir: tmpDir });
     expect(result.checks.agentsMd).toBe(false);
@@ -105,13 +127,13 @@ describe("doctorCommand", () => {
   });
 
   it("verifies .codex/hooks.json and config.toml exist for Codex emitter", async () => {
-    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    await setupInitializedProject(tmpDir);
     const result = await doctorCommand({ projectDir: tmpDir });
     expect(result.checks.codexConfig).toBe(true);
   });
 
   it("reports unhealthy when Codex /goal feature flag is missing", async () => {
-    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    await setupInitializedProject(tmpDir);
     await fs.writeFile(
       path.join(tmpDir, ".codex", "config.toml"),
       "[features]\ncodex_hooks = true\n",
@@ -126,7 +148,7 @@ describe("doctorCommand", () => {
   });
 
   it("reports unhealthy when .codex/hooks.json is invalid JSON", async () => {
-    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    await setupInitializedProject(tmpDir);
     // Simulate a merge conflict / hand-edit corrupting hooks.json
     await fs.writeFile(path.join(tmpDir, ".codex", "hooks.json"), "<<< not json", "utf-8");
 
@@ -138,7 +160,7 @@ describe("doctorCommand", () => {
   });
 
   it("verifies hook scripts under .omh/hooks are executable", async () => {
-    await initCommand(["_base"], { yes: true, projectDir: tmpDir, presetsDir: PRESETS_DIR });
+    await setupInitializedProject(tmpDir);
     const result = await doctorCommand({ projectDir: tmpDir });
     expect(result.checks.hooksExecutable).toBe(true);
 

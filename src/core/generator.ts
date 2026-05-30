@@ -1,4 +1,4 @@
-import type { MergedConfig } from "./preset-types.js";
+import type { MergedConfig } from "./merged-config.js";
 import { generateClaudeMd } from "../generators/claude-md.js";
 import { generateAgentsMd } from "../generators/agents-md.js";
 import { generateHooks } from "../generators/hooks.js";

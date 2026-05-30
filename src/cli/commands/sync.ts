@@ -5,6 +5,7 @@ import chalk from "chalk";
 import { HarnessConfigSchema } from "../../core/harness-schema.js";
 import { harnessToMergedConfigV2 } from "../../core/harness-converter-v2.js";
 import { generate } from "../../core/generator.js";
+import { writeHarnessState } from "./init.js";
 
 export interface SyncOptions {
   projectDir?: string;
@@ -57,6 +58,7 @@ export async function syncCommand(options: SyncOptions = {}): Promise<void> {
     }
   }
   const genResult = await generate({ projectDir, config: mergedV2 });
+  await writeHarnessState(projectDir, { presets: ["harness"], generatedAt: new Date().toISOString() });
 
   console.log(chalk.green("oh-my-harness: sync complete"));
   console.log("Generated files:");

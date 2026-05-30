@@ -1,12 +1,60 @@
 import type { HarnessConfig } from "./harness-schema.js";
-import type { MergedConfig, HookDefinition, HooksConfig } from "./preset-types.js";
-import { harnessToMergedConfig, mergeEnforcementAndHooks } from "./harness-converter.js";
+import type { MergedConfig, HookDefinition, HooksConfig, ClaudeMdSection, Variables } from "./merged-config.js";
 import type { CatalogRegistry } from "../catalog/registry.js";
+import type { HookEntry } from "../catalog/types.js";
 import { createDefaultRegistry } from "../catalog/registry.js";
 import { convertHookEntries } from "../catalog/converter.js";
 
-export interface MergedConfigV2 extends MergedConfig {
-  catalogErrors?: string[];
+function harnessToMergedConfig(harness: HarnessConfig): MergedConfig {
+  const variables: Variables = {};
+  if (harness.project.stacks.length > 0) {
+    const primary = harness.project.stacks[0];
+    variables.framework = primary.framework;
+    variables.language = primary.language;
+    if (primary.packageManager) variables.packageManager = primary.packageManager;
+    if (primary.testRunner) variables.testRunner = primary.testRunner;
+    if (primary.linter) variables.linter = primary.linter;
+  }
+
+  const claudeMdSections: ClaudeMdSection[] = harness.rules
+    .map((rule) => ({ id: rule.id, title: rule.title, content: rule.content, priority: rule.priority }))
+    .sort((a, b) => (a.priority ?? 50) - (b.priority ?? 50));
+
+  return {
+    presets: ["harness"],
+    variables,
+    claudeMdSections,
+    hooks: { preToolUse: [], postToolUse: [], sessionStart: [], notification: [], configChange: [], worktreeCreate: [] },
+    settings: { permissions: { allow: harness.permissions.allow, deny: harness.permissions.deny } },
+  };
+}
+
+function convertEnforcementToHooks(enforcement: HarnessConfig["enforcement"]): HookEntry[] {
+  const hooks: HookEntry[] = [];
+  for (const cmd of enforcement.preCommit) {
+    if (/\btsc\b/.test(cmd)) {
+      hooks.push({ block: "commit-typecheck-gate", params: { typecheckCommand: cmd } });
+    } else {
+      hooks.push({ block: "commit-test-gate", params: { testCommand: cmd } });
+    }
+  }
+  if (enforcement.blockedPaths.length > 0) {
+    hooks.push({ block: "path-guard", params: { blockedPaths: enforcement.blockedPaths } });
+  }
+  if (enforcement.blockedCommands.length > 0) {
+    hooks.push({ block: "command-guard", params: { patterns: enforcement.blockedCommands } });
+  }
+  for (const ps of enforcement.postSave) {
+    hooks.push({ block: "lint-on-save", params: { filePattern: ps.pattern, command: ps.command } });
+  }
+  return hooks;
+}
+
+export function mergeEnforcementAndHooks(harness: HarnessConfig): HookEntry[] {
+  const enforcementHooks = convertEnforcementToHooks(harness.enforcement);
+  const explicitHooks = harness.hooks ?? [];
+  const explicitBlockIds = new Set(explicitHooks.map((h) => h.block));
+  return [...enforcementHooks.filter((h) => !explicitBlockIds.has(h.block)), ...explicitHooks];
 }
 
 /** Maps Claude Code event names to HooksConfig field names */
@@ -23,7 +71,7 @@ export async function harnessToMergedConfigV2(
   harness: HarnessConfig,
   registry?: CatalogRegistry,
   projectDir?: string,
-): Promise<MergedConfigV2> {
+): Promise<MergedConfig> {
   // Start with base conversion (rules, variables, permissions — no inline enforcement scripts)
   const base = harnessToMergedConfig(harness);
 

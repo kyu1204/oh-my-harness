@@ -8,9 +8,9 @@ vi.mock("../../src/core/generator.js", () => ({
   generate: vi.fn(),
 }));
 
-// Mock harnessToMergedConfig and mergeEnforcementAndHooks
-vi.mock("../../src/core/harness-converter.js", () => ({
-  harnessToMergedConfig: vi.fn(),
+// Mock harnessToMergedConfigV2
+vi.mock("../../src/core/harness-converter-v2.js", () => ({
+  harnessToMergedConfigV2: vi.fn(),
   mergeEnforcementAndHooks: vi.fn().mockReturnValue([]),
 }));
 
@@ -34,10 +34,10 @@ describe("syncCommand", () => {
 
   it("reads harness.yaml and regenerates files", async () => {
     const { generate } = await import("../../src/core/generator.js");
-    const { harnessToMergedConfig } = await import("../../src/core/harness-converter.js");
+    const { harnessToMergedConfigV2 } = await import("../../src/core/harness-converter-v2.js");
 
     const mockMergedConfig = { presets: ["harness"], variables: {}, claudeMdSections: [], hooks: { preToolUse: [], postToolUse: [] }, settings: { permissions: { allow: [], deny: [] } } };
-    vi.mocked(harnessToMergedConfig).mockReturnValue(mockMergedConfig as ReturnType<typeof harnessToMergedConfig>);
+    vi.mocked(harnessToMergedConfigV2).mockResolvedValue(mockMergedConfig as Awaited<ReturnType<typeof harnessToMergedConfigV2>>);
     vi.mocked(generate).mockResolvedValue({ files: [`${tmpDir}/CLAUDE.md`, `${tmpDir}/.claude/settings.json`] });
 
     const harnessYaml = `
@@ -63,7 +63,7 @@ permissions:
     const { syncCommand } = await import("../../src/cli/commands/sync.js");
     await syncCommand({ projectDir: tmpDir });
 
-    expect(harnessToMergedConfig).toHaveBeenCalled();
+    expect(harnessToMergedConfigV2).toHaveBeenCalled();
     expect(generate).toHaveBeenCalledWith(expect.objectContaining({ projectDir: tmpDir }));
 
     const output = consoleLogSpy.mock.calls.map((c) => c.join(" ")).join("\n");

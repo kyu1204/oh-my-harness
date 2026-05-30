@@ -53,11 +53,10 @@ npx oh-my-harness init "TypeScript Next.js frontend with Python FastAPI backend"
 
 # Or install globally
 npm install -g oh-my-harness
-oh-my-harness init --preset nextjs fastapi
+oh-my-harness init "React app with TDD"
 
 # Short alias works too
-omh init "React app with TDD"
-omh init --preset android            # Android/Kotlin with Hilt, JUnit, Gradle
+omh init "Android Kotlin app with Hilt, JUnit, Gradle"
 omh catalog list
 omh test          # Dry-run verify your harness
 omh stats         # TUI analytics dashboard
@@ -88,7 +87,7 @@ your-project/
 │   └── manifest.json                  # Generated-files manifest
 ├── .claude/
 │   ├── settings.json                  # Claude permissions + hooks → .omh/hooks/*.sh
-│   └── oh-my-harness.json             # Active preset tracking
+│   └── oh-my-harness.json             # Harness init/sync state
 └── .codex/
     ├── config.toml                    # [features] codex_hooks = true, goals = true
     └── hooks.json                     # Codex hooks → .omh/hooks/*.sh (same scripts)
@@ -102,7 +101,7 @@ your-project/
   ~/.omh/config.json   ┌─────────────────────┐
   ┌────────────────┐   │                     │
   │ • Claude CLI   │──▶│   NL Processing     │◀── "React + FastAPI
-  │ • Claude API   │   │   or --preset flag  │     TDD enforced"
+  │ • Claude API   │   │   (describe your    │     TDD enforced"
   │ • OpenAI API   │   │                     │
   │ • Gemini API   │   └────────┬────────────┘
   └────────────────┘            │
@@ -225,7 +224,7 @@ hooks:
 ```bash
 # 🚀 Initialize
 omh init "your project description"      # NL-powered (requires AI provider)
-omh init --preset nextjs fastapi          # Preset-based (instant)
+omh init                                  # Interactive TUI (import existing harness.yaml)
 
 # 📋 Catalog
 omh catalog list                          # Browse all building blocks
@@ -236,9 +235,7 @@ omh hook add branch-guard                 # Add a hook
 omh hook remove auto-pr                   # Remove a hook
 
 # 🔄 Sync & manage
-omh sync                                 # Regenerate from harness.yaml
-omh add nextjs                            # Add a preset
-omh remove fastapi                        # Remove a preset
+omh sync                                 # Regenerate all files from harness.yaml
 
 # 🩺 Verify & monitor
 omh doctor                               # Health check
@@ -314,7 +311,7 @@ Keyboard: `1/2/3` views, `↑/↓` scroll, `d` date filter, `r` reload, `q` quit
 
 ## 📊 Stateful Hook Logging
 
-Every hook invocation is recorded in `.claude/hooks/.state/events.jsonl`:
+Every hook invocation is recorded in `.omh/state/events.jsonl`:
 
 ```jsonl
 {"ts":"2026-03-18T08:00:00Z","event":"PreToolUse","hook":"catalog-tdd-guard.sh","decision":"block","reason":"TDD — foo.test.* 테스트 파일을 먼저 수정하세요"}
@@ -338,7 +335,7 @@ oh-my-harness/
 │   │   ├── template-engine.ts # Handlebars rendering + applyDefaults
 │   │   └── converter.ts    # HookEntry[] → rendered scripts
 │   ├── cli/
-│   │   ├── commands/       # init, add, remove, doctor, catalog, hook, sync, test
+│   │   ├── commands/       # init, doctor, catalog, hook, sync, test
 │   │   ├── stats/          # TUI dashboard (ink/React)
 │   │   │   ├── App.tsx     # App shell (tab bar, keyboard nav)
 │   │   │   ├── data.ts     # Data aggregation layer
@@ -350,10 +347,10 @@ oh-my-harness/
 │   │   ├── provider-setup.ts  # Provider configuration UI
 │   │   └── tool-checker.ts    # Command executable checks
 │   ├── core/
-│   │   ├── harness-schema.ts   # harness.yaml Zod schema
-│   │   ├── harness-converter.ts # enforcement→hooks + MergedConfig
-│   │   ├── generator.ts        # Orchestrates all generators
-│   │   └── config-merger.ts    # Multi-preset merge
+│   │   ├── harness-schema.ts      # harness.yaml Zod schema
+│   │   ├── merged-config.ts       # MergedConfig + HooksConfig interfaces
+│   │   ├── harness-converter-v2.ts # harness.yaml → MergedConfig (catalog pipeline)
+│   │   └── generator.ts           # Orchestrates all generators
 │   ├── generators/
 │   │   ├── claude-md.ts    # CLAUDE.md with idempotent markers
 │   │   ├── hooks.ts        # Hook scripts + event logger injection
@@ -376,8 +373,7 @@ oh-my-harness/
 │       │   └── gemini-api.ts
 │       ├── parse-intent.ts      # LLM prompt integration
 │       └── prompt-templates.ts  # NL prompt construction
-├── presets/                # Built-in preset definitions
-└── tests/                  # 873+ tests (unit + integration)
+└── tests/                  # 900+ tests (unit + integration)
 ```
 
 ---
@@ -405,8 +401,10 @@ oh-my-harness/
 - [x] GitHub star prompt — first-time only
 - [x] Codex emitter — `AGENTS.md` + `.codex/hooks.json` + `.codex/config.toml`
 - [x] Unified `.omh/` layout — single source of truth for hooks & state across runtimes
-- [ ] PI emitter
-- [ ] Community preset registry
+- [ ] Cursor (`.cursor/rules/`) emitter
+- [ ] PI (Process Isolation) emitter — sandboxed tool execution
+- [ ] `ask` mode — request approval before executing risky tools
+- [ ] Community harness.yaml registry — share and reuse configs
 - [ ] `omh modify "change X"` — NL config editing
 
 ---

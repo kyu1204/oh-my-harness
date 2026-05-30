@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { formatDepResults, formatConfigSummary, formatProjectFacts, buildPresetExtends } from "../../src/cli/tui/init-flow.js";
+import { formatDepResults, formatConfigSummary, formatProjectFacts } from "../../src/cli/tui/init-flow.js";
 import type { DepCheck } from "../../src/cli/deps-checker.js";
 import type { HarnessConfig } from "../../src/core/harness-schema.js";
 import { emptyFacts } from "../../src/detector/types.js";
@@ -195,33 +195,6 @@ describe("formatConfigSummary", () => {
   });
 });
 
-describe("buildPresetExtends", () => {
-  it("returns language-only preset when no framework and no PM", () => {
-    const result = buildPresetExtends("rust", undefined, undefined);
-    expect(result).toEqual(["_base", "rust"]);
-  });
-
-  it("includes framework when not 'none'", () => {
-    const result = buildPresetExtends("python", "django", undefined);
-    expect(result).toEqual(["_base", "python", "django"]);
-  });
-
-  it("excludes framework when value is 'none'", () => {
-    const result = buildPresetExtends("python", "none", "uv");
-    expect(result).toEqual(["_base", "python", "uv"]);
-  });
-
-  it("includes package manager when provided", () => {
-    const result = buildPresetExtends("typescript", "nextjs", "pnpm");
-    expect(result).toEqual(["_base", "typescript", "nextjs", "pnpm"]);
-  });
-
-  it("handles language with no framework and a PM", () => {
-    const result = buildPresetExtends("java", undefined, "gradle");
-    expect(result).toEqual(["_base", "java", "gradle"]);
-  });
-});
-
 describe("formatProjectFacts", () => {
   it("displays detected languages and frameworks", () => {
     const facts = {
@@ -357,22 +330,26 @@ describe("NL mode provider integration", () => {
         writeHarnessState: vi.fn(async () => undefined),
       };
     });
-    vi.doMock("../../src/core/harness-converter-v2.js", () => ({
-      harnessToMergedConfigV2: vi.fn(async () => ({
-        presets: [],
-        variables: {},
-        claudeMdSections: [],
-        hooks: {
-          preToolUse: [],
-          postToolUse: [],
-          sessionStart: [],
-          notification: [],
-          configChange: [],
-          worktreeCreate: [],
-        },
-        settings: { permissions: { allow: [], deny: [] } },
-      })),
-    }));
+    vi.doMock("../../src/core/harness-converter-v2.js", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("../../src/core/harness-converter-v2.js")>();
+      return {
+        ...actual,
+        harnessToMergedConfigV2: vi.fn(async () => ({
+          presets: [],
+          variables: {},
+          claudeMdSections: [],
+          hooks: {
+            preToolUse: [],
+            postToolUse: [],
+            sessionStart: [],
+            notification: [],
+            configChange: [],
+            worktreeCreate: [],
+          },
+          settings: { permissions: { allow: [], deny: [] } },
+        })),
+      };
+    });
     vi.doMock("../../src/catalog/registry.js", () => ({
       createDefaultRegistry: vi.fn(async () => ({
         list: () => [],
@@ -381,7 +358,7 @@ describe("NL mode provider integration", () => {
 
     const { runInitTUI } = await import("../../src/cli/tui/init-flow.js");
 
-    await runInitTUI({ projectDir: tmpDir, presetsDir: path.resolve(import.meta.dirname, "../../presets") });
+    await runInitTUI({ projectDir: tmpDir });
 
     expect(createDefaultRunnerSpy).toHaveBeenCalledOnce();
     expect(mockHasProviderConfig).toHaveBeenCalledOnce();

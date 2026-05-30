@@ -3,7 +3,6 @@ import { mkdtemp, rm, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { HarnessConfigSchema } from "../../src/core/harness-schema.js";
-import { harnessToMergedConfig } from "../../src/core/harness-converter.js";
 import { harnessToMergedConfigV2 } from "../../src/core/harness-converter-v2.js";
 import { generateHooks, wrapWithLogger } from "../../src/generators/hooks.js";
 
@@ -183,25 +182,6 @@ describe("harness.yaml → hooks end-to-end (via v2 catalog pipeline)", () => {
       const fileStat = await stat(scriptFile);
       expect(fileStat.mode & 0o111).toBeGreaterThan(0);
     }
-  });
-
-  it("harnessToMergedConfig returns empty hooks (enforcement handled by v2 pipeline)", async () => {
-    const rawConfig = {
-      ...minimalHarnessYaml,
-      enforcement: {
-        preCommit: ["npm test"],
-        blockedPaths: [],
-        blockedCommands: [],
-        postSave: [],
-      },
-    };
-
-    const harness = HarnessConfigSchema.parse(rawConfig);
-    const v1 = harnessToMergedConfig(harness);
-
-    // v1 no longer generates inline enforcement hooks
-    expect(v1.hooks.preToolUse).toHaveLength(0);
-    expect(v1.hooks.postToolUse).toHaveLength(0);
   });
 
   it("hooksConfig output contains PreToolUse entry with matcher from catalog hook definition", async () => {

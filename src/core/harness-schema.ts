@@ -4,6 +4,13 @@ import { HookEntrySchema } from "../catalog/types.js";
 export const HarnessConfigSchema = z.object({
   version: z.literal("1.0").default("1.0"),
 
+  // Sharing / community metadata (optional — used for omh sync portability and future marketplace)
+  name: z.string().optional(),
+  description: z.string().optional(),
+  harnessVersion: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  extends: z.array(z.string()).optional(), // stub — reserved for future marketplace composition
+
   // Project info (from NL parsing or preset detector). Optional so a minimal
   // hooks-only harness.yaml (the shape shown in README) still validates.
   project: z.object({

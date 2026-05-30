@@ -178,4 +178,25 @@ describe("convertHookEntries", () => {
     expect(result.hooksConfig["PostToolUse"]).toHaveLength(2);
     expect(result.errors.filter((e) => e.includes("Duplicate"))).toHaveLength(0);
   });
+
+  it("defaults mode to block when not specified", async () => {
+    registry.register(makeBlock({ id: "b", canBlock: true }));
+    const result = await convertHookEntries([{ block: "b", params: {} }], registry, projectDir);
+    expect(result.errors).toHaveLength(0);
+    expect(result.hooksConfig["PreToolUse"][0].mode).toBe("block");
+  });
+
+  it("propagates ask mode for a block that can block", async () => {
+    registry.register(makeBlock({ id: "b", canBlock: true }));
+    const result = await convertHookEntries([{ block: "b", params: {}, mode: "ask" }], registry, projectDir);
+    expect(result.errors).toHaveLength(0);
+    expect(result.hooksConfig["PreToolUse"][0].mode).toBe("ask");
+  });
+
+  it("rejects ask mode on a non-blocking block and falls back to block", async () => {
+    registry.register(makeBlock({ id: "b", canBlock: false }));
+    const result = await convertHookEntries([{ block: "b", params: {}, mode: "ask" }], registry, projectDir);
+    expect(result.hooksConfig["PreToolUse"][0].mode).toBe("block");
+    expect(result.errors.some((e) => e.includes("does not support ask mode"))).toBe(true);
+  });
 });

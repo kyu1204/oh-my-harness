@@ -5,6 +5,9 @@ export interface HookDefinition {
   script?: string;
   inline?: string;
   variables?: Record<string, unknown>;
+  // "ask" escalates to the user instead of hard-blocking (Claude); defaults to
+  // "block". Threaded into the generated hook script's _emit_decision.
+  mode?: "block" | "ask";
 }
 
 export interface ClaudeMdSection {

@@ -61,6 +61,10 @@ export interface BuildingBlock {
 export interface HookEntry {
   block: string;
   params: Record<string, unknown>;
+  // "block" (default) hard-blocks the tool call; "ask" escalates to the user
+  // for approval on runtimes that support it (Claude), falling back to block
+  // elsewhere (Codex). Only meaningful for blocks with canBlock === true.
+  mode?: "block" | "ask";
 }
 
 export const ParamDefinitionSchema = z.object({
@@ -87,4 +91,5 @@ export const BuildingBlockSchema = z.object({
 export const HookEntrySchema = z.object({
   block: z.string(),
   params: z.record(z.unknown()).default({}),
+  mode: z.enum(["block", "ask"]).default("block"),
 });

@@ -7,6 +7,7 @@ export interface HookConfigEntry {
   type: "command";
   command: string;
   matcher?: string;
+  mode?: "block" | "ask";
 }
 
 export interface ConvertResult {
@@ -55,9 +56,21 @@ export async function convertHookEntries(
     const scriptPath = `${OMH_HOOKS_DIR}/${scriptName}`;
     scripts.set(scriptPath, scriptContent);
 
+    // Resolve ask/block mode. "ask" only makes sense for blocks that can
+    // block a tool call; for non-blocking blocks it is meaningless, so warn
+    // and fall back to "block" rather than emitting a no-op ask.
+    let mode: "block" | "ask" = entry.mode ?? "block";
+    if (mode === "ask" && !block.canBlock) {
+      errors.push(
+        `Block "${entry.block}" does not support ask mode (canBlock=false); falling back to block.`,
+      );
+      mode = "block";
+    }
+
     const hookEntry: HookConfigEntry = {
       type: "command",
       command: scriptPath,
+      mode,
     };
 
     if (block.matcher) {

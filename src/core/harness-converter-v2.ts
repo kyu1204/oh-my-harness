@@ -108,6 +108,7 @@ export async function harnessToMergedConfigV2(
         matcher: entry.matcher ?? "",
         description: `Catalog block: ${blockId}`,
         inline: catalogResult.scripts.get(entry.command),
+        mode: entry.mode ?? "block",
       };
 
       additionalHooks[field].push(hookDef);

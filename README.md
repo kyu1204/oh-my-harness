@@ -195,6 +195,7 @@ All enforcement is powered by **catalog blocks** — reusable, parameterized hoo
 hooks:
   - block: branch-guard
   - block: tdd-guard
+    mode: ask          # ask for approval instead of hard-blocking (Claude)
   - block: commit-test-gate
     params:
       testCommand: "npx vitest run"
@@ -216,6 +217,20 @@ hooks:
     params:
       baseBranch: main
 ```
+
+#### `mode`: block vs. ask
+
+Any blocking hook accepts an optional `mode` (default `block`):
+
+- **`block`** — hard-blocks the tool call. The agent cannot proceed.
+- **`ask`** — escalates to the user for approval instead of blocking outright.
+  - **Claude Code**: shows a native permission prompt (`permissionDecision: "ask"`).
+  - **Codex**: `ask` is **not** supported, so the hook falls back to a hard
+    block — your guardrail is never silently downgraded to "allow". The same
+    generated script detects the calling runtime and responds accordingly.
+
+`mode: ask` only applies to blocks that can block (`canBlock: true`); setting it
+on a non-blocking block (e.g. `lint-on-save`) is reported and ignored.
 
 ---
 
@@ -403,7 +418,7 @@ oh-my-harness/
 - [x] Unified `.omh/` layout — single source of truth for hooks & state across runtimes
 - [ ] Cursor (`.cursor/rules/`) emitter
 - [ ] Pi ([pi.dev](https://pi.dev)) emitter — generate harness config for the Pi coding agent
-- [ ] `ask` mode — request approval before executing risky tools
+- [x] `ask` mode — request approval before executing risky tools (Claude; Codex falls back to block)
 - [ ] Community harness.yaml registry — share and reuse configs
 - [ ] `omh modify "change X"` — NL config editing
 

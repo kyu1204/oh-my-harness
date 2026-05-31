@@ -10,7 +10,7 @@ function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-function buildLoggerSnippet(event: string, projectDir?: string): string {
+function buildLoggerSnippet(event: string, projectDir?: string, mode: "block" | "ask" = "block"): string {
   const stateDir = projectDir
     ? `${projectDir}/${OMH_STATE_DIR}`
     : OMH_STATE_DIR;
@@ -19,6 +19,7 @@ _OMH_STATE_DIR=${shellSingleQuote(stateDir)}
 mkdir -p "$_OMH_STATE_DIR" 2>/dev/null || true
 _OMH_HOOK_NAME="$(basename "$0")"
 _OMH_EVENT="${event}"
+_OMH_DECISION_MODE="${mode}"
 _OMH_LOGGED=0
 _log_event() {
   # Build the JSONL record entirely through jq so every string field is
@@ -55,8 +56,24 @@ _log_event() {
 # via echo "{...}" — a file name or pattern containing a quote, backslash,
 # or newline would otherwise produce invalid JSON that the runtime cannot
 # parse as a block decision.
+#
+# In ask mode the same hook escalates to the user instead of hard-blocking,
+# but only on runtimes that understand a permissionDecision:"ask" response.
+# Claude's PreToolUse payload carries a transcript_path field; Codex's does
+# not. A runtime we cannot positively identify as Claude falls through to a
+# hard block, so a guardrail (e.g. TDD) is never silently downgraded to allow.
+# The two requirements (Claude=ask, Codex=block) cannot coexist in one JSON —
+# a legacy {decision:"block"} overrides permissionDecision:"ask" on Claude —
+# so we branch on the caller instead of emitting a combined object.
 _emit_decision() {
   local decision="\${1:-block}" reason="\${2:-}"
+  if [ "\${_OMH_DECISION_MODE:-block}" = "ask" ] && [ "$decision" = "block" ]; then
+    if printf '%s' "\${INPUT:-}" | jq -e 'has("transcript_path")' >/dev/null 2>&1; then
+      jq -cn --arg reason "$reason" --arg event "$_OMH_EVENT" \\
+        '{hookSpecificOutput:{hookEventName:$event,permissionDecision:"ask",permissionDecisionReason:$reason}}'
+      return 0
+    fi
+  fi
   jq -cn --arg decision "$decision" --arg reason "$reason" \\
     '{decision:$decision,reason:$reason}'
 }
@@ -64,8 +81,13 @@ trap '_OMH_EXIT_CODE=$?; if [ "$_OMH_LOGGED" -eq 0 ]; then if [ "$_OMH_EXIT_CODE
 # --- end logger ---`;
 }
 
-export function wrapWithLogger(script: string, event: string = "unknown", projectDir?: string): string {
-  const snippet = buildLoggerSnippet(event, projectDir);
+export function wrapWithLogger(
+  script: string,
+  event: string = "unknown",
+  projectDir?: string,
+  mode: "block" | "ask" = "block",
+): string {
+  const snippet = buildLoggerSnippet(event, projectDir, mode);
   if (script.includes("INPUT=$(cat)")) {
     return script.replace("INPUT=$(cat)", `INPUT=$(cat)\n\n${snippet}`);
   }
@@ -194,7 +216,7 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
       event: hook.event,
       matcher: hook.matcher,
       scriptPath: join(hooksDir, scriptName),
-      wrappedScript: wrapWithLogger(hook.inline, hook.event, projectDir),
+      wrappedScript: wrapWithLogger(hook.inline, hook.event, projectDir, hook.mode ?? "block"),
     });
   }
 

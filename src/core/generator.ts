@@ -4,6 +4,7 @@ import { generateAgentsMd } from "../generators/agents-md.js";
 import { generateHooks } from "../generators/hooks.js";
 import { generateSettings } from "../generators/settings.js";
 import { generateCodexConfig } from "../generators/codex-config.js";
+import { generatePiExtension } from "../generators/pi-extension.js";
 import { updateGitignore } from "../generators/gitignore.js";
 import { migrateLegacyState } from "../utils/state-migration.js";
 import { OMH_DIR } from "../utils/paths.js";
@@ -36,13 +37,14 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   const hooksOutput = await generateHooks({ projectDir, config });
   files.push(...hooksOutput.generatedFiles);
 
-  // Claude settings.json and Codex config write to disjoint files using the
-  // same hooksOutput — independent.
-  const [, codexFiles] = await Promise.all([
+  // Claude settings.json, Codex config, and the Pi bridge extension write to
+  // disjoint files using the same hooksOutput — independent.
+  const [, codexFiles, piFiles] = await Promise.all([
     generateSettings({ projectDir, config, hooksOutput }),
     generateCodexConfig({ projectDir, hooksOutput }),
+    generatePiExtension({ projectDir, hooksOutput }),
   ]);
-  files.push(`${projectDir}/.claude/settings.json`, ...codexFiles);
+  files.push(`${projectDir}/.claude/settings.json`, ...codexFiles, ...piFiles);
 
   // .omh/state/ holds volatile log data; hooks/manifest are reproducible.
   await updateGitignore(projectDir, [`${OMH_DIR}/state/`]);

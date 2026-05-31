@@ -184,7 +184,7 @@ name = "second"
 `;
     const result = buildCodexConfigToml(existing);
     const parsed = parse(result) as {
-      features?: { codex_hooks?: unknown; goals?: unknown };
+      features?: { hooks?: unknown; goals?: unknown };
       mcp_servers?: Array<{ name?: unknown }>;
     };
     expect(parsed.features?.hooks).toBe(true);
@@ -269,7 +269,7 @@ describe("generateCodexConfig", () => {
     expect(hooksJson.hooks.PreToolUse[0].matcher).toBe("Bash");
 
     const toml = await fs.readFile(path.join(tmpDir, ".codex/config.toml"), "utf8");
-    const parsed = parse(toml) as { features?: { codex_hooks?: unknown; goals?: unknown } };
+    const parsed = parse(toml) as { features?: { hooks?: unknown; goals?: unknown } };
     expect(parsed.features?.hooks).toBe(true);
     expect(parsed.features?.goals).toBe(true);
   });
@@ -287,7 +287,7 @@ describe("generateCodexConfig", () => {
 
     const toml = await fs.readFile(path.join(codexDir, "config.toml"), "utf8");
     const parsed = parse(toml) as {
-      features?: { codex_hooks?: unknown; goals?: unknown };
+      features?: { hooks?: unknown; goals?: unknown };
       mcp_servers?: { foo?: { command?: unknown } };
     };
     expect(parsed.mcp_servers?.foo?.command).toBe("bar");

@@ -147,6 +147,21 @@ describe("doctorCommand", () => {
     expect(result.messages.some((m) => m.includes("goals = true"))).toBe(true);
   });
 
+  it("hints migration when config still uses the deprecated codex_hooks flag", async () => {
+    await setupInitializedProject(tmpDir);
+    await fs.writeFile(
+      path.join(tmpDir, ".codex", "config.toml"),
+      "[features]\ncodex_hooks = true\ngoals = true\n",
+      "utf-8",
+    );
+
+    const result = await doctorCommand({ projectDir: tmpDir });
+
+    expect(result.checks.codexConfig).toBe(false);
+    expect(result.healthy).toBe(false);
+    expect(result.messages.some((m) => m.includes("deprecated") && m.includes("codex_hooks"))).toBe(true);
+  });
+
   it("reports unhealthy when .codex/hooks.json is invalid JSON", async () => {
     await setupInitializedProject(tmpDir);
     // Simulate a merge conflict / hand-edit corrupting hooks.json

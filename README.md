@@ -418,7 +418,7 @@ oh-my-harness/
 - [x] Unified `.omh/` layout — single source of truth for hooks & state across runtimes
 - [ ] Cursor (`.cursor/rules/`) emitter
 - [ ] Pi ([pi.dev](https://pi.dev)) emitter — generate harness config for the Pi coding agent
-- [ ] `ask` mode — request approval before executing risky tools
+- [x] `ask` mode — request approval before executing risky tools (Claude; Codex falls back to block)
 - [ ] Community harness.yaml registry — share and reuse configs
 - [ ] `omh modify "change X"` — NL config editing
 

@@ -63,9 +63,11 @@ async function buildScript(mode: "block" | "ask"): Promise<string> {
   return scriptPath;
 }
 
-describe("ask-mode decisions (runtime-detecting single script)", () => {
+// jq is required by the generated hook scripts. When it is absent the whole
+// suite is reported as skipped (not silently passed), so a missing jq cannot
+// hide an ask/block regression behind a green check.
+describe.skipIf(!hasJq())("ask-mode decisions (runtime-detecting single script)", () => {
   it("ask mode + Claude payload: emits permissionDecision=ask (no hard block)", async () => {
-    if (!hasJq()) return;
     const scriptPath = await buildScript("ask");
     const out = runScript(scriptPath, CLAUDE_STDIN);
     const decision = JSON.parse(out.trim());
@@ -77,7 +79,6 @@ describe("ask-mode decisions (runtime-detecting single script)", () => {
   });
 
   it("ask mode + Codex payload: falls back to hard block (decision=block)", async () => {
-    if (!hasJq()) return;
     const scriptPath = await buildScript("ask");
     const out = runScript(scriptPath, CODEX_STDIN);
     const decision = JSON.parse(out.trim());
@@ -88,7 +89,6 @@ describe("ask-mode decisions (runtime-detecting single script)", () => {
   });
 
   it("block mode (default): Claude payload still gets a hard block", async () => {
-    if (!hasJq()) return;
     const scriptPath = await buildScript("block");
     const out = runScript(scriptPath, CLAUDE_STDIN);
     const decision = JSON.parse(out.trim());
@@ -97,7 +97,6 @@ describe("ask-mode decisions (runtime-detecting single script)", () => {
   });
 
   it("block mode (default): Codex payload gets a hard block", async () => {
-    if (!hasJq()) return;
     const scriptPath = await buildScript("block");
     const out = runScript(scriptPath, CODEX_STDIN);
     const decision = JSON.parse(out.trim());

@@ -107,4 +107,24 @@ describe.skipIf(!hasJq())("pi bridge extension (shells out to .omh/hooks/*.sh)",
     const result = await handler({ toolName: "read", input: { path: "/etc/hosts" } }, ctx);
     expect(result).toBeUndefined();
   });
+
+  it("fails closed (blocks) when the hook command cannot run", async () => {
+    // Point the binding at a script that does not exist: the shell exits
+    // non-zero with empty stdout. A guard must not be silently downgraded to
+    // allow by an execution failure.
+    const code = buildPiExtension([
+      { tools: ["bash"], command: `bash '${join(projectDir, ".omh", "hooks", "does-not-exist.sh")}'` },
+    ]);
+    await mkdir(join(projectDir, ".pi", "extensions"), { recursive: true });
+    const extPath = join(projectDir, ".pi", "extensions", "omh-harness.ts");
+    await writeFile(extPath, code, "utf-8");
+    let captured: ToolCallHandler | undefined;
+    const mod = await import(/* @vite-ignore */ extPath);
+    mod.default({ on: (e: string, h: ToolCallHandler) => { if (e === "tool_call") captured = h; } });
+
+    const ctx = { hasUI: true, ui: { select: async () => "Yes" } };
+    const result = await captured!({ toolName: "bash", input: { command: "echo hi" } }, ctx);
+    expect(result?.block).toBe(true);
+    expect(result?.reason).toContain("hook failed");
+  });
 });

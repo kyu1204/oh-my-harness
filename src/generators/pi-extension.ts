@@ -143,6 +143,17 @@ export default function (pi: ExtensionAPI) {
         shell: true,
       });
 
+      // The generated hook scripts always exit 0 in normal operation (allow or
+      // block is signalled via stdout JSON), so a spawn error (timeout/signal)
+      // or a non-zero exit means the guard itself malfunctioned. Fail closed:
+      // a guardrail must never be silently downgraded to allow by a failure.
+      if (proc.error || (typeof proc.status === "number" && proc.status !== 0)) {
+        return {
+          block: true,
+          reason: "oh-my-harness hook failed: " + (proc.error?.message ?? "exited with code " + proc.status),
+        };
+      }
+
       const out = (proc.stdout ?? "").trim();
       if (!out) continue;
 

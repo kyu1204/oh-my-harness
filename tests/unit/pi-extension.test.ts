@@ -65,6 +65,12 @@ describe("buildPiExtension", () => {
     expect(code).toContain("shell: true");
   });
 
+  it("fails closed when the hook process errors or exits non-zero", () => {
+    expect(code).toContain("proc.error");
+    expect(code).toContain("proc.status");
+    expect(code).toContain("hook failed");
+  });
+
   it("maps pi edit/write 'path' input to the Claude 'file_path' payload field", () => {
     // The shell guards read tool_input.file_path; pi delivers `path`.
     expect(code).toContain("file_path");
@@ -84,7 +90,7 @@ describe("buildPiExtension", () => {
 
   it("uses a type-only import so the pi package is not a runtime dependency", () => {
     expect(code).toContain("import type");
-    expect(code).not.toMatch(/^import \{[^}]*\} from "@earendil-works/m);
+    expect(code).not.toMatch(/^import \{[^}]*\} from "@earendil-works\/pi-coding-agent"/m);
   });
 
   it("is generated/marked as auto-generated", () => {

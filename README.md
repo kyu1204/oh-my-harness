@@ -416,8 +416,8 @@ oh-my-harness/
 - [x] GitHub star prompt — first-time only
 - [x] Codex emitter — `AGENTS.md` + `.codex/hooks.json` + `.codex/config.toml`
 - [x] Unified `.omh/` layout — single source of truth for hooks & state across runtimes
-- [ ] Pi ([pi.dev](https://pi.dev)) emitter — generate harness config for the Pi coding agent
-- [x] `ask` mode — request approval before executing risky tools (Claude; Codex falls back to block)
+- [x] Pi ([pi.dev](https://pi.dev)) emitter — bridge extension (`.pi/extensions/omh-harness.ts`) reusing the same `.omh/hooks/*.sh`
+- [x] `ask` mode — request approval before executing risky tools (Claude native prompt / Pi `ctx.ui.select`; Codex falls back to block)
 - [ ] Community harness.yaml registry — share and reuse configs
 - [ ] `omh modify "change X"` — NL config editing
 

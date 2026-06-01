@@ -1,7 +1,9 @@
 import { mkdir, writeFile, chmod, readFile, unlink } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type { MergedConfig } from "../core/merged-config.js";
+import type { PlannedFile } from "../core/plan.js";
 import { OMH_HOOKS_DIR, OMH_STATE_DIR, OMH_MANIFEST, OMH_EVENTS_FILE } from "../utils/paths.js";
+import { OMH_VERSION } from "../utils/version.js";
 
 // Wrap a path/value in bash single quotes, escaping any embedded single
 // quotes. Single-quoted strings are not subject to shell expansion, so this
@@ -119,6 +121,7 @@ export interface HooksOutput {
 
 interface HookManifest {
   generatedAt: string;
+  omhVersion: string;
   hooks: string[];
 }
 
@@ -159,14 +162,33 @@ async function unlinkIfPresent(filePath: string): Promise<void> {
 async function writeHookManifest(manifestPath: string, hooks: string[]): Promise<void> {
   const manifest: HookManifest = {
     generatedAt: new Date().toISOString(),
+    omhVersion: OMH_VERSION,
     hooks,
   };
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
 }
 
-export async function generateHooks(options: GenerateHooksOptions): Promise<HooksOutput> {
+export interface HooksPlan {
+  /** Hook script files (each chmod 0o755). */
+  files: PlannedFile[];
+  hooksConfig: Record<string, Array<{ matcher: string; hooks: HookCommand[] }>>;
+  generatedFiles: string[];
+  /** Absolute paths of stale hook scripts that a sync would remove. */
+  wouldDelete: string[];
+  manifestPath: string;
+  /** Hook basenames to record in the manifest. */
+  manifestNames: string[];
+}
+
+/**
+ * Compute hook scripts, settings hooksConfig, and stale-file cleanup WITHOUT
+ * touching disk (other than reading the previous manifest). Shared by the
+ * write path (generateHooks) and the plan/drift path.
+ */
+export async function computeHooks(options: GenerateHooksOptions): Promise<HooksPlan> {
   const { projectDir, config } = options;
   const hooksDir = join(projectDir, OMH_HOOKS_DIR);
+  const manifestPath = join(projectDir, OMH_MANIFEST);
 
   const eventMap: Array<[string, typeof config.hooks.preToolUse]> = [
     ["PreToolUse", config.hooks.preToolUse],
@@ -181,20 +203,18 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
     hooks.map((h) => ({ ...h, event })),
   );
 
-  await mkdir(hooksDir, { recursive: true });
-
-  // Read previous manifest to clean up stale hook files
-  const manifestPath = join(projectDir, OMH_MANIFEST);
-  await mkdir(join(projectDir, OMH_STATE_DIR), { recursive: true });
+  // Read previous manifest to identify stale hook files to clean up.
   const previousHooks = await readPreviousHookNames(manifestPath);
 
   if (allHooks.length === 0) {
-    // Remove all previously generated hooks
-    for (const name of previousHooks) {
-      await unlinkIfPresent(join(hooksDir, name));
-    }
-    await writeHookManifest(manifestPath, []);
-    return { hooksConfig: {}, generatedFiles: [] };
+    return {
+      files: [],
+      hooksConfig: {},
+      generatedFiles: [],
+      wouldDelete: previousHooks.map((name) => join(hooksDir, name)),
+      manifestPath,
+      manifestNames: [],
+    };
   }
 
   const usedScriptNames = new Set<string>();
@@ -220,14 +240,6 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
     });
   }
 
-  // Independent IO across hooks — parallelize.
-  await Promise.all(
-    planned.map(async (p) => {
-      await writeFile(p.scriptPath, p.wrappedScript, "utf8");
-      await chmod(p.scriptPath, 0o755);
-    }),
-  );
-
   const generatedFiles = planned.map((p) => p.scriptPath);
   const hooksConfig: Record<string, Array<{ matcher: string; hooks: HookCommand[] }>> = {};
   for (const p of planned) {
@@ -238,18 +250,43 @@ export async function generateHooks(options: GenerateHooksOptions): Promise<Hook
     });
   }
 
-  // Remove stale hook files from previous sync that are no longer generated
-  const currentNames = new Set(generatedFiles.map((f) => f.split("/").pop() as string));
-  for (const name of previousHooks) {
-    if (!currentNames.has(name)) {
-      await unlinkIfPresent(join(hooksDir, name));
-    }
-  }
+  const currentNames = new Set(generatedFiles.map((f) => basename(f)));
+  const wouldDelete = previousHooks
+    .filter((name) => !currentNames.has(name))
+    .map((name) => join(hooksDir, name));
 
-  await writeHookManifest(
+  return {
+    files: planned.map((p) => ({ path: p.scriptPath, content: p.wrappedScript, chmod: 0o755 })),
+    hooksConfig,
+    generatedFiles,
+    wouldDelete,
     manifestPath,
-    generatedFiles.map((f) => f.split("/").pop() as string),
+    manifestNames: generatedFiles.map((f) => basename(f)),
+  };
+}
+
+export async function generateHooks(options: GenerateHooksOptions): Promise<HooksOutput> {
+  const { projectDir } = options;
+  const hooksDir = join(projectDir, OMH_HOOKS_DIR);
+  const plan = await computeHooks(options);
+
+  await mkdir(hooksDir, { recursive: true });
+  await mkdir(join(projectDir, OMH_STATE_DIR), { recursive: true });
+
+  // Independent IO across hooks — parallelize.
+  await Promise.all(
+    plan.files.map(async (f) => {
+      await writeFile(f.path, f.content, "utf8");
+      if (f.chmod !== undefined) await chmod(f.path, f.chmod);
+    }),
   );
 
-  return { hooksConfig, generatedFiles };
+  // Remove stale hook files from a previous sync that are no longer generated.
+  for (const stale of plan.wouldDelete) {
+    await unlinkIfPresent(stale);
+  }
+
+  await writeHookManifest(plan.manifestPath, plan.manifestNames);
+
+  return { hooksConfig: plan.hooksConfig, generatedFiles: plan.generatedFiles };
 }

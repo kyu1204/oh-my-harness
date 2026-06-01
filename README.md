@@ -60,7 +60,29 @@ omh init "Android Kotlin app with Hilt, JUnit, Gradle"
 omh catalog list
 omh test          # Dry-run verify your harness
 omh stats         # TUI analytics dashboard
+omh diff          # Preview what `omh sync` would change
+omh sync --check  # Fail (exit 1) if generated files are out of date — CI gate
 ```
+
+### 🔄 Keeping generated files in sync
+
+`harness.yaml` is the source of truth, so the committed `CLAUDE.md`, hooks, and
+runtime configs can drift if someone edits `harness.yaml` without re-running
+`omh sync`. Three commands keep them honest:
+
+| Command | Use |
+|---------|-----|
+| `omh sync --check` | CI gate — exits non-zero (and lists the files) when generated output is stale, writes nothing |
+| `omh diff` | Human preview of exactly what `omh sync` would change |
+| `omh doctor --strict` | Health check that also fails on drift (plain `omh doctor` warns) |
+
+```yaml
+# .github/workflows/ci.yml
+- run: npx oh-my-harness sync --check   # fails the build if the harness is out of date
+```
+
+The hook manifest records the oh-my-harness version that generated it, so an
+upgrade that changes output is surfaced as a "re-run `omh sync`" hint.
 
 ### 📁 What Gets Generated
 

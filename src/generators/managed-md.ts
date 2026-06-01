@@ -3,7 +3,11 @@ import type { ClaudeMdSection } from "../core/merged-config.js";
 import { extractManagedSections, removeManagedSection, upsertManagedSection } from "../utils/markdown.js";
 import { readFileOrDefault } from "../utils/fs-helpers.js";
 
-export async function writeManagedMarkdown(
+/**
+ * Compute the final managed-markdown content (merging into the existing file)
+ * without writing it. Shared by the write path and the plan/drift path.
+ */
+export async function computeManagedMarkdown(
   filePath: string,
   sections: ClaudeMdSection[],
 ): Promise<string> {
@@ -25,6 +29,14 @@ export async function writeManagedMarkdown(
     content = upsertManagedSection(content, section.id, section.content ?? "");
   }
 
+  return content;
+}
+
+export async function writeManagedMarkdown(
+  filePath: string,
+  sections: ClaudeMdSection[],
+): Promise<string> {
+  const content = await computeManagedMarkdown(filePath, sections);
   await fs.writeFile(filePath, content, "utf8");
   return content;
 }

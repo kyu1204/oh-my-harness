@@ -3,6 +3,23 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { doctorCommand } from "../../src/cli/commands/doctor.js";
+import { syncCommand } from "../../src/cli/commands/sync.js";
+
+const DRIFT_HARNESS = `version: "1.0"
+hooks:
+  - block: command-guard
+    params:
+      patterns:
+        - "FOO"
+`;
+const DRIFT_HARNESS_CHANGED = `version: "1.0"
+hooks:
+  - block: command-guard
+    params:
+      patterns:
+        - "FOO"
+        - "BAR"
+`;
 
 let tmpDir: string;
 
@@ -209,6 +226,52 @@ describe("doctorCommand", () => {
     expect(result.checks.codexConfig).toBe(false);
     expect(result.healthy).toBe(false);
     expect(result.messages.some((m) => m.includes("hooks.json") || m.includes("invalid"))).toBe(true);
+  });
+
+  // Drift detection is integrity-independent: a valid install can still be
+  // out of date with harness.yaml. doctor surfaces it as a warning by default
+  // and only fails health under --strict (for CI gating).
+  it("warns about drift but stays healthy by default when out of sync", async () => {
+    await fs.writeFile(path.join(tmpDir, "harness.yaml"), DRIFT_HARNESS, "utf-8");
+    await syncCommand({ projectDir: tmpDir });
+    // Edit harness.yaml without re-syncing.
+    await fs.writeFile(path.join(tmpDir, "harness.yaml"), DRIFT_HARNESS_CHANGED, "utf-8");
+
+    const result = await doctorCommand({ projectDir: tmpDir });
+
+    expect(result.inSync).toBe(false);
+    expect(result.messages.some((m) => m.toLowerCase().includes("out of sync"))).toBe(true);
+    // Drift alone does not fail health (it is a warning, not a broken install).
+    expect(result.healthy).toBe(true);
+  });
+
+  it("fails health under --strict when out of sync", async () => {
+    await fs.writeFile(path.join(tmpDir, "harness.yaml"), DRIFT_HARNESS, "utf-8");
+    await syncCommand({ projectDir: tmpDir });
+    await fs.writeFile(path.join(tmpDir, "harness.yaml"), DRIFT_HARNESS_CHANGED, "utf-8");
+
+    const result = await doctorCommand({ projectDir: tmpDir, strict: true });
+
+    expect(result.inSync).toBe(false);
+    expect(result.healthy).toBe(false);
+    expect(result.exitCode).toBe(1);
+  });
+
+  it("reports inSync true and no drift warning right after a sync", async () => {
+    await fs.writeFile(path.join(tmpDir, "harness.yaml"), DRIFT_HARNESS, "utf-8");
+    await syncCommand({ projectDir: tmpDir });
+
+    const result = await doctorCommand({ projectDir: tmpDir });
+
+    expect(result.inSync).toBe(true);
+    expect(result.messages.some((m) => m.toLowerCase().includes("out of sync"))).toBe(false);
+  });
+
+  it("skips the drift check when there is no harness.yaml", async () => {
+    await setupInitializedProject(tmpDir);
+    const result = await doctorCommand({ projectDir: tmpDir });
+    // No harness.yaml → drift is not evaluated; inSync stays undefined.
+    expect(result.inSync).toBeUndefined();
   });
 
   it("verifies hook scripts under .omh/hooks are executable", async () => {

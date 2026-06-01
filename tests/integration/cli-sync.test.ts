@@ -98,6 +98,56 @@ describe("syncCommand", () => {
     expect(scriptContent).not.toContain("{{mainBranch}}");
   });
 
+  it("sync --check returns exitCode 0 when the project is in sync", async () => {
+    const harnessContent = makeMinimalHarness({
+      hooks: [{ block: "branch-guard", params: { mainBranch: "main" } }],
+    });
+    await fs.writeFile(path.join(tmpDir, "harness.yaml"), harnessContent, "utf-8");
+    await syncCommand({ projectDir: tmpDir });
+
+    const result = await syncCommand({ projectDir: tmpDir, check: true });
+    expect(result?.exitCode).toBe(0);
+    expect(result?.inSync).toBe(true);
+  });
+
+  it("sync --check returns exitCode 1 when harness.yaml drifted", async () => {
+    const harnessContent = makeMinimalHarness({
+      hooks: [{ block: "command-guard", params: { patterns: ["FOO"] } }],
+    });
+    await fs.writeFile(path.join(tmpDir, "harness.yaml"), harnessContent, "utf-8");
+    await syncCommand({ projectDir: tmpDir });
+
+    const drifted = makeMinimalHarness({
+      hooks: [{ block: "command-guard", params: { patterns: ["FOO", "BAR"] } }],
+    });
+    await fs.writeFile(path.join(tmpDir, "harness.yaml"), drifted, "utf-8");
+
+    const result = await syncCommand({ projectDir: tmpDir, check: true });
+    expect(result?.exitCode).toBe(1);
+    expect(result?.inSync).toBe(false);
+  });
+
+  it("sync --check does not write any files", async () => {
+    const harnessContent = makeMinimalHarness({
+      hooks: [{ block: "command-guard", params: { patterns: ["FOO"] } }],
+    });
+    await fs.writeFile(path.join(tmpDir, "harness.yaml"), harnessContent, "utf-8");
+    await syncCommand({ projectDir: tmpDir });
+
+    const scriptPath = path.join(tmpDir, ".omh", "hooks", "catalog-command-guard.sh");
+    const before = await fs.readFile(scriptPath, "utf-8");
+
+    // Drift the harness, then run --check; the on-disk script must be untouched.
+    const drifted = makeMinimalHarness({
+      hooks: [{ block: "command-guard", params: { patterns: ["FOO", "BAR"] } }],
+    });
+    await fs.writeFile(path.join(tmpDir, "harness.yaml"), drifted, "utf-8");
+    await syncCommand({ projectDir: tmpDir, check: true });
+
+    const after = await fs.readFile(scriptPath, "utf-8");
+    expect(after).toBe(before);
+  });
+
   it("updates files when synced a second time after harness.yaml changes", async () => {
     // First sync
     const initial = makeMinimalHarness({

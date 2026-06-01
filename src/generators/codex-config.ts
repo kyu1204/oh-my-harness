@@ -120,16 +120,19 @@ export function buildCodexConfigToml(existing: string): string {
   return CODEX_CONFIG_HEADER + stringify(data) + "\n";
 }
 
-export async function generateCodexConfig(options: GenerateCodexConfigOptions): Promise<string[]> {
+/**
+ * Compute the .codex/hooks.json and .codex/config.toml contents (merging into
+ * the existing TOML) without writing.
+ */
+export async function computeCodexConfig(
+  options: GenerateCodexConfigOptions,
+): Promise<{ path: string; content: string }[]> {
   const { projectDir, hooksOutput } = options;
   const codexDir = path.join(projectDir, ".codex");
-  await fs.mkdir(codexDir, { recursive: true });
-
   const hooksPath = path.join(codexDir, "hooks.json");
   const tomlPath = path.join(codexDir, "config.toml");
 
   const { codexHooks } = buildCodexHooks(hooksOutput);
-  await fs.writeFile(hooksPath, JSON.stringify(codexHooks, null, 2) + "\n", "utf8");
 
   let existingToml = "";
   try {
@@ -139,9 +142,18 @@ export async function generateCodexConfig(options: GenerateCodexConfigOptions): 
     if (error.code !== "ENOENT") throw error;
   }
   const newToml = buildCodexConfigToml(existingToml);
-  if (newToml !== existingToml) {
-    await fs.writeFile(tomlPath, newToml, "utf8");
-  }
 
-  return [hooksPath, tomlPath];
+  return [
+    { path: hooksPath, content: JSON.stringify(codexHooks, null, 2) + "\n" },
+    { path: tomlPath, content: newToml },
+  ];
+}
+
+export async function generateCodexConfig(options: GenerateCodexConfigOptions): Promise<string[]> {
+  const planned = await computeCodexConfig(options);
+  await fs.mkdir(path.join(options.projectDir, ".codex"), { recursive: true });
+  for (const f of planned) {
+    await fs.writeFile(f.path, f.content, "utf8");
+  }
+  return planned.map((f) => f.path);
 }

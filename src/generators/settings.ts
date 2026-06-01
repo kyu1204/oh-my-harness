@@ -13,7 +13,15 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
-export async function generateSettings(options: GenerateSettingsOptions): Promise<void> {
+/**
+ * Compute the final .claude/settings.json content (merging into existing
+ * permissions / managed tracking) without writing it. The managedAt timestamp
+ * is held stable when nothing else changes, so re-runs produce identical
+ * content — this keeps drift detection from reporting false positives.
+ */
+export async function computeSettings(
+  options: GenerateSettingsOptions,
+): Promise<{ path: string; content: string }> {
   const { projectDir, config, hooksOutput } = options;
   const claudeDir = path.join(projectDir, ".claude");
   const settingsPath = path.join(claudeDir, "settings.json");
@@ -108,6 +116,11 @@ export async function generateSettings(options: GenerateSettingsOptions): Promis
 
   (result._ohMyHarness as Record<string, unknown>).managedAt = managedAt;
 
-  await fs.mkdir(claudeDir, { recursive: true });
-  await fs.writeFile(settingsPath, JSON.stringify(result, null, 2) + "\n", "utf-8");
+  return { path: settingsPath, content: JSON.stringify(result, null, 2) + "\n" };
+}
+
+export async function generateSettings(options: GenerateSettingsOptions): Promise<void> {
+  const { path: settingsPath, content } = await computeSettings(options);
+  await fs.mkdir(path.dirname(settingsPath), { recursive: true });
+  await fs.writeFile(settingsPath, content, "utf-8");
 }

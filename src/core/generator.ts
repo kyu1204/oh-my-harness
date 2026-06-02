@@ -1,11 +1,14 @@
+import path from "node:path";
 import type { MergedConfig } from "./merged-config.js";
+import type { GenerationPlan, PlannedFile } from "./plan.js";
 import { generateClaudeMd } from "../generators/claude-md.js";
 import { generateAgentsMd } from "../generators/agents-md.js";
-import { generateHooks } from "../generators/hooks.js";
-import { generateSettings } from "../generators/settings.js";
-import { generateCodexConfig } from "../generators/codex-config.js";
-import { generatePiExtension } from "../generators/pi-extension.js";
-import { updateGitignore } from "../generators/gitignore.js";
+import { generateHooks, computeHooks } from "../generators/hooks.js";
+import { generateSettings, computeSettings } from "../generators/settings.js";
+import { generateCodexConfig, computeCodexConfig } from "../generators/codex-config.js";
+import { generatePiExtension, computePiExtension } from "../generators/pi-extension.js";
+import { updateGitignore, computeGitignore } from "../generators/gitignore.js";
+import { computeManagedMarkdown } from "../generators/managed-md.js";
 import { migrateLegacyState } from "../utils/state-migration.js";
 import { OMH_DIR } from "../utils/paths.js";
 
@@ -51,4 +54,41 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   files.push(`${projectDir}/.gitignore`);
 
   return { files };
+}
+
+/**
+ * Compute every file `generate()` would write — and the stale files it would
+ * remove — WITHOUT touching disk. Backs `omh sync --check`, `omh diff`, and the
+ * doctor drift warning. Uses the same compute functions as the write path, so
+ * the plan can never disagree with what a real sync produces.
+ *
+ * The bookkeeping files that embed timestamps (.omh/manifest.json and
+ * .claude/oh-my-harness.json) are intentionally excluded — they change every
+ * run and are not part of the reproducible harness output.
+ */
+export async function planGenerate(options: GenerateOptions): Promise<GenerationPlan> {
+  const { projectDir, config } = options;
+  const files: PlannedFile[] = [];
+
+  const hooksPlan = await computeHooks({ projectDir, config });
+  const hooksOutput = { hooksConfig: hooksPlan.hooksConfig, generatedFiles: hooksPlan.generatedFiles };
+
+  const [claudeMd, agentsMd, settings, codexFiles, piFiles, gitignore] = await Promise.all([
+    computeManagedMarkdown(path.join(projectDir, "CLAUDE.md"), config.claudeMdSections),
+    computeManagedMarkdown(path.join(projectDir, "AGENTS.md"), config.claudeMdSections),
+    computeSettings({ projectDir, config, hooksOutput }),
+    computeCodexConfig({ projectDir, hooksOutput }),
+    Promise.resolve(computePiExtension({ projectDir, hooksOutput })),
+    computeGitignore(projectDir, [`${OMH_DIR}/state/`]),
+  ]);
+
+  files.push({ path: path.join(projectDir, "CLAUDE.md"), content: claudeMd });
+  files.push({ path: path.join(projectDir, "AGENTS.md"), content: agentsMd });
+  files.push(...hooksPlan.files);
+  files.push(settings);
+  files.push(...codexFiles);
+  files.push(...piFiles);
+  if (gitignore) files.push(gitignore);
+
+  return { files, wouldDelete: hooksPlan.wouldDelete };
 }

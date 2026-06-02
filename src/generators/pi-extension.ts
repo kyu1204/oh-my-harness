@@ -198,18 +198,26 @@ export interface GeneratePiExtensionOptions {
 }
 
 /**
+ * Compute the Pi bridge extension file without writing. Returns an empty array
+ * when there are no PreToolUse bindings (no file would be generated).
+ */
+export function computePiExtension(options: GeneratePiExtensionOptions): { path: string; content: string }[] {
+  const { projectDir, hooksOutput } = options;
+  const bindings = extractPiBindings(hooksOutput.hooksConfig);
+  if (bindings.length === 0) return [];
+  const filePath = join(projectDir, PI_EXTENSION_DIR, PI_EXTENSION_FILE);
+  return [{ path: filePath, content: buildPiExtension(bindings) }];
+}
+
+/**
  * Write the Pi bridge extension to .pi/extensions/omh-harness.ts. Returns the
  * list of generated file paths (empty when there are no PreToolUse bindings,
  * in which case no file is written).
  */
 export async function generatePiExtension(options: GeneratePiExtensionOptions): Promise<string[]> {
-  const { projectDir, hooksOutput } = options;
-  const bindings = extractPiBindings(hooksOutput.hooksConfig);
-  if (bindings.length === 0) return [];
-
-  const dir = join(projectDir, PI_EXTENSION_DIR);
-  await mkdir(dir, { recursive: true });
-  const filePath = join(dir, PI_EXTENSION_FILE);
-  await writeFile(filePath, buildPiExtension(bindings), "utf-8");
-  return [filePath];
+  const planned = computePiExtension(options);
+  if (planned.length === 0) return [];
+  await mkdir(join(options.projectDir, PI_EXTENSION_DIR), { recursive: true });
+  await Promise.all(planned.map((f) => writeFile(f.path, f.content, "utf-8")));
+  return planned.map((f) => f.path);
 }

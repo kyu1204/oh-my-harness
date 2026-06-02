@@ -37,9 +37,23 @@ export function createCli(): Command {
   program
     .command("doctor")
     .description("Validate harness configuration health")
-    .action(async () => {
+    .option("-d, --project-dir <dir>", "Project directory")
+    .option("--strict", "Treat drift (out-of-sync generated files) as a failure")
+    .action(async (options: { projectDir?: string; strict?: boolean }) => {
       const { doctorCommand } = await import("./commands/doctor.js");
-      const result = await doctorCommand();
+      const result = await doctorCommand(options);
+      if (result.exitCode !== 0) {
+        process.exitCode = result.exitCode;
+      }
+    });
+
+  program
+    .command("diff")
+    .description("Preview what `omh sync` would change, without writing")
+    .option("-d, --project-dir <dir>", "Project directory")
+    .action(async (options: { projectDir?: string }) => {
+      const { diffCommand } = await import("./commands/diff.js");
+      const result = await diffCommand(options);
       if (result.exitCode !== 0) {
         process.exitCode = result.exitCode;
       }
@@ -58,9 +72,13 @@ export function createCli(): Command {
     .command("sync")
     .description("Regenerate files from harness.yaml")
     .option("-d, --project-dir <dir>", "Project directory")
-    .action(async (options: { projectDir?: string }) => {
+    .option("--check", "Report drift without writing; exit non-zero if out of date")
+    .action(async (options: { projectDir?: string; check?: boolean }) => {
       const { syncCommand } = await import("./commands/sync.js");
-      await syncCommand(options);
+      const result = await syncCommand(options);
+      if (result.exitCode !== 0) {
+        process.exitCode = result.exitCode;
+      }
     });
 
   program

@@ -72,10 +72,12 @@ permissions:
 
   it("fails gracefully when harness.yaml is missing", async () => {
     const { syncCommand } = await import("../../src/cli/commands/sync.js");
-    await syncCommand({ projectDir: tmpDir });
+    const result = await syncCommand({ projectDir: tmpDir });
 
     const errorOutput = consoleErrorSpy.mock.calls.map((c) => c.join(" ")).join("\n");
     expect(errorOutput).toContain("harness.yaml");
-    expect(processExitSpy).toHaveBeenCalledWith(1);
+    expect(processExitSpy).not.toHaveBeenCalled();
+    // Must stop after the error (not fall through to generate) and report failure.
+    expect(result?.exitCode).toBe(1);
   });
 });

@@ -3,7 +3,15 @@ import path from "node:path";
 
 const SECTION_HEADER = "# oh-my-harness";
 
-export async function updateGitignore(projectDir: string, entries: string[]): Promise<void> {
+/**
+ * Compute the final .gitignore content after ensuring `entries` are present,
+ * without writing. Returns `{ path, content }`, or `null` when all entries are
+ * already present (no change needed).
+ */
+export async function computeGitignore(
+  projectDir: string,
+  entries: string[],
+): Promise<{ path: string; content: string } | null> {
   const gitignorePath = path.join(projectDir, ".gitignore");
 
   let content = "";
@@ -23,7 +31,7 @@ export async function updateGitignore(projectDir: string, entries: string[]): Pr
 
   if (newEntries.length === 0) {
     // All entries already present; nothing to do
-    return;
+    return null;
   }
 
   // Check if our section header already exists
@@ -40,5 +48,11 @@ export async function updateGitignore(projectDir: string, entries: string[]): Pr
     content = content + separator + "\n" + SECTION_HEADER + "\n" + newEntries.join("\n") + "\n";
   }
 
-  await fs.writeFile(gitignorePath, content, "utf-8");
+  return { path: gitignorePath, content };
+}
+
+export async function updateGitignore(projectDir: string, entries: string[]): Promise<void> {
+  const planned = await computeGitignore(projectDir, entries);
+  if (!planned) return;
+  await fs.writeFile(planned.path, planned.content, "utf-8");
 }

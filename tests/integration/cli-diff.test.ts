@@ -33,6 +33,16 @@ function captureStdout(): { output: () => string; restore: () => void } {
   };
 }
 
+async function withCapturedStdout<T>(action: () => Promise<T>): Promise<{ result: T; output: string }> {
+  const cap = captureStdout();
+  try {
+    const result = await action();
+    return { result, output: cap.output() };
+  } finally {
+    cap.restore();
+  }
+}
+
 beforeEach(async () => {
   projectDir = await mkdtemp(join(tmpdir(), "omh-diff-"));
 });
@@ -45,12 +55,10 @@ describe("diffCommand", () => {
     await writeFile(join(projectDir, "harness.yaml"), HARNESS, "utf-8");
     await syncCommand({ projectDir });
 
-    const cap = captureStdout();
-    const result = await diffCommand({ projectDir });
-    cap.restore();
+    const { result, output } = await withCapturedStdout(() => diffCommand({ projectDir }));
 
     expect(result?.exitCode).toBe(0);
-    expect(cap.output().toLowerCase()).toContain("no changes");
+    expect(output.toLowerCase()).toContain("no changes");
   });
 
   it("shows the added line for a drifted hook script", async () => {
@@ -58,11 +66,7 @@ describe("diffCommand", () => {
     await syncCommand({ projectDir });
     await writeFile(join(projectDir, "harness.yaml"), HARNESS_DRIFTED, "utf-8");
 
-    const cap = captureStdout();
-    await diffCommand({ projectDir });
-    cap.restore();
-
-    const out = cap.output();
+    const { output: out } = await withCapturedStdout(() => diffCommand({ projectDir }));
     expect(out).toContain("catalog-command-guard.sh");
     // The new "BAR" pattern should appear as an added (+) line.
     expect(out).toMatch(/\+.*BAR/);
@@ -75,9 +79,7 @@ describe("diffCommand", () => {
     const before = await readFile(scriptPath, "utf-8");
 
     await writeFile(join(projectDir, "harness.yaml"), HARNESS_DRIFTED, "utf-8");
-    const cap = captureStdout();
-    await diffCommand({ projectDir });
-    cap.restore();
+    await withCapturedStdout(() => diffCommand({ projectDir }));
 
     const after = await readFile(scriptPath, "utf-8");
     expect(after).toBe(before);

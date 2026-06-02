@@ -38,7 +38,6 @@ export async function syncCommand(options: SyncOptions = {}): Promise<SyncResult
     } else {
       console.error(chalk.red(`Failed to read harness.yaml: ${error.message}`));
     }
-    process.exit(1);
     return { exitCode: 1 };
   }
 
@@ -48,7 +47,6 @@ export async function syncCommand(options: SyncOptions = {}): Promise<SyncResult
   } catch (err) {
     const error = err as Error;
     console.error(chalk.red(`Failed to parse harness.yaml: ${error.message}`));
-    process.exit(1);
     return { exitCode: 1 };
   }
 
@@ -58,7 +56,6 @@ export async function syncCommand(options: SyncOptions = {}): Promise<SyncResult
     for (const issue of result.error.issues) {
       console.error(`  ${issue.path.join(".")}: ${issue.message}`);
     }
-    process.exit(1);
     return { exitCode: 1 };
   }
 

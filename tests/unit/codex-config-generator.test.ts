@@ -305,4 +305,100 @@ describe("generateCodexConfig", () => {
     const hooksJson = JSON.parse(await fs.readFile(path.join(tmpDir, ".codex/hooks.json"), "utf8"));
     expect(hooksJson).toEqual({ hooks: {} });
   });
+
+  it("preserves user hooks while replacing previously generated OMH hooks", async () => {
+    const codexDir = path.join(tmpDir, ".codex");
+    const hooksDir = path.join(tmpDir, ".omh", "hooks");
+    await fs.mkdir(codexDir, { recursive: true });
+    await fs.mkdir(hooksDir, { recursive: true });
+    const oldOmhHook = path.join(hooksDir, "old.sh");
+    const newOmhHook = path.join(hooksDir, "new.sh");
+    await fs.writeFile(oldOmhHook, "#!/usr/bin/env bash\n", "utf8");
+    await fs.writeFile(newOmhHook, "#!/usr/bin/env bash\n", "utf8");
+    await fs.writeFile(
+      path.join(codexDir, "hooks.json"),
+      JSON.stringify(
+        {
+          hooks: {
+            PreToolUse: [
+              { matcher: "Bash", hooks: [{ type: "command", command: "python3 user-hook.py" }] },
+              { matcher: "Bash", hooks: [{ type: "command", command: `bash '${oldOmhHook}'` }] },
+            ],
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
+
+    await generateCodexConfig({
+      projectDir: tmpDir,
+      hooksOutput: {
+        hooksConfig: {
+          PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: `bash '${newOmhHook}'` }] }],
+        },
+        generatedFiles: [newOmhHook],
+      },
+    });
+
+    const hooksJson = JSON.parse(await fs.readFile(path.join(codexDir, "hooks.json"), "utf8"));
+    const commands = hooksJson.hooks.PreToolUse.flatMap((entry: any) => entry.hooks.map((hook: any) => hook.command));
+    expect(commands).toEqual(["python3 user-hook.py", `bash '${newOmhHook}'`]);
+  });
+
+  it("normalizes a single user hook object to an ordered array before merging", async () => {
+    const codexDir = path.join(tmpDir, ".codex");
+    const hooksDir = path.join(tmpDir, ".omh", "hooks");
+    await fs.mkdir(codexDir, { recursive: true });
+    await fs.mkdir(hooksDir, { recursive: true });
+    const newOmhHook = path.join(hooksDir, "new.sh");
+    await fs.writeFile(newOmhHook, "#!/usr/bin/env bash\n", "utf8");
+    await fs.writeFile(
+      path.join(codexDir, "hooks.json"),
+      JSON.stringify({
+        hooks: {
+          PreToolUse: { matcher: "Bash", hooks: [{ type: "command", command: "python3 user-hook.py" }] },
+        },
+      }) + "\n",
+      "utf8",
+    );
+
+    await generateCodexConfig({
+      projectDir: tmpDir,
+      hooksOutput: {
+        hooksConfig: {
+          PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: `bash '${newOmhHook}'` }] }],
+        },
+        generatedFiles: [newOmhHook],
+      },
+    });
+
+    const hooksJson = JSON.parse(await fs.readFile(path.join(codexDir, "hooks.json"), "utf8"));
+    expect(hooksJson.hooks.PreToolUse.map((entry: any) => entry.hooks[0].command)).toEqual([
+      "python3 user-hook.py",
+      `bash '${newOmhHook}'`,
+    ]);
+  });
+
+  it("refuses to overwrite hooks.json when the hook event schema is incompatible", async () => {
+    const codexDir = path.join(tmpDir, ".codex");
+    await fs.mkdir(codexDir, { recursive: true });
+    const hooksPath = path.join(codexDir, "hooks.json");
+    await fs.writeFile(hooksPath, JSON.stringify({ hooks: { PreToolUse: "future-schema" } }) + "\n", "utf8");
+
+    await expect(
+      generateCodexConfig({
+        projectDir: tmpDir,
+        hooksOutput: {
+          hooksConfig: {
+            PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "bash /tmp/new.sh" }] }],
+          },
+          generatedFiles: [],
+        },
+      }),
+    ).rejects.toThrow(/incompatible Codex hooks/);
+
+    await expect(fs.readFile(hooksPath, "utf8")).resolves.toContain("future-schema");
+  });
 });

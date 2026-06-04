@@ -131,6 +131,56 @@ describe("generateSettings", () => {
     expect(settings.permissions.deny).toContain("Bash(rm -rf /)");
   });
 
+  it("preserves user hooks while replacing previously generated OMH hooks", async () => {
+    const claudeDir = path.join(tmpDir, ".claude");
+    const hooksDir = path.join(tmpDir, ".omh", "hooks");
+    await fs.mkdir(claudeDir, { recursive: true });
+    await fs.mkdir(hooksDir, { recursive: true });
+    const oldOmhHook = path.join(hooksDir, "old-guard.sh");
+    const newOmhHook = path.join(hooksDir, "new-guard.sh");
+    await fs.writeFile(oldOmhHook, "#!/usr/bin/env bash\n", "utf-8");
+    await fs.writeFile(newOmhHook, "#!/usr/bin/env bash\n", "utf-8");
+
+    await fs.writeFile(
+      path.join(claudeDir, "settings.json"),
+      JSON.stringify(
+        {
+          hooks: {
+            PreToolUse: [
+              {
+                matcher: "Bash",
+                hooks: [
+                  { type: "command", command: "node custom-hook.js" },
+                  { type: "command", command: `bash '${oldOmhHook}'` },
+                ],
+              },
+            ],
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+
+    await generateSettings({
+      projectDir: tmpDir,
+      config: makeMergedConfig(),
+      hooksOutput: {
+        hooksConfig: {
+          PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: `bash '${newOmhHook}'` }] }],
+        },
+        generatedFiles: [newOmhHook],
+      } as any,
+    });
+
+    const settings = JSON.parse(await fs.readFile(path.join(claudeDir, "settings.json"), "utf-8"));
+    const commands = settings.hooks.PreToolUse.flatMap((entry: any) => entry.hooks.map((hook: any) => hook.command));
+
+    expect(commands).toContain("node custom-hook.js");
+    expect(commands).toContain(`bash '${newOmhHook}'`);
+    expect(commands).not.toContain(`bash '${oldOmhHook}'`);
+  });
+
   it("removes managed permissions that were removed from harness.yaml", async () => {
     const hooksOutput = makeHooksOutput();
 

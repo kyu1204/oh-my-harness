@@ -26,12 +26,9 @@ async function preserveUserHooks(
 
   const preserved: Record<string, unknown[]> = {};
   for (const [event, entries] of Object.entries(existingHooks)) {
-    if (!Array.isArray(entries)) {
-      preserved[event] = [entries];
-      continue;
-    }
+    const eventEntries = Array.isArray(entries) ? entries : [entries];
 
-    for (const entry of entries) {
+    for (const entry of eventEntries) {
       if (!isPlainObject(entry) || !Array.isArray(entry.hooks)) {
         if (!preserved[event]) preserved[event] = [];
         preserved[event].push(entry);

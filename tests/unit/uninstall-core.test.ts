@@ -113,6 +113,23 @@ describe("uninstall strip helpers", () => {
     expect(stripped.warnings.join("\n")).toContain("comments");
   });
 
+  it("leaves Codex config untouched when no managed feature flags exist", () => {
+    const original = [
+      "# keep my comments",
+      "[features]",
+      "some_other_flag = true",
+      "",
+      "[mcp_servers.foo]",
+      'command = "bar"',
+      "",
+    ].join("\n");
+
+    const stripped = stripCodexConfigToml(original);
+
+    expect(stripped.content).toBe(original);
+    expect(stripped.warnings).toEqual([]);
+  });
+
   it("removes the oh-my-harness gitignore section only", () => {
     const result = stripGitignoreSection(["node_modules/", "", "# oh-my-harness", ".omh/state/", "", "dist/"].join("\n"));
     expect(result).toBe(["node_modules/", "", "dist/", ""].join("\n"));
@@ -176,4 +193,3 @@ describe("computeUninstall and applyUninstallPlan", () => {
     expect(result.restored).toContain(keep);
   });
 });
-

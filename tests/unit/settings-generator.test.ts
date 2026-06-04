@@ -4,11 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { generateSettings } from "../../src/generators/settings.js";
 import type { MergedConfig } from "../../src/core/preset-types.js";
-
-interface HooksOutput {
-  hooksConfig: Record<string, Array<{ matcher: string; hooks: string[] }>>;
-  generatedFiles: string[];
-}
+import type { HooksOutput } from "../../src/generators/hooks.js";
 
 const makeMergedConfig = (overrides: Partial<MergedConfig> = {}): MergedConfig => ({
   presets: ["_base", "nextjs"],
@@ -26,11 +22,33 @@ const makeMergedConfig = (overrides: Partial<MergedConfig> = {}): MergedConfig =
 
 const makeHooksOutput = (overrides: Partial<HooksOutput> = {}): HooksOutput => ({
   hooksConfig: {
-    PreToolUse: [{ matcher: "Bash", hooks: ["~/.claude/hooks/command-guard.sh"] }],
+    PreToolUse: [
+      {
+        matcher: "Bash",
+        hooks: [{ type: "command", command: "~/.claude/hooks/command-guard.sh" }],
+      },
+    ],
   },
   generatedFiles: [],
   ...overrides,
 });
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function collectPreToolUseCommands(settings: unknown): string[] {
+  if (!isRecord(settings) || !isRecord(settings.hooks)) return [];
+  const preToolUse = settings.hooks.PreToolUse;
+  if (!Array.isArray(preToolUse)) return [];
+
+  return preToolUse.flatMap((entry) => {
+    if (!isRecord(entry) || !Array.isArray(entry.hooks)) return [];
+    return entry.hooks.flatMap((hook) => (
+      isRecord(hook) && typeof hook.command === "string" ? [hook.command] : []
+    ));
+  });
+}
 
 let tmpDir: string;
 
@@ -170,11 +188,59 @@ describe("generateSettings", () => {
           PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: `bash '${newOmhHook}'` }] }],
         },
         generatedFiles: [newOmhHook],
-      } as any,
+      },
     });
 
     const settings = JSON.parse(await fs.readFile(path.join(claudeDir, "settings.json"), "utf-8"));
-    const commands = settings.hooks.PreToolUse.flatMap((entry: any) => entry.hooks.map((hook: any) => hook.command));
+    const commands = collectPreToolUseCommands(settings);
+
+    expect(commands).toContain("node custom-hook.js");
+    expect(commands).toContain(`bash '${newOmhHook}'`);
+    expect(commands).not.toContain(`bash '${oldOmhHook}'`);
+  });
+
+  it("filters managed commands from single-object hook events before merging", async () => {
+    const claudeDir = path.join(tmpDir, ".claude");
+    const hooksDir = path.join(tmpDir, ".omh", "hooks");
+    await fs.mkdir(claudeDir, { recursive: true });
+    await fs.mkdir(hooksDir, { recursive: true });
+    const oldOmhHook = path.join(hooksDir, "old-guard.sh");
+    const newOmhHook = path.join(hooksDir, "new-guard.sh");
+    await fs.writeFile(oldOmhHook, "#!/usr/bin/env bash\n", "utf-8");
+    await fs.writeFile(newOmhHook, "#!/usr/bin/env bash\n", "utf-8");
+
+    await fs.writeFile(
+      path.join(claudeDir, "settings.json"),
+      JSON.stringify(
+        {
+          hooks: {
+            PreToolUse: {
+              matcher: "Bash",
+              hooks: [
+                { type: "command", command: "node custom-hook.js" },
+                { type: "command", command: `bash '${oldOmhHook}'` },
+              ],
+            },
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+
+    await generateSettings({
+      projectDir: tmpDir,
+      config: makeMergedConfig(),
+      hooksOutput: {
+        hooksConfig: {
+          PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: `bash '${newOmhHook}'` }] }],
+        },
+        generatedFiles: [newOmhHook],
+      },
+    });
+
+    const settings = JSON.parse(await fs.readFile(path.join(claudeDir, "settings.json"), "utf-8"));
+    const commands = collectPreToolUseCommands(settings);
 
     expect(commands).toContain("node custom-hook.js");
     expect(commands).toContain(`bash '${newOmhHook}'`);

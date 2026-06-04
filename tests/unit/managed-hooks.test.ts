@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, mkdir, writeFile, symlink } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { isOmhHookCommand } from "../../src/core/managed-hooks.js";
 
@@ -35,7 +35,10 @@ describe("isOmhHookCommand", () => {
     try {
       const outsideScript = join(outside, "evil.sh");
       await writeFile(outsideScript, "#!/usr/bin/env bash\n", "utf8");
-      const traversal = join(projectDir, ".omh", "hooks", "..", "..", "..", outsideScript);
+      const hooksDir = join(projectDir, ".omh", "hooks");
+      const outsideRelativeToHooks = relative(hooksDir, outsideScript);
+      expect(outsideRelativeToHooks).toContain("..");
+      const traversal = `${hooksDir}${sep}${outsideRelativeToHooks}`;
 
       await expect(isOmhHookCommand(`bash '${traversal}'`, projectDir)).resolves.toBe(false);
     } finally {

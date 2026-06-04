@@ -140,13 +140,19 @@ export function stripCodexConfigToml(content: string): { content: string | null;
   if (!content.trim()) return { content: null, warnings: [] };
 
   const data = parse(content) as Record<string, unknown>;
+  let deletedAny = false;
   if (isPlainObject(data.features)) {
-    delete data.features.hooks;
-    delete data.features.goals;
-    delete data.features.codex_hooks;
+    for (const key of ["hooks", "goals", "codex_hooks"]) {
+      if (Object.prototype.hasOwnProperty.call(data.features, key)) {
+        delete data.features[key];
+        deletedAny = true;
+      }
+    }
+    if (!deletedAny) return { content, warnings: [] };
     if (Object.keys(data.features).length === 0) delete data.features;
   }
 
+  if (!deletedAny) return { content, warnings: [] };
   if (Object.keys(data).length === 0) return { content: null, warnings };
   return { content: `${stringify(data)}\n`, warnings };
 }
@@ -336,4 +342,3 @@ export async function applyUninstallPlan(
     await fs.rm(backupDir, { recursive: true, force: true }).catch(() => undefined);
   }
 }
-

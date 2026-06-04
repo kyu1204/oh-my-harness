@@ -273,12 +273,44 @@ omh hook remove auto-pr                   # Remove a hook
 
 # 🔄 Sync & manage
 omh sync                                 # Regenerate all files from harness.yaml
+omh uninstall --dry-run                  # Preview generated-file cleanup
+omh uninstall -y                         # Remove generated files, keep user content
+omh uninstall -y --purge                 # Also remove harness.yaml
 
 # 🩺 Verify & monitor
 omh doctor                               # Health check
 omh test                                  # Dry-run verify all hooks
 omh stats                                 # TUI analytics dashboard
 ```
+
+### 🧹 `omh uninstall` — Safe generated-file cleanup
+
+`omh uninstall` removes oh-my-harness generated artifacts while preserving user
+content in merged files.
+
+```bash
+omh uninstall --dry-run
+omh uninstall -y
+omh uninstall -y --purge
+```
+
+Safety behavior:
+
+- Prints the same uninstall plan for dry-run and real execution.
+- Recommends backing up before execution; use `--skip-backup-warning` only for
+  automation that already handles backups.
+- Keeps `harness.yaml` by default; `--purge` removes it.
+- Preserves user content in `CLAUDE.md`, `AGENTS.md`, `.claude/settings.json`,
+  `.codex/hooks.json`, `.codex/config.toml`, and user Pi extensions.
+- Removes only OMH-owned hook commands that point at this project's
+  `.omh/hooks` directory.
+- Warns when `.codex/config.toml` feature flags (`hooks`/`goals`) are removed,
+  because manually-owned feature settings cannot be distinguished from OMH
+  generated settings.
+- Warns that `.codex/config.toml` comments may be lost when TOML is rewritten.
+- Uses backups for modified files and restores them on stop-on-error failures;
+  `--continue-on-error` records failures and keeps applying independent
+  operations.
 
 ### 🩺 `omh doctor`
 
@@ -440,6 +472,7 @@ oh-my-harness/
 - [x] Unified `.omh/` layout — single source of truth for hooks & state across runtimes
 - [x] Pi ([pi.dev](https://pi.dev)) emitter — bridge extension (`.pi/extensions/omh-harness.ts`) reusing the same `.omh/hooks/*.sh`
 - [x] `ask` mode — request approval before executing risky tools (Claude native prompt / Pi `ctx.ui.select`; Codex falls back to block)
+- [x] `omh uninstall` — remove generated artifacts while preserving user content
 - [ ] Community harness.yaml registry — share and reuse configs
 - [ ] `omh modify "change X"` — NL config editing
 

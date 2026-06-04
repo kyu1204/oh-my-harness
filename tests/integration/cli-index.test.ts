@@ -26,8 +26,18 @@ describe("createCli wiring", () => {
     expect(hasOption(find(program, "doctor"), "--strict")).toBe(true);
   });
 
+  it("registers uninstall with safety options", () => {
+    const uninstall = find(program, "uninstall");
+    expect(uninstall).toBeDefined();
+    expect(hasOption(uninstall, "--dry-run")).toBe(true);
+    expect(hasOption(uninstall, "--yes")).toBe(true);
+    expect(hasOption(uninstall, "--purge")).toBe(true);
+    expect(hasOption(uninstall, "--skip-backup-warning")).toBe(true);
+    expect(hasOption(uninstall, "--continue-on-error")).toBe(true);
+  });
+
   it("still registers the existing core commands", () => {
-    for (const name of ["init", "sync", "doctor", "test", "stats"]) {
+    for (const name of ["init", "sync", "doctor", "test", "stats", "uninstall"]) {
       expect(find(program, name)).toBeDefined();
     }
   });

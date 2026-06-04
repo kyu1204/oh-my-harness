@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { parse, stringify } from "smol-toml";
 import type { HooksOutput } from "./hooks.js";
+import { isOmhHookCommand } from "../core/managed-hooks.js";
 
 export interface GenerateCodexConfigOptions {
   projectDir: string;
@@ -48,6 +49,12 @@ export interface CodexHooksFile {
   hooks: Record<string, Array<{ matcher: string; hooks: Array<{ type: "command"; command: string }> }>>;
 }
 
+type CodexHookEntry = { matcher?: unknown; hooks?: unknown };
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 export function buildCodexHooks(hooksOutput: HooksOutput): {
   codexHooks: CodexHooksFile;
   skipped: string[];
@@ -67,6 +74,95 @@ export function buildCodexHooks(hooksOutput: HooksOutput): {
   }
 
   return { codexHooks, skipped };
+}
+
+function normalizeExistingCodexHooks(raw: string): Record<string, unknown[]> {
+  if (!raw.trim()) return {};
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(
+      `oh-my-harness: .codex/hooks.json is invalid JSON; ` +
+        `fix it before re-running sync to avoid losing user hooks. (${(err as Error).message})`,
+    );
+  }
+
+  if (!isPlainObject(parsed)) {
+    throw new Error("oh-my-harness: incompatible Codex hooks schema in .codex/hooks.json.");
+  }
+  const hooks = parsed.hooks;
+  if (hooks === undefined) return {};
+  if (!isPlainObject(hooks)) {
+    throw new Error("oh-my-harness: incompatible Codex hooks schema in .codex/hooks.json.");
+  }
+
+  const normalized: Record<string, unknown[]> = {};
+  for (const [event, entries] of Object.entries(hooks)) {
+    if (Array.isArray(entries)) {
+      normalized[event] = entries;
+    } else if (isPlainObject(entries)) {
+      normalized[event] = [entries];
+    } else {
+      throw new Error(`oh-my-harness: incompatible Codex hooks schema for event ${event}.`);
+    }
+  }
+  return normalized;
+}
+
+async function stripOmhHooksFromCodexEntries(
+  entries: unknown[],
+  projectDir: string,
+): Promise<unknown[]> {
+  const preserved: unknown[] = [];
+  for (const entry of entries) {
+    if (!isPlainObject(entry)) {
+      throw new Error("oh-my-harness: incompatible Codex hooks entry in .codex/hooks.json.");
+    }
+    const hooks = (entry as CodexHookEntry).hooks;
+    if (!Array.isArray(hooks)) {
+      throw new Error("oh-my-harness: incompatible Codex hooks handler list in .codex/hooks.json.");
+    }
+
+    const userHooks: unknown[] = [];
+    for (const hook of hooks) {
+      if (
+        isPlainObject(hook) &&
+        typeof hook.command === "string" &&
+        await isOmhHookCommand(hook.command, projectDir)
+      ) {
+        continue;
+      }
+      userHooks.push(hook);
+    }
+
+    if (userHooks.length > 0) preserved.push({ ...entry, hooks: userHooks });
+  }
+  return preserved;
+}
+
+export async function mergeCodexHooksFile(
+  existingRaw: string,
+  generated: CodexHooksFile,
+  projectDir: string,
+): Promise<CodexHooksFile> {
+  const existing = normalizeExistingCodexHooks(existingRaw);
+  const merged: CodexHooksFile = { hooks: {} };
+
+  for (const [event, entries] of Object.entries(existing)) {
+    const preserved = await stripOmhHooksFromCodexEntries(entries, projectDir);
+    if (preserved.length > 0) {
+      merged.hooks[event] = preserved as CodexHooksFile["hooks"][string];
+    }
+  }
+
+  for (const [event, entries] of Object.entries(generated.hooks)) {
+    if (!merged.hooks[event]) merged.hooks[event] = [];
+    merged.hooks[event].push(...entries);
+  }
+
+  return merged;
 }
 
 /**
@@ -135,16 +231,24 @@ export async function computeCodexConfig(
   const { codexHooks } = buildCodexHooks(hooksOutput);
 
   let existingToml = "";
+  let existingHooks = "";
   try {
     existingToml = await fs.readFile(tomlPath, "utf8");
   } catch (err) {
     const error = err as NodeJS.ErrnoException;
     if (error.code !== "ENOENT") throw error;
   }
+  try {
+    existingHooks = await fs.readFile(hooksPath, "utf8");
+  } catch (err) {
+    const error = err as NodeJS.ErrnoException;
+    if (error.code !== "ENOENT") throw error;
+  }
   const newToml = buildCodexConfigToml(existingToml);
+  const newHooks = await mergeCodexHooksFile(existingHooks, codexHooks, projectDir);
 
   return [
-    { path: hooksPath, content: JSON.stringify(codexHooks, null, 2) + "\n" },
+    { path: hooksPath, content: JSON.stringify(newHooks, null, 2) + "\n" },
     { path: tomlPath, content: newToml },
   ];
 }

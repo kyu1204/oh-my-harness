@@ -82,6 +82,30 @@ export function createCli(): Command {
     });
 
   program
+    .command("uninstall")
+    .description("Safely remove oh-my-harness generated files while preserving user content")
+    .option("-d, --project-dir <dir>", "Project directory")
+    .option("--dry-run", "Print the uninstall plan without writing")
+    .option("-y, --yes", "Skip confirmation prompt")
+    .option("--purge", "Also delete harness.yaml")
+    .option("--skip-backup-warning", "Suppress the backup recommendation")
+    .option("--continue-on-error", "Keep applying independent operations after failures")
+    .action(async (options: {
+      projectDir?: string;
+      dryRun?: boolean;
+      yes?: boolean;
+      purge?: boolean;
+      skipBackupWarning?: boolean;
+      continueOnError?: boolean;
+    }) => {
+      const { uninstallCommand } = await import("./commands/uninstall.js");
+      const result = await uninstallCommand(options);
+      if (result.exitCode !== 0) {
+        process.exitCode = result.exitCode;
+      }
+    });
+
+  program
     .command("stats")
     .description("TUI dashboard for harness analytics")
     .action(async () => {

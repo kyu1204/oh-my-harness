@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { MergedConfig } from "../core/merged-config.js";
 import type { HooksOutput } from "./hooks.js";
+import { isOmhHookCommand } from "../core/managed-hooks.js";
 
 export interface GenerateSettingsOptions {
   projectDir: string;
@@ -11,6 +12,73 @@ export interface GenerateSettingsOptions {
 
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+async function preserveUserHooks(
+  existingHooks: unknown,
+  projectDir: string,
+): Promise<Record<string, unknown[]>> {
+  if (!isPlainObject(existingHooks)) return {};
+
+  const preserved: Record<string, unknown[]> = {};
+  for (const [event, entries] of Object.entries(existingHooks)) {
+    const eventEntries = Array.isArray(entries) ? entries : [entries];
+
+    for (const entry of eventEntries) {
+      if (!isPlainObject(entry) || !Array.isArray(entry.hooks)) {
+        if (!preserved[event]) preserved[event] = [];
+        preserved[event].push(entry);
+        continue;
+      }
+
+      const userHooks: unknown[] = [];
+      for (const hook of entry.hooks) {
+        if (
+          isPlainObject(hook) &&
+          typeof hook.command === "string" &&
+          await isOmhHookCommand(hook.command, projectDir)
+        ) {
+          continue;
+        }
+        userHooks.push(hook);
+      }
+
+      if (userHooks.length > 0) {
+        if (!preserved[event]) preserved[event] = [];
+        preserved[event].push({ ...entry, hooks: userHooks });
+      }
+    }
+  }
+
+  return preserved;
+}
+
+async function mergeHooksConfig(
+  existingHooks: unknown,
+  generatedHooks: HooksOutput["hooksConfig"],
+  projectDir: string,
+): Promise<Record<string, unknown[]>> {
+  const preserved = await preserveUserHooks(existingHooks, projectDir);
+  const merged: Record<string, unknown[]> = {};
+  for (const [event, entries] of Object.entries(preserved)) {
+    if (entries.length > 0) merged[event] = [...entries];
+  }
+  for (const [event, entries] of Object.entries(generatedHooks)) {
+    if (!merged[event]) merged[event] = [];
+    const seen = new Set(merged[event].map((entry) => JSON.stringify(entry)));
+    for (const entry of entries) {
+      const key = JSON.stringify(entry);
+      if (!seen.has(key)) {
+        merged[event].push(entry);
+        seen.add(key);
+      }
+    }
+  }
+  return merged;
 }
 
 /**
@@ -76,6 +144,7 @@ export async function computeSettings(
   const mergedAllow = Array.from(new Set([...userAllow, ...newManagedAllow]));
   const mergedDeny = Array.from(new Set([...userDeny, ...newManagedDeny]));
   const previousManagedAt = existingMeta.managedAt;
+  const mergedHooks = await mergeHooksConfig(existing.hooks, hooksOutput.hooksConfig, projectDir);
 
   const result: Record<string, unknown> = {
     ...existing,
@@ -84,7 +153,7 @@ export async function computeSettings(
       allow: mergedAllow,
       deny: mergedDeny,
     },
-    hooks: hooksOutput.hooksConfig,
+    hooks: mergedHooks,
     _ohMyHarness: {
       managedAt: "__PLACEHOLDER__",
       presets: config.presets,

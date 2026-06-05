@@ -120,3 +120,21 @@ describe("configCommand (reconfigure)", () => {
     expect(setupRunner).toHaveBeenCalledOnce();
   });
 });
+
+describe("configCommand mutually exclusive flags", () => {
+  it("errors when --show and --reset are used together, without touching the config", async () => {
+    await saveProviderConfig({ provider: "openai", method: "api", apiKey: "sk-secret" });
+
+    const result = await configCommand({ show: true, reset: true, yes: true });
+
+    // Conflicting intent must fail loudly rather than silently picking one.
+    expect(result.exitCode).toBe(1);
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    const errOut = consoleErrorSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(errOut).toContain("--show");
+    expect(errOut).toContain("--reset");
+    // Neither branch ran: config is untouched and nothing was printed to stdout.
+    expect(await hasProviderConfig()).toBe(true);
+    expect(loggedOutput()).toBe("");
+  });
+});

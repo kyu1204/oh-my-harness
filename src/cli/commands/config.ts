@@ -60,6 +60,13 @@ async function defaultSetupRunner(): Promise<ProviderConfig | undefined> {
  * key or switch providers.
  */
 export async function configCommand(options: ConfigOptions = {}): Promise<ConfigResult> {
+  // --show and --reset express contradictory intent; fail loudly rather than
+  // silently letting one win.
+  if (options.show && options.reset) {
+    console.error("`--show` and `--reset` cannot be used together.");
+    return { exitCode: 1 };
+  }
+
   const existing = await loadProviderConfig();
 
   // --show: read-only summary.

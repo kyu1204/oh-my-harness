@@ -106,6 +106,20 @@ export function createCli(): Command {
     });
 
   program
+    .command("config")
+    .description("View, reconfigure, or reset the saved AI provider")
+    .option("--show", "Show the current provider config (API key masked)")
+    .option("--reset", "Delete the saved provider config")
+    .option("-y, --yes", "Skip confirmation prompts")
+    .action(async (options: { show?: boolean; reset?: boolean; yes?: boolean }) => {
+      const { configCommand } = await import("./commands/config.js");
+      const result = await configCommand(options);
+      if (result.exitCode !== 0) {
+        process.exitCode = result.exitCode;
+      }
+    });
+
+  program
     .command("stats")
     .description("TUI dashboard for harness analytics")
     .action(async () => {

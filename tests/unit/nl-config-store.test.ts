@@ -6,7 +6,9 @@ import {
   loadProviderConfig,
   saveProviderConfig,
   hasProviderConfig,
+  deleteProviderConfig,
   getConfigDir,
+  maskApiKey,
   type ProviderConfig,
 } from "../../src/nl/config-store.js";
 
@@ -109,5 +111,39 @@ describe("config-store", () => {
     const configPath = path.join(tmpHome, ".omh", "config.json");
     const stat = await fs.stat(configPath);
     expect(stat.mode & 0o777).toBe(0o600);
+  });
+
+  it("deleteProviderConfig removes ~/.omh/config.json", async () => {
+    await saveProviderConfig({ provider: "openai", method: "api", apiKey: "sk-secret" });
+    expect(await hasProviderConfig()).toBe(true);
+
+    await deleteProviderConfig();
+
+    expect(await hasProviderConfig()).toBe(false);
+  });
+
+  it("deleteProviderConfig is a no-op when no config exists", async () => {
+    await expect(deleteProviderConfig()).resolves.toBeUndefined();
+    expect(await hasProviderConfig()).toBe(false);
+  });
+});
+
+describe("maskApiKey", () => {
+  it("masks the middle of a long key, keeping a prefix and suffix", () => {
+    expect(maskApiKey("sk-1234567890abcdef")).toBe("sk-…cdef");
+  });
+
+  it("fully masks short keys to avoid leaking them", () => {
+    expect(maskApiKey("short")).toBe("****");
+    expect(maskApiKey("12345678")).toBe("****");
+  });
+
+  it("trims surrounding whitespace before masking", () => {
+    expect(maskApiKey("  sk-1234567890abcdef  ")).toBe("sk-…cdef");
+  });
+
+  it("returns a placeholder for empty input", () => {
+    expect(maskApiKey("")).toBe("****");
+    expect(maskApiKey(undefined)).toBe("****");
   });
 });

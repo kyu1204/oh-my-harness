@@ -288,3 +288,70 @@ describe("doctorCommand", () => {
     expect(after.checks.hooksExecutable).toBe(false);
   });
 });
+
+// The AI provider config lives globally at ~/.omh/config.json, so these tests
+// isolate HOME to a temp dir for deterministic results.
+describe("doctorCommand provider check", () => {
+  let tmpHome: string;
+  let originalHome: string;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "omh-doctor-prov-"));
+    tmpHome = await fs.mkdtemp(path.join(os.tmpdir(), "omh-doctor-home-"));
+    originalHome = process.env.HOME ?? "";
+    process.env.HOME = tmpHome;
+  });
+
+  afterEach(async () => {
+    process.env.HOME = originalHome;
+    await fs.rm(tmpHome, { recursive: true, force: true });
+  });
+
+  async function writeProviderConfig(config: unknown): Promise<void> {
+    await fs.mkdir(path.join(tmpHome, ".omh"), { recursive: true });
+    await fs.writeFile(
+      path.join(tmpHome, ".omh", "config.json"),
+      JSON.stringify(config, null, 2) + "\n",
+      "utf-8",
+    );
+  }
+
+  it("hints to run `omh config` when an API provider is configured", async () => {
+    await setupInitializedProject(tmpDir);
+    await writeProviderConfig({ provider: "openai", method: "api", apiKey: "sk-secret", model: "gpt-5.4" });
+
+    const result = await doctorCommand({ projectDir: tmpDir });
+
+    expect(result.providerConfigured).toBe(true);
+    const hint = result.messages.find((m) => m.includes("omh config"));
+    expect(hint).toBeDefined();
+    expect(hint).toContain("openai");
+    // Hint should mention key rotation so an expired key is recoverable.
+    expect(hint!.toLowerCase()).toContain("key");
+    // The provider check is informational and never leaks the API key.
+    expect(result.messages.join("\n")).not.toContain("sk-secret");
+    // Informational only — a configured provider does not affect health.
+    expect(result.healthy).toBe(true);
+  });
+
+  it("notes when no AI provider is configured and points at `omh config`", async () => {
+    await setupInitializedProject(tmpDir);
+
+    const result = await doctorCommand({ projectDir: tmpDir });
+
+    expect(result.providerConfigured).toBe(false);
+    expect(result.messages.some((m) => m.includes("omh config"))).toBe(true);
+    // Missing global provider config must not fail project health.
+    expect(result.healthy).toBe(true);
+  });
+
+  it("never fails health for a CLI provider", async () => {
+    await setupInitializedProject(tmpDir);
+    await writeProviderConfig({ provider: "claude", method: "cli", cliCommand: "claude" });
+
+    const result = await doctorCommand({ projectDir: tmpDir });
+
+    expect(result.providerConfigured).toBe(true);
+    expect(result.healthy).toBe(true);
+  });
+});

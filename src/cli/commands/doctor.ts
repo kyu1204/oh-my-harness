@@ -3,6 +3,7 @@ import path from "node:path";
 import { parse } from "smol-toml";
 import { OMH_HOOKS_DIR } from "../../utils/paths.js";
 import { computeDrift, HarnessNotFoundError } from "../../core/drift.js";
+import { loadProviderConfig } from "../../nl/config-store.js";
 
 export interface DoctorOptions {
   projectDir?: string;
@@ -28,6 +29,13 @@ export interface DoctorResult {
    * warning unless `strict` is set.
    */
   inSync?: boolean;
+  /**
+   * Whether an AI provider is configured for natural-language mode
+   * (~/.omh/config.json). Informational only — it never affects health, since
+   * the provider is global and optional. Surfaced so users can discover
+   * `omh config` to rotate an expired key or switch provider/model.
+   */
+  providerConfigured: boolean;
   messages: string[];
 }
 
@@ -185,6 +193,11 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<Doctor
     // No harness.yaml → leave inSync undefined (drift not applicable).
   }
 
+  // 9. AI provider config (~/.omh/config.json). Global and optional, so this is
+  // purely informational (INFO) and never affects health — it just surfaces
+  // `omh config` so users can rotate an expired key or switch provider/model.
+  const providerConfigured = await checkProviderConfig(messages);
+
   const checksHealthy = Object.values(checks).every(Boolean);
   const healthy = checksHealthy && (!options.strict || inSync !== false);
   const exitCode = healthy ? 0 : 1;
@@ -201,5 +214,34 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<Doctor
     }
   }
 
-  return { healthy, exitCode, checks, inSync, messages };
+  return { healthy, exitCode, checks, inSync, providerConfigured, messages };
+}
+
+/**
+ * Inspects the global AI provider config and appends an INFO hint to `messages`.
+ * Returns whether a provider is configured. Never reads or echoes the API key.
+ */
+async function checkProviderConfig(messages: string[]): Promise<boolean> {
+  const config = await loadProviderConfig();
+
+  if (!config) {
+    messages.push(
+      "INFO: No AI provider configured for natural-language mode — run `omh config` to set one up.",
+    );
+    return false;
+  }
+
+  if (config.method === "api") {
+    const model = config.model ? `, ${config.model}` : "";
+    messages.push(
+      `INFO: AI provider: ${config.provider} (api${model}). ` +
+        "If your API key expired, run `omh config` to update it or switch provider.",
+    );
+  } else {
+    messages.push(
+      `INFO: AI provider: ${config.provider} (cli). Run \`omh config\` to switch provider or model.`,
+    );
+  }
+
+  return true;
 }

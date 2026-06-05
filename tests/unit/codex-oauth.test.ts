@@ -57,4 +57,23 @@ describe("codex-oauth provider", () => {
 
     await expect(resultPromise).rejects.toThrow("Codex CLI not found");
   });
+
+  it("defaults Codex exec to gpt-5.5 when no model is configured", async () => {
+    const proc = makeProcess();
+    spawnMock.mockReturnValue(proc);
+    const { createCodexOauthProvider } = await import("../../src/nl/providers/codex-oauth.js");
+    const provider = createCodexOauthProvider("codex");
+
+    const resultPromise = provider.run("test");
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      "codex",
+      expect.arrayContaining(["-m", "gpt-5.5"]),
+      expect.any(Object),
+    );
+
+    proc.stdout.emit("data", Buffer.from("ok"));
+    proc.emit("close", 0);
+    await expect(resultPromise).resolves.toBe("ok");
+  });
 });

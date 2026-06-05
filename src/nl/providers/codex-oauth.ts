@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import type { LLMProvider } from "../provider-registry.js";
 
 const DEFAULT_COMMAND = "codex";
-const DEFAULT_MODEL = "gpt-5.4";
+const DEFAULT_MODEL = "gpt-5.5";
 
 export function createCodexOauthProvider(
   command: string = DEFAULT_COMMAND,

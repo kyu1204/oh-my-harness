@@ -177,9 +177,9 @@ oh-my-harness supports multiple AI providers for natural language mode:
 |----------|-------|------------------|---------|
 | **Claude CLI** | `claude` command installed | Opus 4.6, Sonnet 4.6, Haiku 4.5 | ✓ |
 | **Claude API** | Set `ANTHROPIC_API_KEY` | Opus 4.6, Sonnet 4.6, Haiku 4.5 | Sonnet 4.6 |
-| **OpenAI API** | Set `OPENAI_API_KEY` | GPT-5.4, GPT-5.4-mini, GPT-5.4-nano, GPT-4.1, GPT-4.1-mini, o3, o4-mini | GPT-5.4 |
+| **OpenAI API** | Set `OPENAI_API_KEY` | GPT-5.5, GPT-5.4, GPT-5.4-mini, GPT-5.4-nano, GPT-4.1, GPT-4.1-mini, o3, o4-mini | GPT-5.5 |
 | **Gemini API** | Set `GOOGLE_API_KEY` | Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.5 Flash Lite, Gemini 3.1 Pro Preview | Gemini 2.5 Pro |
-| **Codex OAuth** | `codex` command installed + `codex login` | GPT-5.4, GPT-5.4-mini, GPT-5.5 | GPT-5.4 |
+| **Codex OAuth** | `codex` command installed + `codex login` | GPT-5.5, GPT-5.4, GPT-5.4-mini | GPT-5.5 |
 
 Configuration is saved to `~/.omh/config.json` and selected via interactive UI on first use:
 

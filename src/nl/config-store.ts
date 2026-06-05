@@ -45,3 +45,18 @@ export async function saveProviderConfig(config: ProviderConfig): Promise<void> 
   await fs.writeFile(configPath, payload, { encoding: "utf-8", mode: 0o600 });
   await fs.chmod(configPath, 0o600);
 }
+
+export async function deleteProviderConfig(): Promise<void> {
+  await fs.rm(getConfigPath(), { force: true });
+}
+
+/**
+ * Masks an API key for display, keeping a short prefix and suffix so the user
+ * can recognize which key is stored without revealing it. Keys short enough
+ * that a prefix/suffix would overlap are masked entirely.
+ */
+export function maskApiKey(apiKey: string | undefined): string {
+  const key = apiKey?.trim() ?? "";
+  if (key.length <= 8) return "****";
+  return `${key.slice(0, 3)}…${key.slice(-4)}`;
+}

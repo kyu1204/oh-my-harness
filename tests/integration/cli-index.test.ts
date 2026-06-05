@@ -36,8 +36,16 @@ describe("createCli wiring", () => {
     expect(hasOption(uninstall, "--continue-on-error")).toBe(true);
   });
 
+  it("registers the config command with --show and --reset", () => {
+    const config = find(program, "config");
+    expect(config).toBeDefined();
+    expect(hasOption(config, "--show")).toBe(true);
+    expect(hasOption(config, "--reset")).toBe(true);
+    expect(hasOption(config, "--yes")).toBe(true);
+  });
+
   it("still registers the existing core commands", () => {
-    for (const name of ["init", "sync", "doctor", "test", "stats", "uninstall"]) {
+    for (const name of ["init", "sync", "doctor", "test", "stats", "uninstall", "config"]) {
       expect(find(program, name)).toBeDefined();
     }
   });

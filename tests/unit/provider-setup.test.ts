@@ -23,6 +23,13 @@ describe("provider-setup TUI data", () => {
     expect(oauthProviders[0].name).toBe("codex");
   });
 
+  it("codex-oauth-api is the only provider with OAuth API support", () => {
+    const providers = getAvailableProviders();
+    const oauthApiProviders = providers.filter((p) => p.supportsOAuthApi);
+    expect(oauthApiProviders).toHaveLength(1);
+    expect(oauthApiProviders[0].name).toBe("codex-oauth-api");
+  });
+
   it("all providers have a default model", () => {
     const providers = getAvailableProviders();
     for (const p of providers) {

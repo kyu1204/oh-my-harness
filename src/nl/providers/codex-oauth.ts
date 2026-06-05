@@ -3,15 +3,31 @@ import type { LLMProvider } from "../provider-registry.js";
 
 const DEFAULT_COMMAND = "codex";
 const DEFAULT_MODEL = "gpt-5.5";
+const DEFAULT_TIMEOUT_MS = 120_000;
+
+export interface CodexOauthProviderOptions {
+  timeoutMs?: number;
+}
 
 export function createCodexOauthProvider(
   command: string = DEFAULT_COMMAND,
   model: string = DEFAULT_MODEL,
+  options: CodexOauthProviderOptions = {},
 ): LLMProvider {
   return {
     name: "codex",
     run: async (prompt: string): Promise<string> => {
       return new Promise((resolve, reject) => {
+        let settled = false;
+        const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+        let timeout: NodeJS.Timeout | undefined;
+        const finalize = (fn: () => void): void => {
+          if (settled) return;
+          settled = true;
+          if (timeout) clearTimeout(timeout);
+          fn();
+        };
+
         const args = [
           "--ask-for-approval",
           "never",
@@ -32,6 +48,13 @@ export function createCodexOauthProvider(
           env: { ...process.env },
         });
 
+        timeout = setTimeout(() => {
+          proc.kill("SIGTERM");
+          finalize(() => {
+            reject(new Error(`${command} timed out after ${Math.ceil(timeoutMs / 1000)} seconds`));
+          });
+        }, timeoutMs);
+
         let stdout = "";
         let stderr = "";
 
@@ -45,29 +68,29 @@ export function createCodexOauthProvider(
 
         proc.on("error", (err: NodeJS.ErrnoException) => {
           if (err.code === "ENOENT") {
-            reject(
+            finalize(() => reject(
               new Error(
                 `${command} Codex CLI not found. Install Codex and sign in with ChatGPT using: codex login`,
               ),
-            );
+            ));
           } else {
-            reject(err);
+            finalize(() => reject(err));
           }
         });
 
         proc.on("close", (code) => {
           if (code === 0) {
-            resolve(stdout.trim());
+            finalize(() => resolve(stdout.trim()));
             return;
           }
 
           const details = (stderr || stdout).trim();
-          reject(
+          finalize(() => reject(
             new Error(
               `${command} exited with code ${code}: ${details || "no output"}\n` +
                 "Codex OAuth mode uses your Codex CLI ChatGPT login. Run `codex login` and retry.",
             ),
-          );
+          ));
         });
 
         proc.stdin.write(prompt);

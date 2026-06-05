@@ -18,22 +18,24 @@ describe("provider-registry", () => {
     expect(providers.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("providers include claude, openai, gemini, codex", () => {
+  it("providers include claude, openai, gemini, codex, codex-oauth-api", () => {
     const providers = getAvailableProviders();
     const names = providers.map((p) => p.name);
     expect(names).toContain("claude");
     expect(names).toContain("openai");
     expect(names).toContain("gemini");
     expect(names).toContain("codex");
+    expect(names).toContain("codex-oauth-api");
   });
 
-  it("each provider has displayName, supportsCli, supportsApi, supportsOAuth", () => {
+  it("each provider has displayName, supportsCli, supportsApi, supportsOAuth, supportsOAuthApi", () => {
     const providers = getAvailableProviders();
     for (const p of providers) {
       expect(p.displayName).toBeTruthy();
       expect(typeof p.supportsCli).toBe("boolean");
       expect(typeof p.supportsApi).toBe("boolean");
       expect(typeof p.supportsOAuth).toBe("boolean");
+      expect(typeof p.supportsOAuthApi).toBe("boolean");
     }
   });
 
@@ -75,6 +77,18 @@ describe("provider-registry", () => {
     expect(typeof provider.run).toBe("function");
   });
 
+  it("createProvider returns LLMProvider for Codex OAuth API config without an API key", () => {
+    const config: ProviderConfig = {
+      provider: "codex-oauth-api",
+      method: "oauth-api",
+      model: "gpt-5.5",
+    };
+    const provider = createProvider(config);
+    expect(provider).toBeDefined();
+    expect(provider.name).toBe("codex-oauth-api");
+    expect(typeof provider.run).toBe("function");
+  });
+
   it("createProvider throws for unknown provider", () => {
     const config: ProviderConfig = {
       provider: "unknown-llm" as never,
@@ -104,6 +118,15 @@ describe("provider-registry", () => {
     expect(codex!.supportsCli).toBe(false);
     expect(codex!.supportsApi).toBe(false);
     expect(codex!.supportsOAuth).toBe(true);
+  });
+
+  it("codex-oauth-api provider supports OAuth API only", () => {
+    const providers = getAvailableProviders();
+    const codexApi = providers.find((p) => p.name === "codex-oauth-api");
+    expect(codexApi!.supportsCli).toBe(false);
+    expect(codexApi!.supportsApi).toBe(false);
+    expect(codexApi!.supportsOAuth).toBe(false);
+    expect(codexApi!.supportsOAuthApi).toBe(true);
   });
 
   it("each provider has availableModels list with at least one model", () => {
@@ -141,6 +164,12 @@ describe("provider-registry", () => {
     const providers = getAvailableProviders();
     const codex = providers.find((p) => p.name === "codex");
     expect(codex!.defaultModel).toBe("gpt-5.5");
+  });
+
+  it("codex-oauth-api default model is gpt-5.5", () => {
+    const providers = getAvailableProviders();
+    const codexApi = providers.find((p) => p.name === "codex-oauth-api");
+    expect(codexApi!.defaultModel).toBe("gpt-5.5");
   });
 
   it("claude default model is claude-sonnet-4-6", () => {

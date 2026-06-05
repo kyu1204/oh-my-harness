@@ -22,6 +22,7 @@ function makeProcess() {
 describe("codex-oauth provider", () => {
   beforeEach(() => {
     spawnMock.mockReset();
+    vi.useRealTimers();
   });
 
   it("runs codex exec with cached OAuth auth and returns the final stdout", async () => {
@@ -75,5 +76,22 @@ describe("codex-oauth provider", () => {
     proc.stdout.emit("data", Buffer.from("ok"));
     proc.emit("close", 0);
     await expect(resultPromise).resolves.toBe("ok");
+  });
+
+  it("kills codex exec and rejects when the CLI hangs past the timeout", async () => {
+    vi.useFakeTimers();
+    const proc = makeProcess();
+    const killMock = vi.fn();
+    Object.assign(proc, { kill: killMock });
+    spawnMock.mockReturnValue(proc);
+    const { createCodexOauthProvider } = await import("../../src/nl/providers/codex-oauth.js");
+    const provider = createCodexOauthProvider("codex", "gpt-5.5", { timeoutMs: 100 });
+
+    const resultPromise = provider.run("hang");
+    const rejection = expect(resultPromise).rejects.toThrow("timed out");
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(killMock).toHaveBeenCalledWith("SIGTERM");
+    await rejection;
   });
 });

@@ -243,6 +243,12 @@ async function checkProviderConfig(messages: string[]): Promise<boolean> {
       `INFO: AI provider: ${config.provider} (oauth${model}). ` +
         "Uses Codex CLI auth; run `codex login` if the session expired.",
     );
+  } else if (config.method === "oauth-api") {
+    const model = config.model ? `, ${config.model}` : "";
+    messages.push(
+      `INFO: AI provider: ${config.provider} (oauth-api${model}). ` +
+        "Uses ~/.codex/auth.json; run `codex login` if the token expired.",
+    );
   } else {
     messages.push(
       `INFO: AI provider: ${config.provider} (cli). Run \`omh config\` to switch provider or model.`,

@@ -94,6 +94,20 @@ describe("config-store", () => {
     expect(loaded!.apiKey).toBeUndefined();
   });
 
+  it("saves Codex OAuth API configs without requiring an API key", async () => {
+    const config: ProviderConfig = {
+      provider: "codex-oauth-api",
+      method: "oauth-api",
+      model: "gpt-5.5",
+    };
+
+    await saveProviderConfig(config);
+
+    const loaded = await loadProviderConfig();
+    expect(loaded).toEqual(config);
+    expect(loaded!.apiKey).toBeUndefined();
+  });
+
   it("loadProviderConfig returns undefined when no config exists", async () => {
     const loaded = await loadProviderConfig();
     expect(loaded).toBeUndefined();

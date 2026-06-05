@@ -36,6 +36,7 @@ export async function runProviderSetup(): Promise<ProviderConfig | undefined> {
     def.supportsCli ? { value: "cli", label: `CLI tool (${def.cliCommand ?? def.name})` } : undefined,
     def.supportsApi ? { value: "api", label: "API Key" } : undefined,
     def.supportsOAuth ? { value: "oauth", label: `Codex OAuth (${def.cliCommand ?? def.name} login)` } : undefined,
+    def.supportsOAuthApi ? { value: "oauth-api", label: "Codex OAuth API (~/.codex/auth.json)" } : undefined,
   ].filter((option): option is { value: ProviderConfig["method"]; label: string } => option !== undefined);
 
   if (methodOptions.length > 1) {
@@ -95,7 +96,7 @@ export async function runProviderSetup(): Promise<ProviderConfig | undefined> {
     }
 
     config.model = selectedModel as string;
-  } else if (method === "oauth") {
+  } else if (method === "oauth" || method === "oauth-api") {
     config.cliCommand = def.cliCommand ?? def.name;
 
     const selectedModel = await p.select({

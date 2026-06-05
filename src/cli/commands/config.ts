@@ -40,6 +40,9 @@ function printSummary(config: ProviderConfig): void {
     console.log(`  model:    ${chalk.cyan(config.model ?? "(default)")}`);
     console.log(`  command:  ${chalk.cyan(config.cliCommand ?? config.provider)}`);
     console.log(`  auth:     ${chalk.dim("uses Codex CLI OAuth session; run `codex login` to sign in")}`);
+  } else if (config.method === "oauth-api") {
+    console.log(`  model:    ${chalk.cyan(config.model ?? "(default)")}`);
+    console.log(`  auth:     ${chalk.dim("uses Codex OAuth token from ~/.codex/auth.json; run `codex login` to refresh")}`);
   } else {
     console.log(`  command:  ${chalk.cyan(config.cliCommand ?? config.provider)}`);
   }

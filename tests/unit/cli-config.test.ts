@@ -89,7 +89,7 @@ describe("configCommand --show", () => {
     expect(out).toContain("codex-oauth-api");
     expect(out).toContain("oauth-api");
     expect(out).toContain("gpt-5.5");
-    expect(out).toContain("~/.codex/auth.json");
+    expect(out).toContain("~/.omh");
     expect(out.toLowerCase()).not.toContain("api key");
   });
 });

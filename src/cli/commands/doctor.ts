@@ -247,7 +247,7 @@ async function checkProviderConfig(messages: string[]): Promise<boolean> {
     const model = config.model ? `, ${config.model}` : "";
     messages.push(
       `INFO: AI provider: ${config.provider} (oauth-api${model}). ` +
-        "Uses ~/.codex/auth.json; run `codex login` if the token expired.",
+        "Uses ~/.omh Codex OAuth auth store; run `omh config` if the token expired.",
     );
   } else {
     messages.push(

@@ -59,6 +59,34 @@ describe("codex-oauth provider", () => {
     await expect(resultPromise).rejects.toThrow("Codex CLI not found");
   });
 
+  it("includes stderr and login guidance when codex exec exits non-zero", async () => {
+    const proc = makeProcess();
+    spawnMock.mockReturnValue(proc);
+    const { createCodexOauthProvider } = await import("../../src/nl/providers/codex-oauth.js");
+    const provider = createCodexOauthProvider("codex", "gpt-5.4");
+
+    const resultPromise = provider.run("test");
+    proc.stderr.emit("data", Buffer.from("auth expired"));
+    proc.emit("close", 1);
+
+    await expect(resultPromise).rejects.toThrow("auth expired");
+    await expect(resultPromise).rejects.toThrow("codex login");
+  });
+
+  it("rejects non-zero codex exec exits even when stdout was produced", async () => {
+    const proc = makeProcess();
+    spawnMock.mockReturnValue(proc);
+    const { createCodexOauthProvider } = await import("../../src/nl/providers/codex-oauth.js");
+    const provider = createCodexOauthProvider("codex", "gpt-5.4");
+
+    const resultPromise = provider.run("test");
+    proc.stdout.emit("data", Buffer.from("partial output"));
+    proc.emit("close", 2);
+
+    await expect(resultPromise).rejects.toThrow("exited with code 2");
+    await expect(resultPromise).rejects.toThrow("partial output");
+  });
+
   it("defaults Codex exec to gpt-5.5 when no model is configured", async () => {
     const proc = makeProcess();
     spawnMock.mockReturnValue(proc);

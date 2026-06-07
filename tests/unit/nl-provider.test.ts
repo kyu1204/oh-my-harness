@@ -89,6 +89,36 @@ describe("provider-registry", () => {
     expect(typeof provider.run).toBe("function");
   });
 
+  it("createProvider rejects unsupported API mode for Codex OAuth", () => {
+    const config: ProviderConfig = {
+      provider: "codex",
+      method: "api",
+      apiKey: "sk-test",
+    };
+
+    expect(() => createProvider(config)).toThrow("does not support API mode");
+  });
+
+  it("createProvider rejects unsupported OAuth mode for OpenAI API", () => {
+    const config: ProviderConfig = {
+      provider: "openai",
+      method: "oauth",
+      model: "gpt-5.5",
+    };
+
+    expect(() => createProvider(config)).toThrow("does not support OAuth mode");
+  });
+
+  it("createProvider rejects unsupported OAuth API mode for Codex CLI OAuth", () => {
+    const config: ProviderConfig = {
+      provider: "codex",
+      method: "oauth-api",
+      model: "gpt-5.5",
+    };
+
+    expect(() => createProvider(config)).toThrow("does not support OAuth API mode");
+  });
+
   it("createProvider throws for unknown provider", () => {
     const config: ProviderConfig = {
       provider: "unknown-llm" as never,

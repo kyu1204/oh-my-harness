@@ -3,6 +3,7 @@ import {
   getAvailableProviders,
   getProviderDefinition,
 } from "../../nl/provider-registry.js";
+import { ensureCodexOauthApiAuth } from "../../nl/providers/codex-oauth-api.js";
 import {
   saveProviderConfig,
   type ProviderConfig,
@@ -36,7 +37,7 @@ export async function runProviderSetup(): Promise<ProviderConfig | undefined> {
     def.supportsCli ? { value: "cli", label: `CLI tool (${def.cliCommand ?? def.name})` } : undefined,
     def.supportsApi ? { value: "api", label: "API Key" } : undefined,
     def.supportsOAuth ? { value: "oauth", label: `Codex OAuth (${def.cliCommand ?? def.name} login)` } : undefined,
-    def.supportsOAuthApi ? { value: "oauth-api", label: "Codex OAuth API (~/.codex/auth.json)" } : undefined,
+    def.supportsOAuthApi ? { value: "oauth-api", label: "Codex OAuth API (~/.omh auth store)" } : undefined,
   ].filter((option): option is { value: ProviderConfig["method"]; label: string } => option !== undefined);
 
   if (methodOptions.length > 1) {
@@ -97,7 +98,9 @@ export async function runProviderSetup(): Promise<ProviderConfig | undefined> {
 
     config.model = selectedModel as string;
   } else if (method === "oauth" || method === "oauth-api") {
-    config.cliCommand = def.cliCommand ?? def.name;
+    if (method === "oauth") {
+      config.cliCommand = def.cliCommand ?? def.name;
+    }
 
     const selectedModel = await p.select({
       message: "Select model:",
@@ -115,6 +118,15 @@ export async function runProviderSetup(): Promise<ProviderConfig | undefined> {
     }
 
     config.model = selectedModel as string;
+
+    if (method === "oauth-api") {
+      await ensureCodexOauthApiAuth({
+        onDeviceCode: ({ url, code }) => {
+          p.note(`Open ${url} and enter code: ${code}`, "Codex OAuth API sign-in");
+        },
+      });
+      p.log.success("Codex OAuth API session saved under ~/.omh.");
+    }
   } else {
     config.cliCommand = def.cliCommand ?? def.name;
   }

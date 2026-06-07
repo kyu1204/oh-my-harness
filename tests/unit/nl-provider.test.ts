@@ -10,6 +10,7 @@ import type { ProviderConfig } from "../../src/nl/config-store.js";
 import { createOpenaiApiProvider } from "../../src/nl/providers/openai-api.js";
 import { createClaudeApiProvider } from "../../src/nl/providers/claude-api.js";
 import { createGeminiApiProvider } from "../../src/nl/providers/gemini-api.js";
+import { createCodexOauthProvider } from "../../src/nl/providers/codex-oauth.js";
 
 describe("provider-registry", () => {
   it("getAvailableProviders returns at least 3 providers", () => {
@@ -17,20 +18,24 @@ describe("provider-registry", () => {
     expect(providers.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("providers include claude, openai, gemini", () => {
+  it("providers include claude, openai, gemini, codex, codex-oauth-api", () => {
     const providers = getAvailableProviders();
     const names = providers.map((p) => p.name);
     expect(names).toContain("claude");
     expect(names).toContain("openai");
     expect(names).toContain("gemini");
+    expect(names).toContain("codex");
+    expect(names).toContain("codex-oauth-api");
   });
 
-  it("each provider has displayName, supportsCli, supportsApi", () => {
+  it("each provider has displayName, supportsCli, supportsApi, supportsOAuth, supportsOAuthApi", () => {
     const providers = getAvailableProviders();
     for (const p of providers) {
       expect(p.displayName).toBeTruthy();
       expect(typeof p.supportsCli).toBe("boolean");
       expect(typeof p.supportsApi).toBe("boolean");
+      expect(typeof p.supportsOAuth).toBe("boolean");
+      expect(typeof p.supportsOAuthApi).toBe("boolean");
     }
   });
 
@@ -59,6 +64,61 @@ describe("provider-registry", () => {
     expect(typeof provider.run).toBe("function");
   });
 
+  it("createProvider returns LLMProvider for Codex OAuth config without an API key", () => {
+    const config: ProviderConfig = {
+      provider: "codex",
+      method: "oauth",
+      model: "gpt-5.4",
+      cliCommand: "codex",
+    };
+    const provider = createProvider(config);
+    expect(provider).toBeDefined();
+    expect(provider.name).toBe("codex");
+    expect(typeof provider.run).toBe("function");
+  });
+
+  it("createProvider returns LLMProvider for Codex OAuth API config without an API key", () => {
+    const config: ProviderConfig = {
+      provider: "codex-oauth-api",
+      method: "oauth-api",
+      model: "gpt-5.5",
+    };
+    const provider = createProvider(config);
+    expect(provider).toBeDefined();
+    expect(provider.name).toBe("codex-oauth-api");
+    expect(typeof provider.run).toBe("function");
+  });
+
+  it("createProvider rejects unsupported API mode for Codex OAuth", () => {
+    const config: ProviderConfig = {
+      provider: "codex",
+      method: "api",
+      apiKey: "sk-test",
+    };
+
+    expect(() => createProvider(config)).toThrow("does not support API mode");
+  });
+
+  it("createProvider rejects unsupported OAuth mode for OpenAI API", () => {
+    const config: ProviderConfig = {
+      provider: "openai",
+      method: "oauth",
+      model: "gpt-5.5",
+    };
+
+    expect(() => createProvider(config)).toThrow("does not support OAuth mode");
+  });
+
+  it("createProvider rejects unsupported OAuth API mode for Codex CLI OAuth", () => {
+    const config: ProviderConfig = {
+      provider: "codex",
+      method: "oauth-api",
+      model: "gpt-5.5",
+    };
+
+    expect(() => createProvider(config)).toThrow("does not support OAuth API mode");
+  });
+
   it("createProvider throws for unknown provider", () => {
     const config: ProviderConfig = {
       provider: "unknown-llm" as never,
@@ -80,6 +140,23 @@ describe("provider-registry", () => {
     const openai = providers.find((p) => p.name === "openai");
     expect(openai!.supportsCli).toBe(false);
     expect(openai!.supportsApi).toBe(true);
+  });
+
+  it("codex provider supports OAuth only", () => {
+    const providers = getAvailableProviders();
+    const codex = providers.find((p) => p.name === "codex");
+    expect(codex!.supportsCli).toBe(false);
+    expect(codex!.supportsApi).toBe(false);
+    expect(codex!.supportsOAuth).toBe(true);
+  });
+
+  it("codex-oauth-api provider supports OAuth API only", () => {
+    const providers = getAvailableProviders();
+    const codexApi = providers.find((p) => p.name === "codex-oauth-api");
+    expect(codexApi!.supportsCli).toBe(false);
+    expect(codexApi!.supportsApi).toBe(false);
+    expect(codexApi!.supportsOAuth).toBe(false);
+    expect(codexApi!.supportsOAuthApi).toBe(true);
   });
 
   it("each provider has availableModels list with at least one model", () => {
@@ -107,10 +184,22 @@ describe("provider-registry", () => {
     }
   });
 
-  it("openai default model is gpt-5.4", () => {
+  it("openai default model is gpt-5.5", () => {
     const providers = getAvailableProviders();
     const openai = providers.find((p) => p.name === "openai");
-    expect(openai!.defaultModel).toBe("gpt-5.4");
+    expect(openai!.defaultModel).toBe("gpt-5.5");
+  });
+
+  it("codex default model is gpt-5.5", () => {
+    const providers = getAvailableProviders();
+    const codex = providers.find((p) => p.name === "codex");
+    expect(codex!.defaultModel).toBe("gpt-5.5");
+  });
+
+  it("codex-oauth-api default model is gpt-5.5", () => {
+    const providers = getAvailableProviders();
+    const codexApi = providers.find((p) => p.name === "codex-oauth-api");
+    expect(codexApi!.defaultModel).toBe("gpt-5.5");
   });
 
   it("claude default model is claude-sonnet-4-6", () => {
@@ -134,6 +223,14 @@ describe("provider-registry", () => {
   it("getAvailableModels returns empty array for unknown provider", () => {
     const models = getAvailableModels("unknown-llm");
     expect(models).toEqual([]);
+  });
+});
+
+describe("codex-oauth provider", () => {
+  it("creates a provider with name 'codex'", () => {
+    const provider = createCodexOauthProvider("codex", "gpt-5.4");
+    expect(provider.name).toBe("codex");
+    expect(typeof provider.run).toBe("function");
   });
 });
 

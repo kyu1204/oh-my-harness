@@ -3,6 +3,7 @@ import {
   getAvailableProviders,
   getProviderDefinition,
 } from "../../nl/provider-registry.js";
+import { ensureCodexOauthApiAuth } from "../../nl/providers/codex-oauth-api.js";
 import {
   saveProviderConfig,
   type ProviderConfig,
@@ -29,27 +30,31 @@ export async function runProviderSetup(): Promise<ProviderConfig | undefined> {
 
   const def = getProviderDefinition(providerName as string)!;
 
-  // Step 2: Select method (CLI or API)
-  let method: "cli" | "api";
+  // Step 2: Select method (CLI, API, or OAuth)
+  let method: ProviderConfig["method"];
 
-  if (def.supportsCli && def.supportsApi) {
+  const methodOptions = [
+    def.supportsCli ? { value: "cli", label: `CLI tool (${def.cliCommand ?? def.name})` } : undefined,
+    def.supportsApi ? { value: "api", label: "API Key" } : undefined,
+    def.supportsOAuth ? { value: "oauth", label: `Codex OAuth (${def.cliCommand ?? def.name} login)` } : undefined,
+    def.supportsOAuthApi ? { value: "oauth-api", label: "Codex OAuth API (~/.omh auth store)" } : undefined,
+  ].filter((option): option is { value: ProviderConfig["method"]; label: string } => option !== undefined);
+
+  if (methodOptions.length > 1) {
     const selected = await p.select({
       message: "How would you like to connect?",
-      options: [
-        { value: "cli", label: `CLI tool (${def.cliCommand ?? def.name})` },
-        { value: "api", label: "API Key" },
-      ],
+      options: methodOptions,
     });
 
     if (p.isCancel(selected)) {
       p.cancel("Provider setup cancelled.");
       return undefined;
     }
-    method = selected as "cli" | "api";
-  } else if (def.supportsCli) {
-    method = "cli";
+    method = selected as ProviderConfig["method"];
+  } else if (methodOptions[0]) {
+    method = methodOptions[0].value;
   } else {
-    method = "api";
+    throw new Error(`Provider "${def.name}" has no supported authentication method`);
   }
 
   const config: ProviderConfig = {
@@ -92,6 +97,36 @@ export async function runProviderSetup(): Promise<ProviderConfig | undefined> {
     }
 
     config.model = selectedModel as string;
+  } else if (method === "oauth" || method === "oauth-api") {
+    if (method === "oauth") {
+      config.cliCommand = def.cliCommand ?? def.name;
+    }
+
+    const selectedModel = await p.select({
+      message: "Select model:",
+      options: def.availableModels.map((m) => ({
+        value: m.id,
+        label: m.label,
+        hint: m.id === def.defaultModel ? "default" : undefined,
+      })),
+      initialValue: def.defaultModel,
+    });
+
+    if (p.isCancel(selectedModel)) {
+      p.cancel("Provider setup cancelled.");
+      return undefined;
+    }
+
+    config.model = selectedModel as string;
+
+    if (method === "oauth-api") {
+      await ensureCodexOauthApiAuth({
+        onDeviceCode: ({ url, code }) => {
+          p.note(`Open ${url} and enter code: ${code}`, "Codex OAuth API sign-in");
+        },
+      });
+      p.log.success("Codex OAuth API session saved under ~/.omh.");
+    }
   } else {
     config.cliCommand = def.cliCommand ?? def.name;
   }

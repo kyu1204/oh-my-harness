@@ -237,6 +237,18 @@ async function checkProviderConfig(messages: string[]): Promise<boolean> {
       `INFO: AI provider: ${config.provider} (api${model}). ` +
         "If your API key expired, run `omh config` to update it or switch provider.",
     );
+  } else if (config.method === "oauth") {
+    const model = config.model ? `, ${config.model}` : "";
+    messages.push(
+      `INFO: AI provider: ${config.provider} (oauth${model}). ` +
+        "Uses Codex CLI auth; run `codex login` if the session expired.",
+    );
+  } else if (config.method === "oauth-api") {
+    const model = config.model ? `, ${config.model}` : "";
+    messages.push(
+      `INFO: AI provider: ${config.provider} (oauth-api${model}). ` +
+        "Uses ~/.omh Codex OAuth auth store; run `omh config` if the token expired.",
+    );
   } else {
     messages.push(
       `INFO: AI provider: ${config.provider} (cli). Run \`omh config\` to switch provider or model.`,

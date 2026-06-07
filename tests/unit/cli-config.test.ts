@@ -55,6 +55,43 @@ describe("configCommand --show", () => {
     expect(result.exitCode).toBe(0);
     expect(loggedOutput().toLowerCase()).toContain("no ai provider");
   });
+
+  it("prints Codex OAuth config without asking for or leaking an API key", async () => {
+    await saveProviderConfig({
+      provider: "codex",
+      method: "oauth",
+      cliCommand: "codex",
+      model: "gpt-5.4",
+    });
+
+    const result = await configCommand({ show: true });
+
+    expect(result.exitCode).toBe(0);
+    const out = loggedOutput();
+    expect(out).toContain("codex");
+    expect(out).toContain("oauth");
+    expect(out).toContain("gpt-5.4");
+    expect(out).toContain("codex login");
+    expect(out.toLowerCase()).not.toContain("api key");
+  });
+
+  it("prints Codex OAuth API config without asking for or leaking an API key", async () => {
+    await saveProviderConfig({
+      provider: "codex-oauth-api",
+      method: "oauth-api",
+      model: "gpt-5.5",
+    });
+
+    const result = await configCommand({ show: true });
+
+    expect(result.exitCode).toBe(0);
+    const out = loggedOutput();
+    expect(out).toContain("codex-oauth-api");
+    expect(out).toContain("oauth-api");
+    expect(out).toContain("gpt-5.5");
+    expect(out).toContain("~/.omh");
+    expect(out.toLowerCase()).not.toContain("api key");
+  });
 });
 
 describe("configCommand --reset", () => {

@@ -3,6 +3,8 @@ import { createClaudeCliProvider } from "./providers/claude-cli.js";
 import { createClaudeApiProvider } from "./providers/claude-api.js";
 import { createOpenaiApiProvider } from "./providers/openai-api.js";
 import { createGeminiApiProvider } from "./providers/gemini-api.js";
+import { createCodexOauthProvider } from "./providers/codex-oauth.js";
+import { createCodexOauthApiProvider } from "./providers/codex-oauth-api.js";
 
 export interface LLMProvider {
   name: string;
@@ -19,6 +21,8 @@ export interface ProviderDefinition {
   displayName: string;
   supportsCli: boolean;
   supportsApi: boolean;
+  supportsOAuth: boolean;
+  supportsOAuthApi: boolean;
   defaultModel: string;
   availableModels: ModelEntry[];
   cliCommand?: string;
@@ -30,6 +34,8 @@ const providers: ProviderDefinition[] = [
     displayName: "Claude (Anthropic)",
     supportsCli: true,
     supportsApi: true,
+    supportsOAuth: false,
+    supportsOAuthApi: false,
     defaultModel: "claude-sonnet-4-6",
     availableModels: [
       { id: "claude-opus-4-6", label: "Claude Opus 4.6 — most capable, 1M context" },
@@ -40,12 +46,15 @@ const providers: ProviderDefinition[] = [
   },
   {
     name: "openai",
-    displayName: "OpenAI (GPT-5.4)",
+    displayName: "OpenAI (GPT-5.5)",
     supportsCli: false,
     supportsApi: true,
-    defaultModel: "gpt-5.4",
+    supportsOAuth: false,
+    supportsOAuthApi: false,
+    defaultModel: "gpt-5.5",
     availableModels: [
-      { id: "gpt-5.4", label: "GPT-5.4 — flagship, agentic & coding" },
+      { id: "gpt-5.5", label: "GPT-5.5 — newest frontier, complex reasoning & coding" },
+      { id: "gpt-5.4", label: "GPT-5.4 — previous flagship, agentic & coding" },
       { id: "gpt-5.4-mini", label: "GPT-5.4 Mini — strongest mini model" },
       { id: "gpt-5.4-nano", label: "GPT-5.4 Nano — cheapest GPT-5.4 class" },
       { id: "gpt-4.1", label: "GPT-4.1 — best non-reasoning, coding" },
@@ -59,6 +68,8 @@ const providers: ProviderDefinition[] = [
     displayName: "Gemini (Google)",
     supportsCli: false,
     supportsApi: true,
+    supportsOAuth: false,
+    supportsOAuthApi: false,
     defaultModel: "gemini-2.5-pro",
     availableModels: [
       { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro — most advanced stable" },
@@ -66,6 +77,35 @@ const providers: ProviderDefinition[] = [
       { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite — most cost-effective" },
       { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview — cutting-edge (preview)" },
       { id: "gemini-3-flash-preview", label: "Gemini 3 Flash Preview — frontier performance (preview)" },
+    ],
+  },
+  {
+    name: "codex",
+    displayName: "Codex OAuth (OpenAI ChatGPT login)",
+    supportsCli: false,
+    supportsApi: false,
+    supportsOAuth: true,
+    supportsOAuthApi: false,
+    defaultModel: "gpt-5.5",
+    availableModels: [
+      { id: "gpt-5.5", label: "GPT-5.5 — frontier Codex reasoning when available" },
+      { id: "gpt-5.4", label: "GPT-5.4 — previous Codex default-capable flagship" },
+      { id: "gpt-5.4-mini", label: "GPT-5.4 Mini — faster Codex runs" },
+    ],
+    cliCommand: "codex",
+  },
+  {
+    name: "codex-oauth-api",
+    displayName: "Codex OAuth API (ChatGPT token direct)",
+    supportsCli: false,
+    supportsApi: false,
+    supportsOAuth: false,
+    supportsOAuthApi: true,
+    defaultModel: "gpt-5.5",
+    availableModels: [
+      { id: "gpt-5.5", label: "GPT-5.5 — direct Codex OAuth Responses endpoint" },
+      { id: "gpt-5.4", label: "GPT-5.4 — previous direct Codex OAuth model" },
+      { id: "gpt-5.4-mini", label: "GPT-5.4 Mini — faster direct Codex OAuth runs" },
     ],
   },
 ];
@@ -89,8 +129,24 @@ export function createProvider(config: ProviderConfig): LLMProvider {
     throw new Error(`Unknown AI provider: "${config.provider}". Available: ${providers.map((p) => p.name).join(", ")}`);
   }
 
-  if (config.method !== "cli" && config.method !== "api") {
+  if (config.method !== "cli" && config.method !== "api" && config.method !== "oauth" && config.method !== "oauth-api") {
     throw new Error(`Unsupported provider method: "${String(config.method)}"`);
+  }
+
+  if (config.method === "cli" && !def.supportsCli) {
+    throw new Error(`Provider "${config.provider}" does not support CLI mode`);
+  }
+
+  if (config.method === "api" && !def.supportsApi) {
+    throw new Error(`Provider "${config.provider}" does not support API mode`);
+  }
+
+  if (config.method === "oauth" && !def.supportsOAuth) {
+    throw new Error(`Provider "${config.provider}" does not support OAuth mode`);
+  }
+
+  if (config.method === "oauth-api" && !def.supportsOAuthApi) {
+    throw new Error(`Provider "${config.provider}" does not support OAuth API mode`);
   }
 
   if (config.method === "cli") {
@@ -98,6 +154,22 @@ export function createProvider(config: ProviderConfig): LLMProvider {
       return createClaudeCliProvider(config.cliCommand ?? "claude");
     }
     throw new Error(`Provider "${config.provider}" does not support CLI mode`);
+  }
+
+  if (config.method === "oauth") {
+    if (config.provider === "codex") {
+      const model = config.model?.trim() || def.defaultModel;
+      return createCodexOauthProvider(config.cliCommand ?? "codex", model);
+    }
+    throw new Error(`Provider "${config.provider}" does not support OAuth mode`);
+  }
+
+  if (config.method === "oauth-api") {
+    if (config.provider === "codex-oauth-api") {
+      const model = config.model?.trim() || def.defaultModel;
+      return createCodexOauthApiProvider({ model });
+    }
+    throw new Error(`Provider "${config.provider}" does not support OAuth API mode`);
   }
 
   // API mode

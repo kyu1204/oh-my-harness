@@ -125,7 +125,10 @@ your-project/
   │ • Claude CLI   │──▶│   NL Processing     │◀── "React + FastAPI
   │ • Claude API   │   │   (describe your    │     TDD enforced"
   │ • OpenAI API   │   │                     │
-  │ • Gemini API   │   └────────┬────────────┘
+  │ • Gemini API   │   │                     │
+  │ • Codex OAuth  │   │                     │
+  │ • Codex OAuth  │   │                     │
+  │   API          │   └────────┬────────────┘
   └────────────────┘            │
    (global AI config)   ┌────────▼────────────┐
                         │  Project Detector   │  ← Auto-detects language,
@@ -176,8 +179,10 @@ oh-my-harness supports multiple AI providers for natural language mode:
 |----------|-------|------------------|---------|
 | **Claude CLI** | `claude` command installed | Opus 4.6, Sonnet 4.6, Haiku 4.5 | ✓ |
 | **Claude API** | Set `ANTHROPIC_API_KEY` | Opus 4.6, Sonnet 4.6, Haiku 4.5 | Sonnet 4.6 |
-| **OpenAI API** | Set `OPENAI_API_KEY` | GPT-5.4, GPT-5.4-mini, GPT-5.4-nano, GPT-4.1, GPT-4.1-mini, o3, o4-mini | GPT-5.4 |
+| **OpenAI API** | Set `OPENAI_API_KEY` | GPT-5.5, GPT-5.4, GPT-5.4-mini, GPT-5.4-nano, GPT-4.1, GPT-4.1-mini, o3, o4-mini | GPT-5.5 |
 | **Gemini API** | Set `GOOGLE_API_KEY` | Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.5 Flash Lite, Gemini 3.1 Pro Preview | Gemini 2.5 Pro |
+| **Codex OAuth** | `codex` command installed + `codex login`; runs `codex exec` | GPT-5.5, GPT-5.4, GPT-5.4-mini | GPT-5.5 |
+| **Codex OAuth API** | `omh config` device-code login; imports `~/.codex/auth.json` once if present, then uses `~/.omh` | GPT-5.5, GPT-5.4, GPT-5.4-mini | GPT-5.5 |
 
 Configuration is saved to `~/.omh/config.json` and selected via interactive UI on first use:
 
@@ -452,6 +457,8 @@ oh-my-harness/
 - **Node.js** >= 20
 - **Claude CLI** (optional, for default NL mode) — [Install guide](https://docs.anthropic.com/en/docs/claude-code)
 - **API Keys** (optional, for Claude/OpenAI/Gemini API modes) — set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY`
+- **Codex CLI OAuth** (optional, for `codex` CLI-wrapper mode) — install `codex` and run `codex login`
+- **Codex OAuth API** (optional, experimental direct mode) — run `omh config` and choose Codex OAuth API to complete device-code sign-in; credentials are stored under `~/.omh`
 
 ---
 
@@ -465,7 +472,7 @@ oh-my-harness/
 - [x] `omh stats` — TUI analytics dashboard (ink)
 - [x] Stateful hook logging — events.jsonl
 - [x] TDD Guard — enforce test-first workflow
-- [x] Multi-provider AI support — Claude API, OpenAI, Gemini
+- [x] Multi-provider AI support — Claude API, OpenAI, Gemini, Codex OAuth
 - [x] Interactive model selection per provider
 - [x] GitHub star prompt — first-time only
 - [x] Codex emitter — `AGENTS.md` + `.codex/hooks.json` + `.codex/config.toml`

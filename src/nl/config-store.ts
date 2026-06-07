@@ -3,8 +3,8 @@ import path from "node:path";
 import os from "node:os";
 
 export interface ProviderConfig {
-  provider: "claude" | "openai" | "gemini";
-  method: "cli" | "api";
+  provider: "claude" | "openai" | "gemini" | "codex" | "codex-oauth-api";
+  method: "cli" | "api" | "oauth" | "oauth-api";
   apiKey?: string;
   model?: string;
   cliCommand?: string;

@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import type { MergedConfig } from "./merged-config.js";
 import type { GenerationPlan, PlannedFile } from "./plan.js";
@@ -9,6 +10,7 @@ import { generateCodexConfig, computeCodexConfig } from "../generators/codex-con
 import { generatePiExtension, computePiExtension } from "../generators/pi-extension.js";
 import { updateGitignore, computeGitignore } from "../generators/gitignore.js";
 import { computeManagedMarkdown } from "../generators/managed-md.js";
+import { computeLoopAssets } from "../generators/loop-assets.js";
 import { migrateLegacyState } from "../utils/state-migration.js";
 import { OMH_DIR } from "../utils/paths.js";
 
@@ -49,6 +51,17 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   ]);
   files.push(`${projectDir}/.claude/settings.json`, ...codexFiles, ...piFiles);
 
+  // Loop-engine assets (runner, and later the skill/monitor/templates). Emitted
+  // through the same compute function as the plan path so drift detection sees
+  // them; skipped entirely when the loop engine is not configured.
+  const loopAssets = await computeLoopAssets({ projectDir, config });
+  for (const asset of loopAssets) {
+    await fs.mkdir(path.dirname(asset.path), { recursive: true });
+    await fs.writeFile(asset.path, asset.content, "utf-8");
+    if (asset.chmod !== undefined) await fs.chmod(asset.path, asset.chmod);
+    files.push(asset.path);
+  }
+
   // .omh/state/ holds volatile log data; hooks/manifest are reproducible.
   await updateGitignore(projectDir, [`${OMH_DIR}/state/`]);
   files.push(`${projectDir}/.gitignore`);
@@ -88,6 +101,7 @@ export async function planGenerate(options: GenerateOptions): Promise<Generation
   files.push(settings);
   files.push(...codexFiles);
   files.push(...piFiles);
+  files.push(...(await computeLoopAssets({ projectDir, config })));
   if (gitignore) files.push(gitignore);
 
   return { files, wouldDelete: hooksPlan.wouldDelete };

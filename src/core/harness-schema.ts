@@ -48,6 +48,22 @@ export const HarnessConfigSchema = z.object({
   // Catalog-based hooks (v2)
   hooks: z.array(HookEntrySchema).default([]),
 
+  // Autonomous loop engine. Defaulted on: the runner does nothing until a
+  // session explicitly starts it, so an unused loop costs nothing, and the
+  // setup is already in place the moment someone asks for one.
+  loop: z.object({
+    enabled: z.boolean().default(true),
+    ledger: z.string().default("WORKPLAN.md"),
+    workOrders: z.string().default("docs/work-orders"),
+    model: z.string().default("sonnet"),
+    sentinel: z.string().default("OMH_GOAL_COMPLETE"),
+    interval: z.number().default(120),
+    blockedBackoff: z.number().default(1800),
+    architectOnly: z.array(z.string()).default([]),
+    isolate: z.boolean().default(true),
+    runtime: z.enum(["claude", "codex", "pi"]).default("claude"),
+  }).default({}),
+
   // Permissions
   permissions: z.object({
     allow: z.array(z.string()).default([]),
@@ -55,4 +71,13 @@ export const HarnessConfigSchema = z.object({
   }).default({}),
 });
 
-export type HarnessConfig = z.infer<typeof HarnessConfigSchema>;
+type ParsedHarnessConfig = z.infer<typeof HarnessConfigSchema>;
+
+/**
+ * Parsing always fills `loop` from its defaults, but hand-built configs (tests,
+ * `buildMinimalHarnessConfig`) may omit it — so the type stays optional while
+ * the schema stays defaulted-on.
+ */
+export type HarnessConfig = Omit<ParsedHarnessConfig, "loop"> & {
+  loop?: ParsedHarnessConfig["loop"];
+};

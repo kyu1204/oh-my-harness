@@ -26,6 +26,7 @@ function harnessToMergedConfig(harness: HarnessConfig): MergedConfig {
     claudeMdSections,
     hooks: { preToolUse: [], postToolUse: [], sessionStart: [], notification: [], configChange: [], worktreeCreate: [] },
     settings: { permissions: { allow: harness.permissions.allow, deny: harness.permissions.deny } },
+    ...(harness.loop?.enabled ? { loop: harness.loop } : {}),
   };
 }
 

@@ -53,7 +53,7 @@ describe("computeLoopAssets", () => {
     const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
     const runner = files.find((f) => f.path.endsWith("run.sh"));
     expect(runner?.content).toContain("OMH_GOAL_COMPLETE");
-    expect(runner?.content).toContain("--model sonnet");
+    expect(runner?.content).toContain("OMH_LOOP_MODEL='sonnet'");
     expect(runner?.content).toContain("OMH_LOOP_INTERVAL=120");
     expect(runner?.content).toContain("OMH_LOOP_BLOCKED_BACKOFF=1800");
   });
@@ -80,7 +80,7 @@ describe("computeLoopAssets", () => {
       config: baseConfig({ ...LOOP, model: "haiku" }),
     });
     const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
-    expect(content).toContain("--model haiku");
+    expect(content).toContain("OMH_LOOP_MODEL='haiku'");
   });
 
   it("dispatches on runtime so codex and pi sessions can drive the same loop", async () => {
@@ -95,7 +95,8 @@ describe("computeLoopAssets", () => {
   it("appends loop events to .omh/state so monitoring never depends on the runtime", async () => {
     const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
     const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
-    expect(content).toContain(".omh/state/loop-events.jsonl");
+    expect(content).toContain('EVENTS="$STATE_DIR/loop-events.jsonl"');
+    expect(content).toContain(".omh/state");
   });
 });
 
@@ -146,6 +147,53 @@ describe("loop skill", () => {
   });
 });
 
+describe("runner fixes from deep review", () => {
+  it("clears a leftover stop file at startup so the loop can be restarted", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    expect(content).toContain('rm -f "$STOP_FILE"');
+  });
+
+  it("counts only 'BLOCKED:' markers, not turns that merely mention the word", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    expect(content).toContain('grep -q "BLOCKED:"');
+    expect(content).not.toMatch(/grep -q "BLOCKED"(?!:)/);
+  });
+
+  it("drives the model from the single OMH_LOOP_MODEL variable", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    expect(content).toContain('--model "$OMH_LOOP_MODEL"');
+  });
+
+  it("emits events via node, the one interpreter an npm CLI can rely on", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    expect(content).not.toContain("python3");
+    expect(content).toContain("node");
+  });
+
+  it("isolates into a git worktree when isolate is on", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    expect(content).toContain("git worktree add");
+    expect(content).toContain("omh-loop");
+  });
+
+  it("skips the worktree when isolate is off", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig({ ...LOOP, isolate: false }) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    expect(content).not.toContain("git worktree add");
+  });
+
+  it("tells the architect to start the runner in the background, never foreground", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const skill = files.find((f) => f.path.endsWith("SKILL.md"))?.content ?? "";
+    expect(skill).toContain("nohup");
+  });
+});
+
 describe("generated runner is valid shell", () => {
   it("passes bash -n", async () => {
     const os = await import("node:os");
@@ -156,5 +204,17 @@ describe("generated runner is valid shell", () => {
     const tmp = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "omh-loop-sh-")), "run.sh");
     await fs.writeFile(tmp, runner.content, "utf-8");
     expect(() => execFileSync("bash", ["-n", tmp])).not.toThrow();
+  });
+});
+
+describe("loop worktree hygiene", () => {
+  it("gitignores the loop worktree so it never shows up as untracked in the main repo", async () => {
+    const { generate } = await import("../../src/core/generator.js");
+    const os = await import("node:os");
+    const fs = await import("node:fs/promises");
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omh-loop-gi-"));
+    await generate({ projectDir: dir, config: baseConfig(LOOP) });
+    const gitignore = await fs.readFile(path.join(dir, ".gitignore"), "utf-8");
+    expect(gitignore).toContain(".omh/loop/worktree/");
   });
 });

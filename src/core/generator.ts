@@ -63,7 +63,12 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   }
 
   // .omh/state/ holds volatile log data; hooks/manifest are reproducible.
-  await updateGitignore(projectDir, [`${OMH_DIR}/state/`]);
+  await updateGitignore(projectDir, [
+    `${OMH_DIR}/state/`,
+    // The loop's isolated worktree lives inside the repo; without this it (and
+    // everything the loop builds there) shows up as untracked in the main tree.
+    ...(config.loop?.isolate ? [`${OMH_DIR}/loop/worktree/`] : []),
+  ]);
   files.push(`${projectDir}/.gitignore`);
 
   return { files };

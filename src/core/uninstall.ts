@@ -215,6 +215,7 @@ export async function computeUninstall(options: ComputeUninstallOptions): Promis
     path.join(projectDir, ".omh"),
     path.join(projectDir, ".claude", "oh-my-harness.json"),
     path.join(projectDir, ".pi", "extensions", "omh-harness.ts"),
+    path.join(projectDir, ".claude", "skills", "omh-loop"),
   ]) {
     if (await exists(target)) plan.delete.push(target);
   }

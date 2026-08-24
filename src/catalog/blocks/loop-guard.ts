@@ -42,8 +42,15 @@ INPUT=$(cat)
 FILE_PATH=$(echo "\$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null)
 [[ -z "\$FILE_PATH" ]] && exit 0
 
+# Component-boundary matching: wrap both sides in slashes so 'ios' matches
+# ios/App.swift and /repo/ios/... but never src/kiosk.ts.
+_omh_path_under() {
+  local file="/\$1/" prefix="\${2%/}"
+  [[ "\$file" == *"/\$prefix/"* ]]
+}
+
 WORK_ORDERS='{{{workOrders}}}'
-if [[ "\$FILE_PATH" == *"\$WORK_ORDERS"* ]]; then
+if _omh_path_under "\$FILE_PATH" "\$WORK_ORDERS"; then
   REASON="oh-my-harness: loop-guard — the loop must not write its own work orders. Mark the task 'BLOCKED: no work order' and move on; the architect writes work orders."
   _log_event "block" "\$REASON"
   _emit_decision "block" "\$REASON"
@@ -53,7 +60,7 @@ fi
 ARCHITECT_ONLY=({{#each architectOnly}}"{{{this}}}" {{/each}})
 for prefix in "\${ARCHITECT_ONLY[@]+"\${ARCHITECT_ONLY[@]}"}"; do
   [[ -z "\$prefix" ]] && continue
-  if [[ "\$FILE_PATH" == *"\$prefix"* ]]; then
+  if _omh_path_under "\$FILE_PATH" "\$prefix"; then
     REASON="oh-my-harness: loop-guard — \$prefix is architect-only. Mark the task 'BLOCKED: architect-only path' and move on."
     _log_event "block" "\$REASON"
     _emit_decision "block" "\$REASON"

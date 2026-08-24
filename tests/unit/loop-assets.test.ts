@@ -218,3 +218,35 @@ describe("loop worktree hygiene", () => {
     expect(gitignore).toContain(".omh/loop/worktree/");
   });
 });
+
+describe("review fixes", () => {
+  it("F2: only a clean exit can complete the goal — sentinel is checked after status", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    const statusCheck = content.indexOf("[ $STATUS -ne 0 ]");
+    const sentinelCheck = content.indexOf('grep -qx "$SENTINEL"');
+    expect(statusCheck).toBeGreaterThan(-1);
+    expect(sentinelCheck).toBeGreaterThan(statusCheck);
+  });
+
+  it("F3: planGenerate reports stale loop assets in wouldDelete for check parity", async () => {
+    const { generate, planGenerate } = await import("../../src/core/generator.js");
+    const os = await import("node:os");
+    const fs = await import("node:fs/promises");
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omh-loop-plan-stale-"));
+    await generate({ projectDir: dir, config: baseConfig(LOOP) });
+    const plan = await planGenerate({ projectDir: dir, config: baseConfig() });
+    expect(plan.wouldDelete).toContain(path.join(dir, ".omh", "loop", "run.sh"));
+  });
+
+  it("F3: disabling the loop removes previously generated loop assets on re-sync", async () => {
+    const { generate } = await import("../../src/core/generator.js");
+    const os = await import("node:os");
+    const fs = await import("node:fs/promises");
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omh-loop-stale-"));
+    await generate({ projectDir: dir, config: baseConfig(LOOP) });
+    await generate({ projectDir: dir, config: baseConfig() });
+    await expect(fs.access(path.join(dir, ".omh", "loop", "run.sh"))).rejects.toThrow();
+    await expect(fs.access(path.join(dir, ".claude", "skills", "omh-loop", "SKILL.md"))).rejects.toThrow();
+  });
+});

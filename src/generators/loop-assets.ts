@@ -124,13 +124,6 @@ while true; do
   STATUS=$?
   printf '%s\\n' "$OUT" >> "$LOG"
 
-  # Whole-line match only. \`grep -q\` would fire on a turn that merely mentions
-  # the sentinel while explaining it has NOT finished.
-  if printf '%s' "$OUT" | tail -n 5 | grep -qx "$SENTINEL"; then
-    emit complete "sentinel observed — goal complete"
-    break
-  fi
-
   if printf '%s' "$OUT" | grep -qiE "usage limit|limit reached|rate.?limit"; then
     emit limit "usage limit — backing off \${OMH_LOOP_LIMIT_BACKOFF}s"
     sleep "$OMH_LOOP_LIMIT_BACKOFF"
@@ -146,6 +139,13 @@ while true; do
       sleep "$OMH_LOOP_INTERVAL"
     fi
     continue
+  fi
+
+  # Whole-line match only, and only on a clean exit: a crashed turn that
+  # happened to echo the sentinel must not end the loop as "complete".
+  if printf '%s' "$OUT" | tail -n 5 | grep -qx "$SENTINEL"; then
+    emit complete "sentinel observed — goal complete"
+    break
   fi
 
   if printf '%s' "$OUT" | grep -q "BLOCKED:"; then
@@ -226,6 +226,14 @@ your own work — the loop reports through its event log.
 
 ${renderLoopProtocol(loop)}
 `;
+}
+
+/** The paths computeLoopAssets can emit — used to clean up when the loop is disabled. */
+export function loopAssetPaths(projectDir: string): string[] {
+  return [
+    path.join(projectDir, OMH_DIR, "loop", "run.sh"),
+    path.join(projectDir, ".claude", "skills", "omh-loop", "SKILL.md"),
+  ];
 }
 
 export async function computeLoopAssets(options: LoopAssetOptions): Promise<PlannedFile[]> {

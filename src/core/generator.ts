@@ -10,7 +10,7 @@ import { generateCodexConfig, computeCodexConfig } from "../generators/codex-con
 import { generatePiExtension, computePiExtension } from "../generators/pi-extension.js";
 import { updateGitignore, computeGitignore } from "../generators/gitignore.js";
 import { computeManagedMarkdown } from "../generators/managed-md.js";
-import { computeLoopAssets } from "../generators/loop-assets.js";
+import { computeLoopAssets, loopAssetPaths } from "../generators/loop-assets.js";
 import { migrateLegacyState } from "../utils/state-migration.js";
 import { OMH_DIR } from "../utils/paths.js";
 
@@ -61,6 +61,12 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
     if (asset.chmod !== undefined) await fs.chmod(asset.path, asset.chmod);
     files.push(asset.path);
   }
+  if (!config.loop) {
+    // The loop was disabled after a previous sync: its assets are now stale.
+    for (const stale of loopAssetPaths(projectDir)) {
+      await fs.rm(stale, { force: true });
+    }
+  }
 
   // .omh/state/ holds volatile log data; hooks/manifest are reproducible.
   await updateGitignore(projectDir, [
@@ -109,5 +115,16 @@ export async function planGenerate(options: GenerateOptions): Promise<Generation
   files.push(...(await computeLoopAssets({ projectDir, config })));
   if (gitignore) files.push(gitignore);
 
-  return { files, wouldDelete: hooksPlan.wouldDelete };
+  const wouldDelete = [...hooksPlan.wouldDelete];
+  if (!config.loop) {
+    for (const stale of loopAssetPaths(projectDir)) {
+      try {
+        await fs.access(stale);
+        wouldDelete.push(stale);
+      } catch {
+        // not present — nothing stale
+      }
+    }
+  }
+  return { files, wouldDelete };
 }

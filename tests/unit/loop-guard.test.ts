@@ -65,6 +65,36 @@ describe("loop-guard block", () => {
   });
 });
 
+describe("loop-guard path boundaries (review F1)", () => {
+  it("does not block src/kiosk.ts for an architectOnly entry of 'ios'", async () => {
+    const out = await runGuard({
+      filePath: "src/kiosk.ts",
+      env: { OMH_LOOP: "1" },
+      params: { architectOnly: ["ios"] },
+    });
+    expect(out).not.toContain("DECISION:block");
+  });
+
+  it("still blocks files under the architectOnly directory itself", async () => {
+    for (const filePath of ["ios/App.swift", "/repo/ios/App.swift"]) {
+      const out = await runGuard({
+        filePath,
+        env: { OMH_LOOP: "1" },
+        params: { architectOnly: ["ios"] },
+      });
+      expect(out).toContain("DECISION:block");
+    }
+  });
+
+  it("does not block a file merely containing the work-orders string", async () => {
+    const out = await runGuard({
+      filePath: "src/docs/work-orders-viewer.ts",
+      env: { OMH_LOOP: "1" },
+    });
+    expect(out).not.toContain("DECISION:block");
+  });
+});
+
 describe("loop-guard wiring", () => {
   it("is added automatically when the loop engine is on", async () => {
     const harness = HarnessConfigSchema.parse({ version: "1.0" });

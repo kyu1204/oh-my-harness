@@ -144,6 +144,65 @@ done
 `;
 }
 
+/**
+ * The loop protocol, in one place. It is emitted twice: into CLAUDE.md /
+ * AGENTS.md (so every runtime's session carries it) and into the skill. Rules
+ * live in the ledger and these managed sections rather than in the runner
+ * prompt, because those are what get reloaded on every fresh iteration.
+ */
+export function renderLoopProtocol(loop: LoopConfig): string {
+  const architectOnly =
+    loop.architectOnly.length > 0
+      ? loop.architectOnly.map((p) => `\`${p}\``).join(", ")
+      : "none declared — add paths to `loop.architectOnly` in harness.yaml";
+  return `The autonomous loop runs one work order per fresh session. \`${loop.ledger}\` is the
+single source of truth: goal gates, task checkboxes, decisions and progress log.
+
+- Pick the next unchecked task in \`${loop.ledger}\`; implement it from its work order
+  in \`${loop.workOrders}/<ID>.md\`, exactly as written. Make no design decisions.
+- No work order, no work. Mark the task \`BLOCKED: no work order\` and stop — never
+  write your own work order and then implement it. Self-approval is the failure mode.
+- Run the work order's acceptance commands before ticking any checkbox.
+- Architect-only, never edited by the loop: ${architectOnly}.
+- On a blocker needing a human, or after three failed attempts, mark
+  \`BLOCKED: <reason>\` and move on. Never idle waiting for a person.
+- One task, one commit. Update the checkbox and the progress log in the same commit.
+
+Start: \`bash .omh/loop/run.sh\` (stop with \`touch ${OMH_DIR}/state/loop.stop\`).
+Watch: \`tail -f ${OMH_DIR}/state/loop-events.jsonl\`.`;
+}
+
+function renderSkill(loop: LoopConfig): string {
+  return `---
+name: omh-loop
+description: Set up and start the autonomous loop for a goal. Use when asked to run work as a loop, in a loop, or unattended.
+---
+
+# Autonomous loop
+
+You are the architect, not the loop. Set it up, start it, then carry on with
+your own work — the loop reports through its event log.
+
+1. Write \`${loop.ledger}\`: the goal as verifiable gates, tasks as checkboxes
+   grouped by phase, a decisions log and a progress log. Exclude anything needing
+   the user's own action (store submission, console access) from the goal.
+2. Write a work order per task in \`${loop.workOrders}/<ID>.md\`: file paths, signatures,
+   thresholds, exact copy, forbidden changes, acceptance criteria and the command
+   that verifies it. Include work outside the code the task implies — deploy
+   scripts, env, migrations, allowlists — the loop will not infer them.
+   Queue several ahead: a loop with no work order left spins doing nothing.
+3. Name the files only you may touch in \`loop.architectOnly\` (harness.yaml, then
+   \`omh sync\`). An abstract "do not improvise" is not obeyed; a named path is.
+4. Start it: \`bash .omh/loop/run.sh\`${loop.isolate ? " (runs in its own git worktree so you can keep working)" : ""}.
+5. Attach monitoring immediately — do not wait to be asked for progress:
+   \`tail -f ${OMH_DIR}/state/loop-events.jsonl\` and \`tail -n 0 -F .git/logs/HEAD\`.
+   Watch for failure signatures too (\`blocked\`, \`limit\`, \`crash\`), not just success:
+   otherwise a dead loop looks exactly like a quiet one.
+
+${renderLoopProtocol(loop)}
+`;
+}
+
 export async function computeLoopAssets(options: LoopAssetOptions): Promise<PlannedFile[]> {
   const { projectDir, config } = options;
   if (!config.loop) return [];
@@ -153,6 +212,10 @@ export async function computeLoopAssets(options: LoopAssetOptions): Promise<Plan
       path: path.join(projectDir, OMH_DIR, "loop", "run.sh"),
       content: renderRunner(config.loop),
       chmod: 0o755,
+    },
+    {
+      path: path.join(projectDir, ".claude", "skills", "omh-loop", "SKILL.md"),
+      content: renderSkill(config.loop),
     },
   ];
 }

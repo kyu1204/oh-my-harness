@@ -43,3 +43,32 @@ describe("loop engine config", () => {
     expect(merged.loop?.ledger).toBe("WORKPLAN.md");
   });
 });
+
+describe("loop protocol section", () => {
+  it("adds a protocol section so CLAUDE.md and AGENTS.md both carry the rules", async () => {
+    const harness = HarnessConfigSchema.parse({ version: "1.0" });
+    const merged = await harnessToMergedConfigV2(harness);
+    const section = merged.claudeMdSections.find((s) => s.id === "omh-loop-protocol");
+    expect(section).toBeDefined();
+    const body = section?.content ?? "";
+    expect(body).toContain("WORKPLAN.md");
+    expect(body).toContain("BLOCKED");
+    expect(body).toContain(".omh/loop/run.sh");
+  });
+
+  it("names the architect-only paths verbatim, since an abstract ban is not obeyed", async () => {
+    const harness = HarnessConfigSchema.parse({
+      version: "1.0",
+      loop: { architectOnly: ["ios/Runner.xcodeproj"] },
+    });
+    const merged = await harnessToMergedConfigV2(harness);
+    const body = merged.claudeMdSections.find((s) => s.id === "omh-loop-protocol")?.content ?? "";
+    expect(body).toContain("ios/Runner.xcodeproj");
+  });
+
+  it("adds no section when the loop engine is off", async () => {
+    const harness = HarnessConfigSchema.parse({ version: "1.0", loop: { enabled: false } });
+    const merged = await harnessToMergedConfigV2(harness);
+    expect(merged.claudeMdSections.some((s) => s.id === "omh-loop-protocol")).toBe(false);
+  });
+});

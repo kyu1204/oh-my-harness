@@ -132,3 +132,16 @@ describe("loop assets in the generator pipeline", () => {
     expect(plan.files.some((f) => f.path.includes("/loop/"))).toBe(false);
   });
 });
+
+describe("loop skill", () => {
+  it("emits a Claude skill that routes a loop request to the setup steps", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const skill = files.find((f) => f.path === path.join(PROJECT_DIR, ".claude", "skills", "omh-loop", "SKILL.md"));
+    expect(skill).toBeDefined();
+    expect(skill?.content).toContain("WORKPLAN.md");
+    expect(skill?.content).toContain("docs/work-orders");
+    expect(skill?.content).toContain(".omh/loop/run.sh");
+    // Monitoring must be attached at start-up, not polled when someone asks.
+    expect(skill?.content).toContain("tail -f");
+  });
+});

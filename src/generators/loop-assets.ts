@@ -66,6 +66,8 @@ set -uo pipefail
 cd "$(dirname "$0")/../.." || exit 1
 PROJECT_ROOT="$(pwd)"
 
+# Inherited by every headless turn and its hooks; loop-guard fires on it.
+export OMH_LOOP=1
 OMH_LOOP_RUNTIME=${loop.runtime}
 OMH_LOOP_MODEL=${shellSingleQuote(loop.model)}
 OMH_LOOP_LEDGER=${shellSingleQuote(loop.ledger)}

@@ -145,3 +145,16 @@ describe("loop skill", () => {
     expect(skill?.content).toContain("tail -f");
   });
 });
+
+describe("generated runner is valid shell", () => {
+  it("passes bash -n", async () => {
+    const os = await import("node:os");
+    const fs = await import("node:fs/promises");
+    const { execFileSync } = await import("node:child_process");
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const runner = files.find((f) => f.path.endsWith("run.sh"))!;
+    const tmp = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "omh-loop-sh-")), "run.sh");
+    await fs.writeFile(tmp, runner.content, "utf-8");
+    expect(() => execFileSync("bash", ["-n", tmp])).not.toThrow();
+  });
+});

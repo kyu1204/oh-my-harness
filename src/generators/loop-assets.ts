@@ -155,7 +155,9 @@ export function renderLoopProtocol(loop: LoopConfig): string {
     loop.architectOnly.length > 0
       ? loop.architectOnly.map((p) => `\`${p}\``).join(", ")
       : "none declared — add paths to `loop.architectOnly` in harness.yaml";
-  return `The autonomous loop runs one work order per fresh session. \`${loop.ledger}\` is the
+  return `## Autonomous Loop Protocol
+
+The autonomous loop runs one work order per fresh session. \`${loop.ledger}\` is the
 single source of truth: goal gates, task checkboxes, decisions and progress log.
 
 - Pick the next unchecked task in \`${loop.ledger}\`; implement it from its work order

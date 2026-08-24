@@ -51,6 +51,7 @@ describe("loop protocol section", () => {
     const section = merged.claudeMdSections.find((s) => s.id === "omh-loop-protocol");
     expect(section).toBeDefined();
     const body = section?.content ?? "";
+    expect(body.startsWith("## ")).toBe(true);
     expect(body).toContain("WORKPLAN.md");
     expect(body).toContain("BLOCKED");
     expect(body).toContain(".omh/loop/run.sh");

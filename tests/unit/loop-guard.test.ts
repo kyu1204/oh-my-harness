@@ -11,7 +11,8 @@ import { harnessToMergedConfigV2 } from "../../src/core/harness-converter-v2.js"
 // Render the block and run it as a real hook: stdin carries the tool input,
 // stubbed _emit_decision/_log_event record what the guard decided.
 async function runGuard(opts: {
-  filePath: string;
+  filePath?: string;
+  command?: string;
   env?: Record<string, string>;
   params?: Record<string, unknown>;
 }): Promise<string> {
@@ -24,7 +25,9 @@ async function runGuard(opts: {
   const script = path.join(dir, "guard.sh");
   await fs.writeFile(script, body, "utf-8");
   return execFileSync("bash", [script], {
-    input: JSON.stringify({ tool_input: { file_path: opts.filePath } }),
+    input: JSON.stringify({
+      tool_input: opts.command !== undefined ? { command: opts.command } : { file_path: opts.filePath },
+    }),
     env: { ...process.env, ...opts.env },
     encoding: "utf-8",
   });
@@ -33,7 +36,7 @@ async function runGuard(opts: {
 describe("loop-guard block", () => {
   it("has PreToolUse Edit|Write metadata and can block", () => {
     expect(loopGuard.event).toBe("PreToolUse");
-    expect(loopGuard.matcher).toBe("Edit|Write");
+    expect(loopGuard.matcher).toBe("Edit|Write|Bash");
     expect(loopGuard.canBlock).toBe(true);
   });
 
@@ -91,6 +94,46 @@ describe("loop-guard path boundaries (review F1)", () => {
       filePath: "src/docs/work-orders-viewer.ts",
       env: { OMH_LOOP: "1" },
     });
+    expect(out).not.toContain("DECISION:block");
+  });
+});
+
+describe("loop-guard Bash coverage (CodeRabbit CR1)", () => {
+  it("blocks a Bash redirection into the work-orders directory", async () => {
+    const out = await runGuard({
+      command: 'cat > docs/work-orders/T-1.md <<EOF\nfake order\nEOF',
+      env: { OMH_LOOP: "1" },
+    });
+    expect(out).toContain("DECISION:block");
+  });
+
+  it("blocks tee/mv/cp writes into architect-only paths", async () => {
+    for (const command of [
+      "echo x | tee ios/Runner.xcodeproj/project.pbxproj",
+      "mv /tmp/p.pbxproj ios/Runner.xcodeproj/project.pbxproj",
+      "cp -f x.plist ios/Runner.xcodeproj/y.plist",
+    ]) {
+      const out = await runGuard({
+        command,
+        env: { OMH_LOOP: "1" },
+        params: { architectOnly: ["ios/Runner.xcodeproj"] },
+      });
+      expect(out).toContain("DECISION:block");
+    }
+  });
+
+  it("lets the loop READ work orders from Bash (acceptance commands need this)", async () => {
+    for (const command of [
+      "cat docs/work-orders/T-1.md",
+      "grep -n acceptance docs/work-orders/T-1.md",
+    ]) {
+      const out = await runGuard({ command, env: { OMH_LOOP: "1" } });
+      expect(out).not.toContain("DECISION:block");
+    }
+  });
+
+  it("ignores Bash commands that never mention a protected path", async () => {
+    const out = await runGuard({ command: "npm test", env: { OMH_LOOP: "1" } });
     expect(out).not.toContain("DECISION:block");
   });
 });

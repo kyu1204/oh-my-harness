@@ -14,7 +14,7 @@ export const loopGuard: BuildingBlock = {
   description: "Blocks a loop session from writing its own work orders or touching architect-only paths",
   category: "quality",
   event: "PreToolUse",
-  matcher: "Edit|Write",
+  matcher: "Edit|Write|Bash",
   canBlock: true,
   params: [
     {
@@ -40,7 +40,8 @@ INPUT=$(cat)
 [[ "\${OMH_LOOP:-}" != "1" ]] && exit 0
 
 FILE_PATH=$(echo "\$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null)
-[[ -z "\$FILE_PATH" ]] && exit 0
+COMMAND=$(echo "\$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
+[[ -z "\$FILE_PATH" && -z "\$COMMAND" ]] && exit 0
 
 # Component-boundary matching: wrap both sides in slashes so 'ios' matches
 # ios/App.swift and /repo/ios/... but never src/kiosk.ts.
@@ -49,8 +50,20 @@ _omh_path_under() {
   [[ "\$file" == *"/\$prefix/"* ]]
 }
 
+# Bash coverage: a shell command that mentions a protected path AND carries a
+# write indicator is blocked. Reads (cat/grep of a work order) pass.
+# ponytail: substring heuristic — a command writing elsewhere while merely
+# mentioning a protected path is over-blocked; tighten to arg-level parsing if
+# that ever bites. This guards a drifting loop, not a malicious one.
+_omh_bash_writes_to() {
+  local cmd="\$1" target="\${2%/}"
+  [[ -z "\$cmd" || -z "\$target" ]] && return 1
+  [[ "\$cmd" == *"\$target"* ]] || return 1
+  echo "\$cmd" | grep -qE '(>|>>)[[:space:]]*[^|&;]*'"\$target"'|(^|[^[:alnum:]_])(tee|mv|cp|rm|touch|truncate|sed[[:space:]]+-i[^[:space:]]*)[[:space:]][^|&;]*'"\$target"
+}
+
 WORK_ORDERS='{{{workOrders}}}'
-if _omh_path_under "\$FILE_PATH" "\$WORK_ORDERS"; then
+if _omh_path_under "\$FILE_PATH" "\$WORK_ORDERS" || _omh_bash_writes_to "\$COMMAND" "\$WORK_ORDERS"; then
   REASON="oh-my-harness: loop-guard — the loop must not write its own work orders. Mark the task 'BLOCKED: no work order' and move on; the architect writes work orders."
   _log_event "block" "\$REASON"
   _emit_decision "block" "\$REASON"
@@ -60,7 +73,7 @@ fi
 ARCHITECT_ONLY=({{#each architectOnly}}"{{{this}}}" {{/each}})
 for prefix in "\${ARCHITECT_ONLY[@]+"\${ARCHITECT_ONLY[@]}"}"; do
   [[ -z "\$prefix" ]] && continue
-  if _omh_path_under "\$FILE_PATH" "\$prefix"; then
+  if _omh_path_under "\$FILE_PATH" "\$prefix" || _omh_bash_writes_to "\$COMMAND" "\$prefix"; then
     REASON="oh-my-harness: loop-guard — \$prefix is architect-only. Mark the task 'BLOCKED: architect-only path' and move on."
     _log_event "block" "\$REASON"
     _emit_decision "block" "\$REASON"

@@ -250,3 +250,26 @@ describe("review fixes", () => {
     await expect(fs.access(path.join(dir, ".claude", "skills", "omh-loop", "SKILL.md"))).rejects.toThrow();
   });
 });
+
+describe("CodeRabbit review fixes", () => {
+  it("CR2: planGenerate includes the worktree gitignore entry when isolate is on", async () => {
+    const { planGenerate } = await import("../../src/core/generator.js");
+    const os = await import("node:os");
+    const fs = await import("node:fs/promises");
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omh-cr2-"));
+    const plan = await planGenerate({ projectDir: dir, config: baseConfig(LOOP) });
+    const gitignore = plan.files.find((f) => f.path.endsWith(".gitignore"));
+    expect(gitignore?.content).toContain(".omh/loop/worktree/");
+  });
+
+  it("CR3: the runner copies uncommitted loop state into the worktree", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    // Ledger, work orders, and the generated harness config must reach the
+    // worktree even when the architect has not committed them yet.
+    for (const asset of ['"$OMH_LOOP_LEDGER"', '"$OMH_LOOP_WORK_ORDERS"', ".claude", ".omh/hooks", "CLAUDE.md", "AGENTS.md"]) {
+      expect(content).toContain(asset);
+    }
+    expect(content).toContain("cp -R");
+  });
+});

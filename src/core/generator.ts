@@ -103,7 +103,10 @@ export async function planGenerate(options: GenerateOptions): Promise<Generation
     computeSettings({ projectDir, config, hooksOutput }),
     computeCodexConfig({ projectDir, hooksOutput }),
     Promise.resolve(computePiExtension({ projectDir, hooksOutput })),
-    computeGitignore(projectDir, [`${OMH_DIR}/state/`]),
+    computeGitignore(projectDir, [
+      `${OMH_DIR}/state/`,
+      ...(config.loop?.isolate ? [`${OMH_DIR}/loop/worktree/`] : []),
+    ]),
   ]);
 
   files.push({ path: path.join(projectDir, "CLAUDE.md"), content: claudeMd });

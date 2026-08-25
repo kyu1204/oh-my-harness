@@ -51,6 +51,14 @@ describe("loop schema hardening (GPT G4)", () => {
   });
 });
 
+describe("loop numeric constraints (round 4 N2)", () => {
+  it("rejects zero and negative interval/blockedBackoff", () => {
+    for (const loop of [{ interval: 0 }, { interval: -5 }, { blockedBackoff: 0 }, { blockedBackoff: -1 }]) {
+      expect(HarnessConfigSchema.safeParse({ version: "1.0", loop }).success).toBe(false);
+    }
+  });
+});
+
 describe("loop protocol section", () => {
   it("adds a protocol section so CLAUDE.md and AGENTS.md both carry the rules", async () => {
     const harness = HarnessConfigSchema.parse({ version: "1.0" });

@@ -340,3 +340,24 @@ describe("CodeRabbit round-3 fixes", () => {
     expect(content).toContain("tail -n 5");
   });
 });
+
+describe("CodeRabbit round-4 fixes", () => {
+  it("N3: the ledger is seeded once at startup, never inside the iteration loop", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    const loopStart = content.indexOf("while true");
+    const seed = content.indexOf('-nt "$OMH_LOOP_LEDGER"');
+    expect(seed).toBeGreaterThan(-1);
+    // seeding lives before the loop body — a mid-run architect edit can no
+    // longer clobber the loop's own checkbox progress
+    expect(seed).toBeLessThan(loopStart);
+    // the per-iteration sync function must not touch the ledger at all
+    const syncStart = content.indexOf("sync_worktree_assets()");
+    const syncEnd = content.indexOf("seed_ledger()");
+    expect(content.slice(syncStart, syncEnd)).not.toContain("OMH_LOOP_LEDGER");
+    // and nothing inside the while-loop body reseeds it either
+    const loopBody = content.slice(loopStart, content.lastIndexOf("done"));
+    expect(loopBody).not.toContain("seed_ledger");
+    expect(loopBody).not.toContain('cp "$PROJECT_ROOT/$OMH_LOOP_LEDGER"');
+  });
+});

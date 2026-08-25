@@ -54,7 +54,9 @@ _omh_path_under() {
 # write indicator is blocked. Reads (cat/grep of a work order) pass.
 # ponytail: substring heuristic — a command writing elsewhere while merely
 # mentioning a protected path is over-blocked; tighten to arg-level parsing if
-# that ever bites. This guards a drifting loop, not a malicious one.
+# that ever bites. This guards a drifting loop, not a malicious one — evasion
+# via split cd chains, variable indirection, pushd, or symlinks is explicitly
+# out of scope: winning that arms race needs a filesystem sandbox, not a hook.
 _omh_bash_writes_to() {
   local cmd="\$1" target="\${2%/}"
   [[ -z "\$cmd" || -z "\$target" ]] && return 1

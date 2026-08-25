@@ -72,9 +72,13 @@ sync_worktree_assets() {
   # The ledger is seeded once, then owned by the loop: overwriting it every
   # iteration would roll its checkboxes back to the architect's stale copy
   # and make the loop redo finished tasks.
-  # Re-seed when missing OR when the architect's copy is newer — that means a
-  # new goal was written after the previous run finished. During a run the
-  # loop's own updates keep the worktree copy newer, so it is never clobbered.
+}
+
+# Ledger seeding happens ONCE, at startup — never per iteration. A new goal is
+# a new runner start (the -nt test picks up the freshly written ledger), and
+# during a run nothing recopies it, so a mid-run architect edit can never roll
+# the loop's checkbox progress back and make it redo finished tasks.
+seed_ledger() {
   if [ -e "$PROJECT_ROOT/$OMH_LOOP_LEDGER" ] && { [ ! -e "$OMH_LOOP_LEDGER" ] || [ "$PROJECT_ROOT/$OMH_LOOP_LEDGER" -nt "$OMH_LOOP_LEDGER" ]; }; then
     # A nested ledger path (planning/WORKPLAN.md) may lack its parent in a
     # fresh worktree; a silent copy failure would leave the loop spinning
@@ -144,6 +148,7 @@ Otherwise summarise the remaining tasks in three lines and do not mention that s
 
 blocked_streak=0
 emit start "loop runner started"
+${loop.isolate ? "seed_ledger" : ""}
 
 while true; do
   if [ -f "$STOP_FILE" ]; then

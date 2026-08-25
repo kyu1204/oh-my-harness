@@ -56,7 +56,7 @@ export const HarnessConfigSchema = z.object({
     ledger: z.string().default("WORKPLAN.md"),
     workOrders: z.string().default("docs/work-orders"),
     model: z.string().default("sonnet"),
-    sentinel: z.string().default("OMH_GOAL_COMPLETE"),
+    sentinel: z.string().min(1).default("OMH_GOAL_COMPLETE"),
     interval: z.number().default(120),
     blockedBackoff: z.number().default(1800),
     architectOnly: z.array(z.string()).default([]),

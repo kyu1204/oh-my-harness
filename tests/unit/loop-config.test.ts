@@ -44,6 +44,13 @@ describe("loop engine config", () => {
   });
 });
 
+describe("loop schema hardening (GPT G4)", () => {
+  it("rejects an empty sentinel — an empty line must never complete the goal", () => {
+    const result = HarnessConfigSchema.safeParse({ version: "1.0", loop: { sentinel: "" } });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe("loop protocol section", () => {
   it("adds a protocol section so CLAUDE.md and AGENTS.md both carry the rules", async () => {
     const harness = HarnessConfigSchema.parse({ version: "1.0" });

@@ -34,7 +34,7 @@ function runtimeCommand(loop: LoopConfig): string {
     case "codex":
       return `codex exec --model "$OMH_LOOP_MODEL" --dangerously-bypass-approvals-and-sandbox "$PROMPT"`;
     case "pi":
-      return `pi run --model "$OMH_LOOP_MODEL" --yes "$PROMPT"`;
+      return `pi --print --no-session --model "$OMH_LOOP_MODEL" "$PROMPT"`;
     case "claude":
     default:
       return `claude --model "$OMH_LOOP_MODEL" --dangerously-skip-permissions -p "$PROMPT"`;
@@ -63,7 +63,7 @@ cd "$WORKTREE" || exit 1
 sync_worktree_assets() {
   local rel
   # Architect-owned assets: always refreshed (work orders added mid-run arrive).
-  for rel in "$OMH_LOOP_WORK_ORDERS" .claude ${OMH_DIR}/hooks CLAUDE.md AGENTS.md harness.yaml; do
+  for rel in "$OMH_LOOP_WORK_ORDERS" .claude .codex .pi ${OMH_DIR}/hooks CLAUDE.md AGENTS.md harness.yaml; do
     if [ -e "$PROJECT_ROOT/$rel" ]; then
       mkdir -p "$(dirname "$rel")"
       cp -R "$PROJECT_ROOT/$rel" "$(dirname "$rel")/" 2>/dev/null || true
@@ -72,7 +72,10 @@ sync_worktree_assets() {
   # The ledger is seeded once, then owned by the loop: overwriting it every
   # iteration would roll its checkboxes back to the architect's stale copy
   # and make the loop redo finished tasks.
-  if [ ! -e "$OMH_LOOP_LEDGER" ] && [ -e "$PROJECT_ROOT/$OMH_LOOP_LEDGER" ]; then
+  # Re-seed when missing OR when the architect's copy is newer — that means a
+  # new goal was written after the previous run finished. During a run the
+  # loop's own updates keep the worktree copy newer, so it is never clobbered.
+  if [ -e "$PROJECT_ROOT/$OMH_LOOP_LEDGER" ] && { [ ! -e "$OMH_LOOP_LEDGER" ] || [ "$PROJECT_ROOT/$OMH_LOOP_LEDGER" -nt "$OMH_LOOP_LEDGER" ]; }; then
     cp "$PROJECT_ROOT/$OMH_LOOP_LEDGER" "$OMH_LOOP_LEDGER" 2>/dev/null || true
   fi
 }
@@ -166,7 +169,7 @@ ${isolateSync}  OUT="$(${runtimeCommand(loop)} 2>&1)"
 
   # Whole-line match only, and only on a clean exit: a crashed turn that
   # happened to echo the sentinel must not end the loop as "complete".
-  if printf '%s' "$OUT" | tail -n 5 | grep -qx "$SENTINEL"; then
+  if printf '%s' "$OUT" | tail -n 5 | grep -Fqx -- "$SENTINEL"; then
     emit complete "sentinel observed — goal complete"
     break
   fi

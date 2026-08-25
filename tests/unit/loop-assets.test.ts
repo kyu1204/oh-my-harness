@@ -62,7 +62,7 @@ describe("computeLoopAssets", () => {
     const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
     const runner = files.find((f) => f.path.endsWith("run.sh"));
     // grep -q would match the model merely *mentioning* the sentinel; -qx does not.
-    expect(runner?.content).toMatch(/grep\s+-qx/);
+    expect(runner?.content).toMatch(/grep\s+-Fqx/);
     expect(runner?.content).not.toMatch(/grep\s+-q\s+"?\$\{?SENTINEL/);
   });
 
@@ -224,7 +224,7 @@ describe("review fixes", () => {
     const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
     const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
     const statusCheck = content.indexOf("[ $STATUS -ne 0 ]");
-    const sentinelCheck = content.indexOf('grep -qx "$SENTINEL"');
+    const sentinelCheck = content.indexOf('grep -Fqx -- "$SENTINEL"');
     expect(statusCheck).toBeGreaterThan(-1);
     expect(sentinelCheck).toBeGreaterThan(statusCheck);
   });
@@ -287,5 +287,37 @@ describe("CodeRabbit re-review fixes", () => {
     const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
     // The ledger copy must be guarded on non-existence in the worktree.
     expect(content).toMatch(/\[ ! -e "\$OMH_LOOP_LEDGER" \]/);
+  });
+});
+
+describe("GPT review fixes", () => {
+  it("G1: the pi runtime uses flags the real CLI accepts", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig({ ...LOOP, runtime: "pi" }) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    expect(content).not.toContain("pi run");
+    expect(content).not.toContain("--yes");
+    expect(content).toContain("--no-session");
+    expect(content).toMatch(/pi .*(-p|--print)/);
+  });
+
+  it("G2: a fresh goal ledger in the main tree re-seeds the worktree copy at startup", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    // -nt: the architect wrote a NEW goal after the previous run finished.
+    expect(content).toContain('-nt "$OMH_LOOP_LEDGER"');
+  });
+
+  it("G3: codex and pi hook configs reach the worktree too", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    expect(content).toContain(".codex");
+    expect(content).toContain(".pi");
+  });
+
+  it("G4: the sentinel is matched as a fixed string, not a regex", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    expect(content).toContain('grep -Fqx -- "$SENTINEL"');
+    expect(content).not.toMatch(/grep -qx "\$SENTINEL"/);
   });
 });

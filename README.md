@@ -103,12 +103,16 @@ your-project/
 │   │   ├── catalog-command-guard.sh   # Blocks dangerous commands
 │   │   ├── catalog-lint-on-save.sh    # Auto-lint on save
 │   │   └── catalog-auto-pr.sh         # Auto-create PR after push
+│   ├── loop/
+│   │   └── run.sh                     # Autonomous loop runner (see Loop Engine)
 │   ├── state/                         # gitignored — log/runtime data
 │   │   ├── events.jsonl               # Unified hook event log (powers omh stats)
+│   │   ├── loop-events.jsonl          # Loop runner event stream
 │   │   └── tdd-edits.json             # TDD guard working state
 │   └── manifest.json                  # Generated-files manifest
 ├── .claude/
 │   ├── settings.json                  # Claude permissions + hooks → .omh/hooks/*.sh
+│   ├── skills/omh-loop/SKILL.md       # "run this as a loop" skill
 │   └── oh-my-harness.json             # Harness init/sync state
 └── .codex/
     ├── config.toml                    # [features] hooks = true, goals = true
@@ -215,6 +219,7 @@ All enforcement is powered by **catalog blocks** — reusable, parameterized hoo
 | 🗜️ `compact-context` | maintenance | Re-injects context on session start |
 | 📋 `config-audit` | audit | Audit trail for config changes |
 | 🔔 `desktop-notify` | ux | Cross-platform desktop notifications |
+| 🔁 `loop-guard` | quality | Blocks a loop session from writing its own work orders or touching architect-only paths |
 
 ### Usage in `harness.yaml`
 
@@ -258,6 +263,78 @@ Any blocking hook accepts an optional `mode` (default `block`):
 
 `mode: ask` only applies to blocks that can block (`canBlock: true`); setting it
 on a non-blocking block (e.g. `lint-on-save`) is reported and ignored.
+
+---
+
+## 🔁 Autonomous Loop Engine
+
+Once `omh init`/`omh sync` has run, any agent session (Claude Code, Codex, Pi)
+can be told **"run this as a loop"** — the generated `omh-loop` skill turns that
+into a fully set-up autonomous loop, no manual wiring:
+
+```text
+you: "ship the remaining Phase B tasks as a loop"
+        │
+        ▼  omh-loop skill (the session becomes the ARCHITECT)
+  1. writes WORKPLAN.md          — goal gates + task checkboxes (single source of truth)
+  2. writes docs/work-orders/*.md — one exact work order per task
+  3. starts .omh/loop/run.sh      — background, in its own git worktree
+  4. attaches monitoring          — tail -f .omh/state/loop-events.jsonl
+        │
+        ▼  loop (fresh headless session per iteration, cheap model)
+  pick next unchecked task → implement its work order exactly → run its
+  acceptance commands → tick checkbox + commit → repeat until the sentinel
+```
+
+The design follows a battle-tested pattern from real autonomous runs: state
+lives in **files** (ledger + git log), never in a conversation. Each iteration
+is a fresh `-p` session on an explicit cheap model, so token use stays flat.
+
+### Why it doesn't fall over
+
+Every guard below exists because the failure actually happened somewhere:
+
+| Guard | Failure it prevents |
+|-------|---------------------|
+| Sentinel = fixed string, whole line, clean exit only | a crashed turn (or a turn merely *mentioning* the sentinel) ending the loop as "complete" |
+| Three **separate** backoffs — usage limit / crashed turn / consecutive `BLOCKED` | a loop once spun **266 iterations** doing nothing because waiting-on-a-human was treated like a failure |
+| `loop-guard` hook blocks the loop writing its own work orders (Edit/Write **and** Bash redirection/`cd`) | self-approval: the loop authoring the spec it then implements |
+| `loop-guard` blocks architect-only paths, listed **by name** | an abstract "don't improvise" is ignored; a named path is obeyed |
+| Worktree isolation (`isolate: true`, default) | the loop and the architect fighting over the same working tree |
+| Ledger seeded once, re-seeded only when the main-tree copy is newer | the loop's progress being rolled back — or a second goal reusing the first goal's ledger |
+
+### Configuration
+
+On by default. Everything is optional in `harness.yaml`:
+
+```yaml
+loop:
+  enabled: true                # false removes all loop assets on next sync
+  ledger: WORKPLAN.md          # single source of truth
+  workOrders: docs/work-orders # architect-written task specs
+  model: sonnet                # cheap implementation model (always explicit)
+  sentinel: OMH_GOAL_COMPLETE  # whole-line completion signal
+  interval: 120                # seconds between iterations
+  blockedBackoff: 1800         # backoff after 3 consecutive BLOCKED turns
+  architectOnly: []            # paths the loop must never touch (name them!)
+  isolate: true                # run in .omh/loop/worktree on branch omh-loop
+  runtime: claude              # claude | codex | pi
+```
+
+### Operating it
+
+```bash
+nohup bash .omh/loop/run.sh >/dev/null 2>&1 &   # start (the skill does this for you)
+tail -f .omh/state/loop-events.jsonl             # watch progress / BLOCKED / limits
+touch .omh/state/loop.stop                       # stop after the current iteration
+```
+
+A task the loop cannot finish (needs a human, or 3 failed attempts) is marked
+`BLOCKED: <reason>` in the ledger and skipped — the loop never idles waiting
+for a person. When you unblock it (e.g. fix an architect-only file), the loop
+picks it back up after its backoff. When the goal completes in isolation, merge
+the `omh-loop` branch and **re-verify** — a clean textual merge is not a
+semantic one.
 
 ---
 
@@ -403,7 +480,7 @@ oh-my-harness/
 ├── bin/                    # CLI entry point
 ├── src/
 │   ├── catalog/
-│   │   ├── blocks/         # 17 building block definitions
+│   │   ├── blocks/         # 18 building block definitions
 │   │   ├── types.ts        # BuildingBlock, HookEntry schemas
 │   │   ├── registry.ts     # Block discovery & search
 │   │   ├── template-engine.ts # Handlebars rendering + applyDefaults
@@ -466,7 +543,7 @@ oh-my-harness/
 
 - [x] `npx oh-my-harness` — zero-install usage
 - [x] `omh sync` — regenerate from harness.yaml
-- [x] Building block catalog — 17 verified hook templates
+- [x] Building block catalog — 18 verified hook templates
 - [x] Project detector — 14 language auto-detection
 - [x] `omh test` — dry-run hook verification
 - [x] `omh stats` — TUI analytics dashboard (ink)
@@ -481,6 +558,7 @@ oh-my-harness/
 - [x] `ask` mode — request approval before executing risky tools (Claude native prompt / Pi `ctx.ui.select`; Codex falls back to block)
 - [x] `omh uninstall` — remove generated artifacts while preserving user content
 - [x] `omh config` — view, reconfigure, or reset the saved AI provider (rotate expired keys, switch provider/model)
+- [x] Autonomous loop engine — `omh-loop` skill, worktree-isolated runner, loop-guard, JSONL monitoring
 - [ ] Community harness.yaml registry — share and reuse configs
 - [ ] `omh modify "change X"` — NL config editing
 

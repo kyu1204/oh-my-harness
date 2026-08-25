@@ -273,3 +273,19 @@ describe("CodeRabbit review fixes", () => {
     expect(content).toContain("cp -R");
   });
 });
+
+describe("CodeRabbit re-review fixes", () => {
+  it("R1: the runtime output is actually assigned to OUT", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    expect(content).toMatch(/OUT="\$\(/);
+    expect(content).not.toMatch(/OUT"\$\(/);
+  });
+
+  it("R2: the ledger is seeded once, never overwritten over the loop's own progress", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    // The ledger copy must be guarded on non-existence in the worktree.
+    expect(content).toMatch(/\[ ! -e "\$OMH_LOOP_LEDGER" \]/);
+  });
+});

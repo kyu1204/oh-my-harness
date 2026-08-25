@@ -62,12 +62,19 @@ cd "$WORKTREE" || exit 1
 # while the loop backs off) arrive too.
 sync_worktree_assets() {
   local rel
-  for rel in "$OMH_LOOP_LEDGER" "$OMH_LOOP_WORK_ORDERS" .claude ${OMH_DIR}/hooks CLAUDE.md AGENTS.md harness.yaml; do
+  # Architect-owned assets: always refreshed (work orders added mid-run arrive).
+  for rel in "$OMH_LOOP_WORK_ORDERS" .claude ${OMH_DIR}/hooks CLAUDE.md AGENTS.md harness.yaml; do
     if [ -e "$PROJECT_ROOT/$rel" ]; then
       mkdir -p "$(dirname "$rel")"
       cp -R "$PROJECT_ROOT/$rel" "$(dirname "$rel")/" 2>/dev/null || true
     fi
   done
+  # The ledger is seeded once, then owned by the loop: overwriting it every
+  # iteration would roll its checkboxes back to the architect's stale copy
+  # and make the loop redo finished tasks.
+  if [ ! -e "$OMH_LOOP_LEDGER" ] && [ -e "$PROJECT_ROOT/$OMH_LOOP_LEDGER" ]; then
+    cp "$PROJECT_ROOT/$OMH_LOOP_LEDGER" "$OMH_LOOP_LEDGER" 2>/dev/null || true
+  fi
 }
 `
     : "";
@@ -136,7 +143,7 @@ while true; do
     break
   fi
 
-${isolateSync}  OUT"$(${runtimeCommand(loop)} 2>&1)"
+${isolateSync}  OUT="$(${runtimeCommand(loop)} 2>&1)"
   STATUS=$?
   printf '%s\\n' "$OUT" >> "$LOG"
 

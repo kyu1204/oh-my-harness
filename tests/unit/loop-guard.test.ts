@@ -138,6 +138,26 @@ describe("loop-guard Bash coverage (CodeRabbit CR1)", () => {
   });
 });
 
+describe("loop-guard cd bypass (re-review R3)", () => {
+  it("blocks cd-into-protected-dir followed by a write", async () => {
+    for (const command of [
+      "cd docs/work-orders && touch T-1.md",
+      "cd docs/work-orders; echo fake > T-1.md",
+    ]) {
+      const out = await runGuard({ command, env: { OMH_LOOP: "1" } });
+      expect(out).toContain("DECISION:block");
+    }
+  });
+
+  it("still allows cd-into-protected-dir for reads", async () => {
+    const out = await runGuard({
+      command: "cd docs/work-orders && cat T-1.md",
+      env: { OMH_LOOP: "1" },
+    });
+    expect(out).not.toContain("DECISION:block");
+  });
+});
+
 describe("loop-guard wiring", () => {
   it("is added automatically when the loop engine is on", async () => {
     const harness = HarnessConfigSchema.parse({ version: "1.0" });

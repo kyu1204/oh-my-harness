@@ -59,7 +59,13 @@ _omh_bash_writes_to() {
   local cmd="\$1" target="\${2%/}"
   [[ -z "\$cmd" || -z "\$target" ]] && return 1
   [[ "\$cmd" == *"\$target"* ]] || return 1
-  echo "\$cmd" | grep -qE '(>|>>)[[:space:]]*[^|&;]*'"\$target"'|(^|[^[:alnum:]_])(tee|mv|cp|rm|touch|truncate|sed[[:space:]]+-i[^[:space:]]*)[[:space:]][^|&;]*'"\$target"
+  local WRITE_OPS='(tee|mv|cp|rm|touch|truncate|sed[[:space:]]+-i[^[:space:]]*)'
+  # write op targeting the protected path directly ...
+  echo "\$cmd" | grep -qE '(>|>>)[[:space:]]*[^|&;]*'"\$target"'|(^|[^[:alnum:]_])'"\$WRITE_OPS"'[[:space:]][^|&;]*'"\$target" && return 0
+  # ... or a cd into it followed by any write op (relative paths escape the
+  # direct pattern once the cwd is inside the protected directory)
+  echo "\$cmd" | grep -qE '(^|[^[:alnum:]_])cd[[:space:]][^|&;]*'"\$target" \\
+    && echo "\$cmd" | grep -qE '>|(^|[^[:alnum:]_])'"\$WRITE_OPS"'[[:space:]]' 
 }
 
 WORK_ORDERS='{{{workOrders}}}'

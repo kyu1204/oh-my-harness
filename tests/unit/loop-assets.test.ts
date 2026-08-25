@@ -321,3 +321,22 @@ describe("GPT review fixes", () => {
     expect(content).not.toMatch(/grep -qx "\$SENTINEL"/);
   });
 });
+
+describe("CodeRabbit round-3 fixes", () => {
+  it("creates the parent directory for a nested ledger and fails loud on copy error", async () => {
+    const files = await computeLoopAssets({
+      projectDir: PROJECT_DIR,
+      config: baseConfig({ ...LOOP, ledger: "planning/WORKPLAN.md" }),
+    });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    expect(content).toContain('mkdir -p "$(dirname "$OMH_LOOP_LEDGER")"');
+    // a silently-missing ledger leaves the loop spinning BLOCKED forever
+    expect(content).not.toMatch(/cp "\$PROJECT_ROOT\/\$OMH_LOOP_LEDGER".*\|\| true/);
+  });
+
+  it("keeps the 5-line sentinel window: a runtime footer must not hide a completed goal", async () => {
+    const files = await computeLoopAssets({ projectDir: PROJECT_DIR, config: baseConfig(LOOP) });
+    const content = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
+    expect(content).toContain("tail -n 5");
+  });
+});

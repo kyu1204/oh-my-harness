@@ -268,8 +268,8 @@ on a non-blocking block (e.g. `lint-on-save`) is reported and ignored.
 
 ## 🔁 Autonomous Loop Engine
 
-Once `omh init`/`omh sync` has run, any agent session (Claude Code, Codex, Pi)
-can be told **"run this as a loop"** — the generated `omh-loop` skill turns that
+Once `omh init`/`omh sync` has run (with `loop.enabled: true`, the default),
+any agent session (Claude Code, Codex, Pi) can be told **"run this as a loop"** — the generated `omh-loop` skill turns that
 into a fully set-up autonomous loop, no manual wiring:
 
 ```text
@@ -278,7 +278,7 @@ you: "ship the remaining Phase B tasks as a loop"
         ▼  omh-loop skill (the session becomes the ARCHITECT)
   1. writes WORKPLAN.md          — goal gates + task checkboxes (single source of truth)
   2. writes docs/work-orders/*.md — one exact work order per task
-  3. starts .omh/loop/run.sh      — background, in its own git worktree
+  3. starts .omh/loop/run.sh      — background; with `isolate: true` (default), in its own git worktree
   4. attaches monitoring          — tail -f .omh/state/loop-events.jsonl
         │
         ▼  loop (fresh headless session per iteration, cheap model)

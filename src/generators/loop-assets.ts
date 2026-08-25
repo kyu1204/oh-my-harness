@@ -76,7 +76,12 @@ sync_worktree_assets() {
   # new goal was written after the previous run finished. During a run the
   # loop's own updates keep the worktree copy newer, so it is never clobbered.
   if [ -e "$PROJECT_ROOT/$OMH_LOOP_LEDGER" ] && { [ ! -e "$OMH_LOOP_LEDGER" ] || [ "$PROJECT_ROOT/$OMH_LOOP_LEDGER" -nt "$OMH_LOOP_LEDGER" ]; }; then
-    cp "$PROJECT_ROOT/$OMH_LOOP_LEDGER" "$OMH_LOOP_LEDGER" 2>/dev/null || true
+    # A nested ledger path (planning/WORKPLAN.md) may lack its parent in a
+    # fresh worktree; a silent copy failure would leave the loop spinning
+    # BLOCKED with no ledger, so fail loud instead.
+    mkdir -p "$(dirname "$OMH_LOOP_LEDGER")"
+    cp "$PROJECT_ROOT/$OMH_LOOP_LEDGER" "$OMH_LOOP_LEDGER" \\
+      || { emit crash "ledger copy into worktree failed"; exit 1; }
   fi
 }
 `

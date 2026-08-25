@@ -59,6 +59,29 @@ describe("loop numeric constraints (round 4 N2)", () => {
   });
 });
 
+describe("loop path values are shell-safe (round 5)", () => {
+  it("rejects quotes, command substitution and backslashes in path fields", () => {
+    for (const loop of [
+      { workOrders: "docs/it's" },
+      { workOrders: 'a"b' },
+      { ledger: "$(id)" },
+      { ledger: "`id`" },
+      { architectOnly: ["ios/x'y"] },
+      { architectOnly: ["a\\b"] },
+    ]) {
+      expect(HarnessConfigSchema.safeParse({ version: "1.0", loop }).success).toBe(false);
+    }
+  });
+
+  it("still accepts ordinary paths", () => {
+    const ok = HarnessConfigSchema.safeParse({
+      version: "1.0",
+      loop: { ledger: "planning/WORKPLAN-v2.md", workOrders: "docs/work orders", architectOnly: ["ios/Runner.xcodeproj"] },
+    });
+    expect(ok.success).toBe(true);
+  });
+});
+
 describe("loop protocol section", () => {
   it("adds a protocol section so CLAUDE.md and AGENTS.md both carry the rules", async () => {
     const harness = HarnessConfigSchema.parse({ version: "1.0" });

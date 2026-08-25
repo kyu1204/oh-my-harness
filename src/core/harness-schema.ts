@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { HookEntrySchema } from "../catalog/types.js";
 
+// Loop path values are interpolated into generated shell (the runner and the
+// loop-guard template). Rejecting shell metacharacters up front keeps a stray
+// quote in harness.yaml from breaking — or, worse, executing inside — a hook.
+const shellSafePath = z
+  .string()
+  .min(1)
+  .regex(/^[^'"`$\\\n]+$/, "must not contain quotes, backticks, $ or backslashes");
+
 export const HarnessConfigSchema = z.object({
   version: z.literal("1.0").default("1.0"),
 
@@ -53,13 +61,13 @@ export const HarnessConfigSchema = z.object({
   // setup is already in place the moment someone asks for one.
   loop: z.object({
     enabled: z.boolean().default(true),
-    ledger: z.string().default("WORKPLAN.md"),
-    workOrders: z.string().default("docs/work-orders"),
+    ledger: shellSafePath.default("WORKPLAN.md"),
+    workOrders: shellSafePath.default("docs/work-orders"),
     model: z.string().default("sonnet"),
     sentinel: z.string().min(1).default("OMH_GOAL_COMPLETE"),
     interval: z.number().positive().default(120),
     blockedBackoff: z.number().positive().default(1800),
-    architectOnly: z.array(z.string()).default([]),
+    architectOnly: z.array(shellSafePath).default([]),
     isolate: z.boolean().default(true),
     runtime: z.enum(["claude", "codex", "pi"]).default("claude"),
   }).default({}),

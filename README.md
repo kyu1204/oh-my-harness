@@ -297,7 +297,7 @@ Every guard below exists because the failure actually happened somewhere:
 | Guard | Failure it prevents |
 |-------|---------------------|
 | Sentinel = fixed string, whole line, clean exit only | a crashed turn (or a turn merely *mentioning* the sentinel) ending the loop as "complete" |
-| Three **separate** backoffs — usage limit / crashed turn / consecutive `BLOCKED` | a loop once spun **266 iterations** doing nothing because waiting-on-a-human was treated like a failure |
+| Three **separate** backoffs — usage limit / empty-output failed turn / consecutive `BLOCKED` | a loop once spun **266 iterations** doing nothing because waiting-on-a-human was treated like a failure |
 | `loop-guard` hook blocks the loop writing its own work orders (Edit/Write **and** Bash redirection/`cd`) | self-approval: the loop authoring the spec it then implements |
 | `loop-guard` blocks architect-only paths, listed **by name** | an abstract "don't improvise" is ignored; a named path is obeyed |
 | Worktree isolation (`isolate: true`, default) | the loop and the architect fighting over the same working tree |

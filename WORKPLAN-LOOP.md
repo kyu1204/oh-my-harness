@@ -81,7 +81,7 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - [x] **L-09** 통합 매트릭스 12케이스(같은 테스트 파일에 추가): complete · 크래시 후 sentinel · 미완료 잔존+sentinel→ignored 후 계속 · limit → limitBackoff · 원장 BLOCKED ×3 → blockedBackoff · idle ×3 → blockedBackoff · 긴 턴 중 stop 플래그 · 동시 `runSupervisor` 2 → 하나 `already-running` · stale run.json 회수 · 실행 중 disable → run.json 소멸·worktree 제거 · 시드/재시드 3케이스 · **stub이 프롬프트를 에코해도 BLOCKED 오판 없음**. depends L-08.
 
 ### Phase D — CLI·생성기 배선
-- [ ] **L-10** `codex-config.ts` `normalizeMatcher` 일반화 — 테스트 `codex-config-generator.test.ts` 케이스 추가(`Edit|Write|Bash` → `apply_patch` 포함). 지시서 범위 외 변경 금지.
+- [x] **L-10** `codex-config.ts` `normalizeMatcher` 일반화 — 테스트 `codex-config-generator.test.ts` 케이스 추가(`Edit|Write|Bash` → `apply_patch` 포함). 지시서 범위 외 변경 금지.
 - [ ] **L-11** `loop-assets.ts` 축소 + `generator.ts`/`uninstall.ts`/`harness-converter-v2.ts` 배선 — 테스트 `loop-assets.test.ts` 재작성(SKILL.md만, plan 대칭, disable 시 `stopLoop`+worktree 제거, run.sh 부재), `uninstall-loop.test.ts` 갱신. 삭제: `renderRunner`·`runtimeCommand`·`shellSingleQuote`·`stopRunningLoop`·`renderLoopProtocol`·`renderSkill`, `loop-runner-behavior.test.ts`. depends L-03, L-06, L-08.
 - [ ] **L-12** `src/cli/commands/loop.ts` + `src/cli/index.ts` — 테스트 `cli-loop.test.ts`(mkdtemp + lazy import): 프리플라이트 에러 각각(git repo 아님·원장 없음·지시서 0·메인이 omh-loop·활성 run), win32 → exit 1, `status` 유/무, `stop` with no run → exit 0. `start`의 spawn은 D5 그대로. depends L-08.
 - [ ] **L-13** e2e `loop-e2e.test.ts`(SLOW=30s) — `node_modules/.bin/tsx bin/oh-my-harness.ts loop start` + stub `claude`(체크 후 sentinel): run.json 출현·start 즉시 반환·`stop`으로 그룹 소멸·`complete` 이벤트; 긴 턴(`sleep 30`) 중 stop → 15s 내 소멸. depends L-12.
@@ -121,3 +121,4 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 2026-08-26: L-07 스키마 완료 (relPath: 셸 메타문자 허용·canonical만 강제, knob 4개 추가).
 - 2026-08-26: L-08 supervisor.ts 완료 (잠금→worktree/시드→시그널→반복→해제; in-process 뼈대 테스트 6).
 - 2026-08-26: L-09 매트릭스 12케이스 중 11 녹색(케이스 10 disable-while-running은 L-11 후 활성), 프롬프트 에코 BLOCKED 오판 0 확인.
+- 2026-08-26: L-10 완료 (Edit/Write 포함 모든 matcher에 apply_patch 별칭 → Codex에서 loop-guard 발동).

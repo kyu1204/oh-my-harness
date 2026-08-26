@@ -39,7 +39,8 @@ function normalizeMatcher(matcher: string): string {
   if (!matcher) return matcher;
   // Codex: apply_patch is the canonical edit tool; Claude uses Edit/Write aliases.
   // Keep both so the same regex matcher works in either runtime.
-  if (/^Edit(\|Write)?$|^Write(\|Edit)?$/.test(matcher)) {
+  const parts = matcher.split("|");
+  if (parts.some((p) => p === "Edit" || p === "Write") && !parts.includes("apply_patch")) {
     return `${matcher}|apply_patch`;
   }
   return matcher;

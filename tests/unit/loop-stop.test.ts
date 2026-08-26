@@ -29,9 +29,9 @@ function alive(pid: number): boolean {
 }
 
 describe("stopLoop", () => {
-  it("is a no-op without a run and leaves no stop flag behind", async () => {
+  it("writes the stop flag even without a run — a stop in start's acquire window must not be lost (L-27c)", async () => {
     await stopLoop(dir, { graceMs: 500 });
-    expect(fs.existsSync(loopPaths(dir).stopFlag)).toBe(false);
+    expect(fs.existsSync(loopPaths(dir).stopFlag)).toBe(true);
   });
 
   it("clears a stale run.json whose pid is dead", async () => {
@@ -70,7 +70,8 @@ describe("stopLoop", () => {
 
 describe("stopLoop — orphaned turn (round 9)", () => {
   it("kills the child's process group even when the supervisor itself is already dead", async () => {
-    const child = spawn("sleep", ["30"], { detached: true, stdio: "ignore" });
+    // the orphan must look like the runtime for the identity check to signal it
+    const child = spawn("bash", ["-c", 'exec -a claude sleep 30'], { detached: true, stdio: "ignore" });
     child.unref();
     await new Promise((r) => setTimeout(r, 200));
     writeRun({ runId: "X", pid: 999999, childPid: child.pid! });
@@ -94,4 +95,52 @@ describe("group hygiene (L-21)", () => {
     // If it signalled our group it would kill the vitest worker; surviving is the assertion.
     expect(() => sweepOwnGroup()).not.toThrow();
   });
+});
+
+describe("stop/clean vs a concurrent acquire (L-27b,e,f)", () => {
+  it("does not delete a run.json that changed since the snapshot", async () => {
+    // Simulate: stop snapshots a stale record, then a new run acquires before
+    // stop's final removal. stopLoop must leave the fresh lock alone.
+    writeRun({ runId: "STALE", pid: 999999 });
+    const stale = { ...JSON.parse(fs.readFileSync(loopPaths(dir).runJson, "utf-8")) };
+    // a fresh run replaces it mid-stop; emulate by monkey-timing: replace the
+    // record, then call stopLoop which re-reads before removing
+    writeRun({ runId: "FRESH", pid: process.pid });
+    // stopLoop must compare against ITS OWN snapshot; here the snapshot IS the
+    // fresh record, so removal is fine. To exercise the guard we call the
+    // internal path via a stale-snapshot double: first stop with the stale
+    // record present, but swap the file during the child-grace window.
+    void stale;
+    // direct contract check: after stopLoop, a record NOT matching what it
+    // read must survive. We emulate by pre-writing FRESH and asserting stop
+    // removes only what it read (FRESH) — then re-run with a swap.
+    await stopLoop(dir, { graceMs: 100 });
+    expect(readRun(dir)).toBeNull();
+    // swap case: dead-child grace lets us interleave
+    const child = spawn("sleep", ["30"], { detached: true, stdio: "ignore" });
+    child.unref();
+    await new Promise((r) => setTimeout(r, 150));
+    writeRun({ runId: "OLD", pid: 999999, childPid: child.pid! });
+    const p = stopLoop(dir, { graceMs: 1500 });
+    await new Promise((r) => setTimeout(r, 300));
+    writeRun({ runId: "NEW", pid: process.pid });
+    await p;
+    expect(readRun(dir)?.runId).toBe("NEW");
+    child.kill();
+  }, SLOW);
+
+  it("only signals a childPid whose process is actually the configured runtime (L-27e identity)", async () => {
+    const bystander = spawn("sleep", ["30"], { detached: true, stdio: "ignore" });
+    bystander.unref();
+    const exited = new Promise<boolean>((r) => {
+      const t = setTimeout(() => r(false), 2000);
+      bystander.on("exit", () => { clearTimeout(t); r(true); });
+    });
+    await new Promise((r) => setTimeout(r, 150));
+    // dead supervisor, childPid reused by an unrelated process ("sleep", not claude)
+    writeRun({ runId: "X", pid: 999999, childPid: bystander.pid!, runtime: "claude" });
+    await stopLoop(dir, { graceMs: 300 });
+    expect(await exited).toBe(false);
+    bystander.kill();
+  }, SLOW);
 });

@@ -152,14 +152,22 @@ export function reclaimStaleRun(projectDir: string, observed: RunInfo): boolean 
   const p = loopPaths(projectDir);
   const lock = `${p.runJson}.reclaim`;
   const pidFile = path.join(lock, "pid");
+  // The lock is staged fully formed (dir + pid file) and renamed into place,
+  // so a contender can never observe a dir without its pid — the state that
+  // used to send the "half-written, treat as dead" branch after a LIVE
+  // reclaimer and crash it with ENOENT.
   const takeLock = (): boolean => {
+    const staging = `${lock}.staging-${process.pid}`;
+    fs.mkdirSync(staging, { recursive: true });
+    fs.writeFileSync(path.join(staging, "pid"), String(process.pid));
     try {
-      fs.mkdirSync(lock);
-      fs.writeFileSync(pidFile, String(process.pid));
+      fs.renameSync(staging, lock);
       return true;
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
-      return false;
+      fs.rmSync(staging, { recursive: true, force: true });
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "ENOTEMPTY" || code === "EEXIST" || code === "EPERM") return false;
+      throw err;
     }
   };
   if (!takeLock()) {
@@ -219,9 +227,14 @@ export function takeoverReclaimLock(lock: string, observedHolder: number): boole
   return true;
 }
 
-export function updateRun(projectDir: string, patch: Partial<RunInfo>): void {
+/**
+ * Patch the run record — but, like releaseRun, only when this process still
+ * owns it. A supervisor that lost its lock to a concurrent acquire must not
+ * rewrite the new run's record with its own iteration/childPid.
+ */
+export function updateRun(projectDir: string, runId: string, patch: Partial<RunInfo>): void {
   const current = readRun(projectDir);
-  if (!current) return;
+  if (!current || current.runId !== runId || current.pid !== process.pid) return;
   atomicWrite(loopPaths(projectDir).runJson, JSON.stringify({ ...current, ...patch }, null, 2));
 }
 

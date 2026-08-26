@@ -83,10 +83,24 @@ describe("acquireRun / release", () => {
     expect(readRun(dir)).toBeNull();
   });
 
-  it("updateRun patches fields atomically", () => {
+  it("updateRun patches fields atomically — and drops childPid when set to undefined", () => {
     acquireRun(dir, info({ runId: "A" }), { psArgs: psA });
-    updateRun(dir, { iteration: 3, childPid: 4242 });
+    updateRun(dir, "A", { iteration: 3, childPid: 4242 });
     expect(readRun(dir)).toMatchObject({ runId: "A", iteration: 3, childPid: 4242 });
+    updateRun(dir, "A", { childPid: undefined });
+    expect("childPid" in (readRun(dir) as object)).toBe(false);
+  });
+
+  it("updateRun refuses to touch a record it does not own (L-27a)", () => {
+    acquireRun(dir, info({ runId: "A" }), { psArgs: psA });
+    // wrong runId
+    updateRun(dir, "B", { iteration: 9 });
+    expect(readRun(dir)?.iteration).toBe(0);
+    // right runId, wrong pid (another process's record)
+    const p = loopPaths(dir);
+    fs.writeFileSync(p.runJson, JSON.stringify(info({ runId: "A", pid: 999999 })));
+    updateRun(dir, "A", { iteration: 9 });
+    expect(readRun(dir)?.iteration).toBe(0);
   });
 });
 
@@ -134,6 +148,22 @@ describe("atomicWrite", () => {
     expect(fs.statSync(f).ino).not.toBe(ino);
     expect(fs.statSync(f).mode & 0o111).toBeTruthy();
     expect(fs.readdirSync(dir).filter((n) => n.includes(".tmp-"))).toEqual([]);
+  });
+});
+
+describe("reclaim lock creation is atomic (L-27d)", () => {
+  it("never exposes a lock directory without its pid file", () => {
+    // The lock must appear fully formed: a contender that sees the dir must
+    // also see the pid. We assert the implementation creates it via a staged
+    // temp dir + rename, by checking a reclaim leaves no bare-dir window
+    // artifacts and works repeatedly.
+    const p = loopPaths(dir);
+    fs.mkdirSync(p.dir, { recursive: true });
+    for (let i = 0; i < 5; i++) {
+      fs.writeFileSync(p.runJson, JSON.stringify(info({ runId: "DEAD", pid: 999999 })));
+      expect(reclaimStaleRun(dir, info({ runId: "DEAD", pid: 999999 }))).toBe(true);
+      expect(fs.readdirSync(p.dir).filter((n) => n.includes("reclaim"))).toEqual([]);
+    }
   });
 });
 

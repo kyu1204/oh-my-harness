@@ -148,6 +148,26 @@ describe("omh loop start — preflight", () => {
   });
 });
 
+describe("omh loop start — orphaned turn (L-27f)", () => {
+  it("refuses to reclaim a stale run while its turn group is still alive", async () => {
+    const { loopStartCommand } = await import("../../src/cli/commands/loop.js");
+    gitRepo();
+    harness();
+    ledgerAndOrders();
+    const { spawn } = await import("node:child_process");
+    const orphan = spawn("sleep", ["30"], { detached: true, stdio: "ignore" });
+    orphan.unref();
+    await new Promise((r) => setTimeout(r, 150));
+    const p = loopPaths(dir);
+    fs.mkdirSync(p.dir, { recursive: true });
+    fs.writeFileSync(p.runJson, JSON.stringify({ runId: "DEAD", pid: 999999, startedAt: "", runtime: "claude", iteration: 1, childPid: orphan.pid, cwd: dir }));
+    const r = await loopStartCommand({ projectDir: dir, spawnImpl: fakeSpawn("runs") });
+    expect(r.exitCode).toBe(1);
+    expect(errors.join("\n")).toMatch(/orphaned turn|omh loop stop/);
+    orphan.kill();
+  }, 20_000);
+});
+
 describe("omh loop start — launch", () => {
   it("spawns a detached supervisor, waits for run.json, then unrefs and reports", async () => {
     const { loopStartCommand } = await import("../../src/cli/commands/loop.js");

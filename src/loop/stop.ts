@@ -38,16 +38,18 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function stopLoop(projectDir: string, opts: StopOptions = {}): Promise<void> {
   const graceMs = opts.graceMs ?? 10_000;
   const p = loopPaths(projectDir);
-  const run = readRun(projectDir);
-  if (!run) return;
-
+  // The flag goes down unconditionally: a supervisor that is between spawn
+  // and acquiring run.json has no record yet, and a stop issued in that
+  // window must still reach it at its first boundary check.
   fs.mkdirSync(p.dir, { recursive: true });
   fs.writeFileSync(p.stopFlag, "");
+  const run = readRun(projectDir);
+  if (!run) return;
 
   // The in-flight turn runs in its own process group (see runtime.ts). Take
   // it down whether or not the supervisor is still alive — a SIGKILLed
   // supervisor leaves the turn orphaned.
-  if (run.childPid !== undefined && groupAlive(run.childPid)) {
+  if (run.childPid !== undefined && groupAlive(run.childPid) && isTurnProcess(run.childPid, run.runtime)) {
     signalGroup(run.childPid, "SIGTERM");
     const deadline = Date.now() + graceMs;
     while (groupAlive(run.childPid) && Date.now() < deadline) await sleep(100);
@@ -64,8 +66,27 @@ export async function stopLoop(projectDir: string, opts: StopOptions = {}): Prom
       while (groupAlive(run.pid) && Date.now() < hardDeadline) await sleep(50);
     }
   }
-  // Stale, refused (pid reuse), or now stopped: the run record is done either way.
-  fs.rmSync(p.runJson, { force: true });
+  // Remove only the record we acted on: a concurrent start may have
+  // legitimately reclaimed the stale record and linked a fresh run.json in
+  // the meantime, and deleting that would leave a live supervisor lockless.
+  const now = readRun(projectDir);
+  if (now && now.runId === run.runId && now.pid === run.pid) {
+    fs.rmSync(p.runJson, { force: true });
+  }
+}
+
+/**
+ * The childPid gets the same pid-reuse protection the supervisor pid gets
+ * from isRunLive: signal it only if ps says the pid is actually running the
+ * configured agent runtime.
+ */
+function isTurnProcess(pid: number, runtime: string): boolean {
+  try {
+    const args = execFileSync("ps", ["-o", "args=", "-p", String(pid)], { encoding: "utf-8" });
+    return args.includes(runtime);
+  } catch {
+    return false;
+  }
 }
 
 /** True when `pid` leads its own process group (a detached supervisor does). */

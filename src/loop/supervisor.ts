@@ -98,7 +98,7 @@ export async function runSupervisor(o: SupervisorOptions, deps: SupervisorDeps =
         event("failed", { message: (err as Error).message });
         return "failed";
       }
-      updateRun(projectDir, { cwd });
+      updateRun(projectDir, runId, { cwd });
     }
 
     event("start", { meta: { runtime: cfg.runtime, model: cfg.model, cwd } });
@@ -124,7 +124,7 @@ export async function runSupervisor(o: SupervisorOptions, deps: SupervisorDeps =
       const ledgerBefore = parseLedger(readOr(ledgerPath));
       const headBefore = await headOf(cwd);
       iteration++;
-      updateRun(projectDir, { iteration });
+      updateRun(projectDir, runId, { iteration });
 
       const result = await deps.runTurn({
         argv: buildTurnArgv(cfg.runtime, cfg.model, prompt),
@@ -135,10 +135,13 @@ export async function runSupervisor(o: SupervisorOptions, deps: SupervisorDeps =
         shouldStop: () => fs.existsSync(p.stopFlag),
         onSpawn: (pid) => {
           childPid = pid;
-          updateRun(projectDir, { childPid: pid });
+          updateRun(projectDir, runId, { childPid: pid });
         },
       });
       childPid = undefined;
+      // Drop the pid from the record too: a stale childPid outlives pid reuse
+      // and would let a later stop signal an unrelated process group.
+      updateRun(projectDir, runId, { childPid: undefined });
 
       const ledgerAfter = parseLedger(readOr(ledgerPath));
       const headAfter = await headOf(cwd);

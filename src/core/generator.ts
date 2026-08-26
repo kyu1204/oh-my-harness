@@ -70,6 +70,9 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
     // The loop was disabled after a previous sync: stop a live run, tear the
     // worktree down, then remove the now-stale assets.
     await stopLoop(projectDir);
+    // The stop flag has served its purpose once the loop is down; a leftover
+    // would otherwise just be cleared by the next start.
+    await fs.rm(path.join(projectDir, OMH_DIR, "state", "loop", "stop"), { force: true });
     await removeWorktree(projectDir).catch(() => undefined);
     for (const stale of loopAssetPaths(projectDir)) {
       await fs.rm(stale, { recursive: true, force: true });

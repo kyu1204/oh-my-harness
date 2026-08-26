@@ -98,6 +98,16 @@ export async function loopStartCommand(options: LoopStartOptions = {}): Promise<
   if (existing && isRunLive(existing, options)) {
     return fail(`a loop is already running (run ${existing.runId}, pid ${existing.pid}); \`omh loop stop\` first`);
   }
+  if (existing?.childPid !== undefined) {
+    // A SIGKILLed supervisor can leave its turn running; two loops must not
+    // share the worktree, so the orphan has to be stopped first.
+    try {
+      process.kill(-existing.childPid, 0);
+      return fail(`run ${existing.runId} left an orphaned turn still running (pid ${existing.childPid}); \`omh loop stop\` first`);
+    } catch {
+      // group gone — safe to reclaim
+    }
+  }
 
   pruneRuns(projectDir, 5);
   // Only start clears the flag. A stop issued between here and the
@@ -210,11 +220,13 @@ export interface LoopStopOptions {
 export async function loopStopCommand(options: LoopStopOptions = {}): Promise<LoopResult> {
   const projectDir = path.resolve(options.projectDir ?? process.cwd());
   const run = readRun(projectDir);
+  // Even with no record, stopLoop lays down the stop flag so a supervisor
+  // mid-acquire still sees the request.
+  await (options.stopImpl ?? stopLoop)(projectDir, { graceMs: options.now ? 1000 : 10_000 });
   if (!run) {
-    console.log("omh loop: no active loop");
+    console.log("omh loop: no active loop (stop flag recorded)");
     return { exitCode: 0 };
   }
-  await (options.stopImpl ?? stopLoop)(projectDir, { graceMs: options.now ? 1000 : 10_000 });
   console.log(chalk.green(`omh loop: stopped run ${run.runId}`));
   return { exitCode: 0 };
 }

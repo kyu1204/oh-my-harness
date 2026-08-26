@@ -93,3 +93,39 @@ describe("runTurn", () => {
     expect(pid).toBeGreaterThan(0);
   }, SLOW);
 });
+
+describe("runTurn — review round 9", () => {
+  it("resolves (never rejects) when spawn itself throws synchronously", async () => {
+    // an empty command makes spawn throw ERR_INVALID_ARG_VALUE before any 'error' event
+    const r = await runTurn({
+      argv: [""], cwd: dir, env: process.env, logPath: path.join(dir, "bad.log"), timeoutMs: 5000, shouldStop: () => false,
+    });
+    expect(r.status).toBeNull();
+    expect(r.tail).toMatch(/spawn failed|ERR_INVALID_ARG/);
+  }, SLOW);
+
+  it("timeout takes the turn's whole process tree down, not just the direct child", async () => {
+    const pidFile = path.join(dir, "grandchild.pid");
+    const r = await runTurn({
+      argv: [stub(`sleep 30 & echo $! > '${pidFile}'; wait`)],
+      cwd: dir, env: process.env, logPath: path.join(dir, "tree.log"), timeoutMs: 700, shouldStop: () => false,
+    });
+    expect(r.timedOut).toBe(true);
+    const gc = Number(fs.readFileSync(pidFile, "utf-8").trim());
+    await new Promise((res) => setTimeout(res, 300));
+    expect(() => process.kill(gc, 0), "grandchild survived the timeout").toThrow();
+  }, SLOW);
+
+  it("a stop request takes the turn's whole process tree down too", async () => {
+    const pidFile = path.join(dir, "grandchild2.pid");
+    const r = await runTurn({
+      argv: [stub(`sleep 30 & echo $! > '${pidFile}'; wait`)],
+      cwd: dir, env: process.env, logPath: path.join(dir, "tree2.log"), timeoutMs: 20_000,
+      shouldStop: () => fs.existsSync(pidFile), pollMs: 100, graceMs: 300,
+    });
+    expect(r.stoppedByRequest).toBe(true);
+    const gc = Number(fs.readFileSync(pidFile, "utf-8").trim());
+    await new Promise((res) => setTimeout(res, 300));
+    expect(() => process.kill(gc, 0), "grandchild survived the stop").toThrow();
+  }, SLOW);
+});

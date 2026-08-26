@@ -68,6 +68,18 @@ describe("stopLoop", () => {
   }, SLOW);
 });
 
+describe("stopLoop — orphaned turn (round 9)", () => {
+  it("kills the child's process group even when the supervisor itself is already dead", async () => {
+    const child = spawn("sleep", ["30"], { detached: true, stdio: "ignore" });
+    child.unref();
+    await new Promise((r) => setTimeout(r, 200));
+    writeRun({ runId: "X", pid: 999999, childPid: child.pid! });
+    await stopLoop(dir, { graceMs: 500 });
+    await new Promise((r) => setTimeout(r, 200));
+    expect(alive(child.pid!)).toBe(false);
+  }, SLOW);
+});
+
 describe("group hygiene (L-21)", () => {
   it("isGroupLeader is false for this test process and true for a detached child", async () => {
     expect(isGroupLeader(process.pid)).toBe(false);

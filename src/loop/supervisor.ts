@@ -69,9 +69,13 @@ export async function runSupervisor(o: SupervisorOptions, deps: SupervisorDeps =
     // Synchronous only: we are inside a signal handler.
     if (childPid !== undefined) {
       try {
-        process.kill(childPid, "SIGTERM");
+        process.kill(-childPid, "SIGTERM"); // the turn's own process group
       } catch {
-        // already gone
+        try {
+          process.kill(childPid, "SIGTERM");
+        } catch {
+          // already gone
+        }
       }
     }
     event("stopped", { message: "signal" });

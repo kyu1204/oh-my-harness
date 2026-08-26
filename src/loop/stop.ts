@@ -44,6 +44,16 @@ export async function stopLoop(projectDir: string, opts: StopOptions = {}): Prom
   fs.mkdirSync(p.dir, { recursive: true });
   fs.writeFileSync(p.stopFlag, "");
 
+  // The in-flight turn runs in its own process group (see runtime.ts). Take
+  // it down whether or not the supervisor is still alive — a SIGKILLed
+  // supervisor leaves the turn orphaned.
+  if (run.childPid !== undefined && groupAlive(run.childPid)) {
+    signalGroup(run.childPid, "SIGTERM");
+    const deadline = Date.now() + graceMs;
+    while (groupAlive(run.childPid) && Date.now() < deadline) await sleep(100);
+    if (groupAlive(run.childPid)) signalGroup(run.childPid, "SIGKILL");
+  }
+
   if (isRunLive(run)) {
     signalGroup(run.pid, "SIGTERM");
     const deadline = Date.now() + graceMs;

@@ -6,9 +6,11 @@ import { spawn } from "node:child_process";
  * One headless turn of the agent runtime.
  *
  * The runtime is spawned from an argv array — never through a shell — so no
- * value from harness.yaml is ever interpolated into shell text. It is NOT
- * detached: it stays in the supervisor's process group, which is what lets
- * `omh loop stop` take the whole tree down with one group signal.
+ * value from harness.yaml is ever interpolated into shell text. It runs in
+ * its own process group so a timeout, a stop request, or the end of the turn
+ * can take the runtime AND everything it spawned down with one group signal;
+ * run.json records the child pid so `omh loop stop` can do the same even
+ * when the supervisor is already gone.
  */
 export type LoopRuntime = "claude" | "codex" | "pi";
 
@@ -84,40 +86,59 @@ export function runTurn(o: TurnOptions): Promise<TurnResult> {
     let stoppedByRequest = false;
     let settled = false;
     const timers: NodeJS.Timeout[] = [];
+    // Declared before finish() so a synchronous spawn failure can call it.
+    let poll: NodeJS.Timeout | undefined;
+    let child: ReturnType<typeof spawn> | undefined;
+
+    // The turn is its own process group; signalling the group reaches the
+    // runtime's own children (shells, sleeps, daemons), not just the runtime.
+    const signalTurn = (sig: NodeJS.Signals) => {
+      if (!child?.pid) return;
+      try {
+        process.kill(-child.pid, sig);
+      } catch {
+        try {
+          child.kill(sig);
+        } catch {
+          // already gone
+        }
+      }
+    };
 
     const finish = (status: number | null, signal: NodeJS.Signals | null, note?: string) => {
       if (settled) return;
       settled = true;
       for (const t of timers) clearTimeout(t);
-      clearInterval(poll);
+      if (poll) clearInterval(poll);
+      // Whatever the turn left behind in its group goes with it.
+      signalTurn("SIGTERM");
       if (note) fs.writeSync(fd, `${note}\n`);
       fs.closeSync(fd);
       resolve({ status, signal, timedOut, stoppedByRequest, tail: readTail(o.logPath) });
     };
 
-    let child: ReturnType<typeof spawn>;
     try {
-      child = spawn(o.argv[0], o.argv.slice(1), { cwd: o.cwd, env: o.env, stdio: ["ignore", fd, fd] });
+      child = spawn(o.argv[0], o.argv.slice(1), { cwd: o.cwd, env: o.env, stdio: ["ignore", fd, fd], detached: true });
     } catch (err) {
       finish(null, null, `omh-loop: spawn failed: ${(err as Error).message}`);
       return;
     }
-    const poll = setInterval(() => {
+    poll = setInterval(() => {
       if (!o.shouldStop() || stoppedByRequest) return;
       stoppedByRequest = true;
-      child.kill("SIGTERM");
-      timers.push(setTimeout(() => child.kill("SIGKILL"), graceMs));
+      signalTurn("SIGTERM");
+      timers.push(setTimeout(() => signalTurn("SIGKILL"), graceMs));
     }, pollMs);
 
     timers.push(
       setTimeout(() => {
         timedOut = true;
-        child.kill("SIGKILL");
+        signalTurn("SIGKILL");
       }, o.timeoutMs),
     );
 
     child.once("spawn", () => {
-      if (child.pid !== undefined) o.onSpawn?.(child.pid);
+      if (child?.pid !== undefined) o.onSpawn?.(child.pid);
     });
     // ENOENT and friends arrive here rather than as a throw; the turn is
     // reported as failed with the reason in the log, and the loop goes on.

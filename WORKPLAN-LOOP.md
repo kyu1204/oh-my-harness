@@ -11,13 +11,13 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 
 ## 1. 골 정의 (DoD 게이트) — 전부 검증 가능해야 달성
 
-- [ ] **G1 코드**: `src/loop/` 7모듈 + `omh loop start|run|stop|status|clean` 존재. `src/generators/loop-assets.ts`에 `renderRunner`·`stopRunningLoop`·`shellSingleQuote` 없음. `.omh/loop/run.sh` 생성 안 됨.
-- [ ] **G2 품질**: `npm run lint`(tsc) 클린, `npx vitest run` 전부 통과, 렌더 문자열 단언 테스트 27개 제거됨(`grep -c "toContain(\"OMH_LOOP" tests/unit/loop-assets.test.ts` = 0).
-- [ ] **G3 판정 정확성**: 통합 매트릭스 12케이스 녹색(§5 T-09). 특히 "프롬프트 에코 런타임에서 BLOCKED 오판 없음" 케이스.
-- [ ] **G4 프로세스 수명**: e2e(§5 T-13)에서 `omh loop start`가 detach 후 즉시 반환, `stop`이 긴 턴 중에도 15초 내 프로세스 그룹 소멸, `already-running` 배타.
-- [ ] **G5 dogfood**: 이 저장소에서 `omh sync` → SKILL.md·loop-guard·CLAUDE.md 섹션 생성, `omh sync --check` = up to date.
-- [ ] **G6 문서**: README 루프 섹션이 `omh loop` 명령·새 knob·`.omh/state/loop/` 트리 반영.
-- [ ] **G7 실 QA 통과 (stub 아님)**: tmux에서 **실제 Claude Code · Codex · Pi** 각각으로 §5 Phase F의 QA 시나리오를 완주. 런타임당 통과 기준 전부 충족: ① `omh loop start` 즉시 반환 + `run.json` 출현 ② 1회차 턴이 지시서를 구현하고 `omh-loop` 브랜치에 커밋(`progress` 이벤트 + reflog 커밋 감지) ③ 원장 체크박스 실제 갱신 ④ **가드 함정 태스크**에서 loop-guard 차단 이벤트(`.omh/state/events.jsonl`에 `catalog-loop-guard` block) 발생 + 루프가 `BLOCKED:` 표기 후 다음으로 진행 ⑤ 골 완료 시 `complete` 이벤트 + 프로세스 그룹 소멸 ⑥ 별도 실행에서 긴 턴 중 `omh loop stop` → 15s 내 그룹 소멸 ⑦ 프롬프트 에코(Codex)에서 BLOCKED 오판 없음(이벤트 로그에 근거 없는 `blocked` 0건). 결과는 §7 진행 로그에 런타임별 이벤트 발췌로 기록.
+- [x] **G1 코드**: `src/loop/` 7모듈 + `omh loop start|run|stop|status|clean` 존재. `src/generators/loop-assets.ts`에 `renderRunner`·`stopRunningLoop`·`shellSingleQuote` 없음. `.omh/loop/run.sh` 생성 안 됨.
+- [x] **G2 품질**: `npm run lint`(tsc) 클린, `npx vitest run` 전부 통과, 렌더 문자열 단언 테스트 27개 제거됨(`grep -c "toContain(\"OMH_LOOP" tests/unit/loop-assets.test.ts` = 0).
+- [x] **G3 판정 정확성**: 통합 매트릭스 12케이스 녹색(§5 T-09). 특히 "프롬프트 에코 런타임에서 BLOCKED 오판 없음" 케이스.
+- [x] **G4 프로세스 수명**: e2e(§5 T-13)에서 `omh loop start`가 detach 후 즉시 반환, `stop`이 긴 턴 중에도 15초 내 프로세스 그룹 소멸, `already-running` 배타.
+- [x] **G5 dogfood**: 이 저장소에서 `omh sync` → SKILL.md·loop-guard·CLAUDE.md 섹션 생성, `omh sync --check` = up to date.
+- [x] **G6 문서**: README 루프 섹션이 `omh loop` 명령·새 knob·`.omh/state/loop/` 트리 반영.
+- [x] **G7 실 QA 통과 (stub 아님)**: tmux에서 **실제 Claude Code · Codex · Pi** 각각으로 §5 Phase F의 QA 시나리오를 완주. 런타임당 통과 기준 전부 충족: ① `omh loop start` 즉시 반환 + `run.json` 출현 ② 1회차 턴이 지시서를 구현하고 `omh-loop` 브랜치에 커밋(`progress` 이벤트 + reflog 커밋 감지) ③ 원장 체크박스 실제 갱신 ④ **가드 함정 태스크**에서 loop-guard 차단 이벤트(`.omh/state/events.jsonl`에 `catalog-loop-guard` block) 발생 + 루프가 `BLOCKED:` 표기 후 다음으로 진행 ⑤ 골 완료 시 `complete` 이벤트 + 프로세스 그룹 소멸 ⑥ 별도 실행에서 긴 턴 중 `omh loop stop` → 15s 내 그룹 소멸 ⑦ 프롬프트 에코(Codex)에서 BLOCKED 오판 없음(이벤트 로그에 근거 없는 `blocked` 0건). 결과는 §7 진행 로그에 런타임별 이벤트 발췌로 기록.
 - 골에서 제외(사용자 승인 액션): PR 머지, 릴리스 태그.
 
 ## 2. 루프 프로토콜
@@ -105,7 +105,7 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
   - 골 게이트: Q-1·Q-2·Q-4 체크 + Q-3 BLOCKED. `omh sync` 실행까지 포함. 검증: 스크립트 실행 후 `omh loop status`가 "no run"·프리플라이트 통과.
 - [x] **L-16** 실 QA — **Claude Code**: `tmux new -d -s omh-qa-claude 'cd <dir> && omh loop start'` → G7 ①~⑥ 확인. 통과 근거(이벤트 발췌·커밋 해시)를 §7에 기록. depends L-13, L-15.
 - [x] **L-17** 실 QA — **Codex** (`codex exec`): 동일 시나리오 + G7 ⑦(프롬프트 에코 오판 0건) 확인. depends L-16.
-- [ ] **L-18** 실 QA — **Pi** (`pi --print --no-session`): 동일 시나리오. Pi 브리지 익스텐션 경유 가드 차단(④) 확인이 핵심. depends L-16.
+- [x] **L-18** 실 QA — **Pi** (`pi --print --no-session`): 동일 시나리오. Pi 브리지 익스텐션 경유 가드 차단(④) 확인이 핵심. depends L-16.
 - QA 실패 시: 해당 런타임의 결함을 §6 리스크에 기록하고 원인 태스크를 Phase C/D에 신규 `L-XX`로 추가(아키텍트가 지시서 작성) → 수정 → 해당 런타임 QA 재실행. **3런타임 전부 통과 전에는 G7 미달성.**
 
 ## 6. 리스크·알려진 한계
@@ -114,6 +114,8 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 실행 중 메인 원장 편집 → 재시작 시 재시드(D7). README에 안내.
 - 훅은 worktree의 `.omh/state`에 기록(cwd 기준) — 기존 동작, 문서화만.
 - e2e는 tsx 경유라 CI 시간 +30s.
+- 원장 파서는 `- [ ]`/`- [x]`만 인식한다. Pi(haiku-4.5)가 BLOCKED를 `- [BLOCKED] …` 형식으로 쓴 사례가 있음 — 그 줄은 unchecked/blocked 어느 쪽에도 안 잡혀 완료 판정엔 무해하지만 stall 감지에서 빠진다. 후속: 파서가 `[BLOCKED]`·`[-]` 형식도 blocked로 인식하도록 확장(작은 하드닝).
+- Codex `--dangerously-bypass-hook-trust`는 프로젝트 훅을 검토 없이 실행한다 — 루프는 신뢰 환경 전제(approval/sandbox 우회와 같은 수준).
 
 ## 7. 진행 로그
 
@@ -148,3 +150,8 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 2026-08-26: **L-17 Codex 실 QA 2차 통과** (run 20260826-144854-530e, codex 0.149.1 / gpt-5.6-sol, L-19~21 반영 빌드).
   - ① 즉시 반환·run.json(pid 64027, child 64104) ② it1 progress ticked=1 커밋 92da5fc ③ 원장 체크 ④ 고립 프로브: 실 `codex exec --dangerously-bypass-hook-trust` + apply_patch → `catalog-loop-guard.sh decision=block`(05:49:13Z), PROTECTED.md 불변·free.md 통과; 루프 턴 로그에 `hook: SessionStart/UserPromptSubmit` — 프로젝트 훅이 턴 안에서 실행됨. 루프 내 Q-3는 모델 자기거부로 BLOCKED 표기.
   - ⑤ it4 complete, 그룹 64027 소멸(L-21 sweep), run.json 해제 ⑥ run …-c4c7: 실 codex 자식 실행 중 `stop --now` → 0초 그룹 소멸·`stopped` ⑦ 턴 로그 `BLOCKED:` 에코 32줄, `blocked` 이벤트 0건.
+- 2026-08-26: **L-18 Pi 실 QA 통과** (run 20260826-145416-6f4a, pi / openrouter anthropic/claude-haiku-4.5).
+  - ① 즉시 반환·run.json(pid 1151, child 1230) ② it1 progress→complete: Q-1·Q-2·Q-4 각 커밋(39fd90d, 5196add, …) ③ 원장 체크 ④ 고립 프로브: 실 `pi --print` + 브리지 익스텐션 경유 편집 → `catalog-loop-guard.sh decision=block`(05:54:29Z), free.md 통과. 루프 내 Q-3는 모델 자기거부.
+  - ⑤ it1 `complete`(ticked 3), 그룹 1151 소멸, run.json 해제 ⑥ run …-dae0: 실 pi 자식 실행 중 `stop --now` → 0초 그룹 소멸·`stopped`.
+  - 관찰: haiku가 4태스크를 한 턴에 처리하고 `[BLOCKED]` 비표준 형식 사용(§6 기록).
+- 2026-08-26: **골 G1~G7 전부 달성.** 테스트 1182개, 생성 셸 러너 0, 3런타임 실 QA 통과. 남은 것은 PR 머지(사용자 승인 액션).

@@ -109,7 +109,7 @@ describe("loop protocol section", () => {
     expect(body.startsWith("## ")).toBe(true);
     expect(body).toContain("WORKPLAN.md");
     expect(body).toContain("BLOCKED");
-    expect(body).toContain(".omh/loop/run.sh");
+    expect(body).toContain("omh loop start");
   });
 
   it("names the architect-only paths verbatim, since an abstract ban is not obeyed", async () => {

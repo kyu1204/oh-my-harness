@@ -184,14 +184,3 @@ describe("loop-guard wiring", () => {
     expect(merged.hooks.preToolUse.some((h) => h.id === "catalog-loop-guard")).toBe(false);
   });
 });
-
-describe("runner exports the loop marker", () => {
-  it("sets OMH_LOOP=1 so the guard fires only inside loop sessions", async () => {
-    const { computeLoopAssets } = await import("../../src/generators/loop-assets.js");
-    const harness = HarnessConfigSchema.parse({ version: "1.0" });
-    const merged = await harnessToMergedConfigV2(harness);
-    const files = await computeLoopAssets({ projectDir: "/tmp/x", config: merged });
-    const runner = files.find((f) => f.path.endsWith("run.sh"))?.content ?? "";
-    expect(runner).toContain("export OMH_LOOP=1");
-  });
-});

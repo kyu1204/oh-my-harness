@@ -4,7 +4,7 @@ import type { CatalogRegistry } from "../catalog/registry.js";
 import type { HookEntry } from "../catalog/types.js";
 import { createDefaultRegistry } from "../catalog/registry.js";
 import { convertHookEntries } from "../catalog/converter.js";
-import { renderLoopProtocol } from "../generators/loop-assets.js";
+import { renderProtocolSection } from "../loop/protocol.js";
 
 function harnessToMergedConfig(harness: HarnessConfig): MergedConfig {
   const variables: Variables = {};
@@ -25,7 +25,7 @@ function harnessToMergedConfig(harness: HarnessConfig): MergedConfig {
     claudeMdSections.push({
       id: "omh-loop-protocol",
       title: "Autonomous Loop Protocol",
-      content: renderLoopProtocol(harness.loop),
+      content: renderProtocolSection(harness.loop),
       priority: 90,
     });
   }

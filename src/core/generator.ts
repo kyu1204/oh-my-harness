@@ -10,7 +10,10 @@ import { generateCodexConfig, computeCodexConfig } from "../generators/codex-con
 import { generatePiExtension, computePiExtension } from "../generators/pi-extension.js";
 import { updateGitignore, computeGitignore } from "../generators/gitignore.js";
 import { computeManagedMarkdown } from "../generators/managed-md.js";
-import { computeLoopAssets, loopAssetPaths, stopRunningLoop } from "../generators/loop-assets.js";
+import { computeLoopAssets, loopAssetPaths } from "../generators/loop-assets.js";
+import { atomicWrite } from "../loop/state.js";
+import { stopLoop } from "../loop/stop.js";
+import { removeWorktree } from "../loop/worktree.js";
 import { migrateLegacyState } from "../utils/state-migration.js";
 import { OMH_DIR } from "../utils/paths.js";
 
@@ -56,21 +59,16 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   // them; skipped entirely when the loop engine is not configured.
   const loopAssets = await computeLoopAssets({ projectDir, config });
   for (const asset of loopAssets) {
-    await fs.mkdir(path.dirname(asset.path), { recursive: true });
-    // A live runner reads run.sh by offset; truncating it in place would make
-    // bash parse the new bytes mid-script. rename swaps the inode instead.
-    const tmp = `${asset.path}.tmp-${process.pid}`;
-    await fs.writeFile(tmp, asset.content, "utf-8");
-    if (asset.chmod !== undefined) await fs.chmod(tmp, asset.chmod);
-    await fs.rename(tmp, asset.path);
+    atomicWrite(asset.path, asset.content, asset.chmod);
     files.push(asset.path);
   }
   if (!config.loop) {
-    // The loop was disabled after a previous sync: stop any live runner first,
-    // then remove its now-stale assets.
-    await stopRunningLoop(projectDir);
+    // The loop was disabled after a previous sync: stop a live run, tear the
+    // worktree down, then remove the now-stale assets.
+    await stopLoop(projectDir);
+    await removeWorktree(projectDir).catch(() => undefined);
     for (const stale of loopAssetPaths(projectDir)) {
-      await fs.rm(stale, { force: true });
+      await fs.rm(stale, { recursive: true, force: true });
     }
   }
 

@@ -237,7 +237,19 @@ describe("runSupervisor — matrix", () => {
     expect(kinds(repo.dir, "M9")[0]).toBe("start");
   }, SLOW);
 
-  it.todo("10 disabling the loop while running stops it and removes the worktree (after L-11)");
+  it("10 disabling the loop (generate with loop off) after a run removes run state and the worktree", async () => {
+    repo = makeRepo(["T-1", "T-2"], { isolate: true });
+    const d = deps((cwd) => { tick(cwd, "T-1"); return { tail: "one\n" }; });
+    await runSupervisor({ projectDir: repo.dir, cfg: repo.cfg, runId: "M10", maxIterations: 1 }, d);
+    const wt = loopPaths(repo.dir).worktree;
+    expect(fs.existsSync(wt)).toBe(true);
+    const { generate } = await import("../../src/core/generator.js");
+    const { harnessToMergedConfigV2 } = await import("../../src/core/harness-converter-v2.js");
+    const off = await harnessToMergedConfigV2(HarnessConfigSchema.parse({ version: "1.0", loop: { enabled: false } }), undefined, repo.dir);
+    await generate({ projectDir: repo.dir, config: off });
+    expect(readRun(repo.dir)).toBeNull();
+    expect(fs.existsSync(wt)).toBe(false);
+  }, SLOW);
 
   it("11 isolate: seeds once, keeps the loop's ticks on restart, reseeds on a new goal", async () => {
     repo = makeRepo(["T-1", "T-2"], { isolate: true });

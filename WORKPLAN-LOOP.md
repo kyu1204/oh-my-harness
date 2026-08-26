@@ -1,0 +1,115 @@
+# 루프 엔진 TypeScript 재구축 원장
+
+> 단일 진실원본. 체크박스가 곧 진행 상태다. 어떤 세션이 죽어도 이 문서 + `git log`만으로 이어받는다.
+> 구현은 `docs/work-orders/L-XX.md` 지시서 그대로. 지시서 없으면 `BLOCKED: no work order`.
+
+## 0. 배경 (왜 다시 만드나)
+
+PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`renderRunner` ~250줄) + 렌더 문자열 단언 테스트(77개 중 28개)로 만들어졌다. 8라운드 리뷰 30건+, 전수조사 16건의 결함이 나왔고 치명 1건이 남아 있다: **러너 프롬프트에 `BLOCKED: no work order` 문자열이 있어 프롬프트를 에코하는 런타임(codex exec)에서 매 턴이 BLOCKED로 오판 → 3턴 뒤 영구 30분 백오프.** 그 외 worktree 미해제, stop이 턴 경계에서만 반영, 규칙 텍스트 3중 복제, Codex에서 loop-guard matcher에 `apply_patch` 별칭 누락으로 가드 미발동.
+
+근본 원인: "슈퍼바이저를 bash로, 테스트는 문자열로"라는 초기 설계. 패치가 아니라 **TypeScript 재구축**으로 간다. 제품 동작(스킬 → 원장·지시서 → 백그라운드 루프 → 모니터링, 3런타임 공통)은 유지.
+
+## 1. 골 정의 (DoD 게이트) — 전부 검증 가능해야 달성
+
+- [ ] **G1 코드**: `src/loop/` 7모듈 + `omh loop start|run|stop|status|clean` 존재. `src/generators/loop-assets.ts`에 `renderRunner`·`stopRunningLoop`·`shellSingleQuote` 없음. `.omh/loop/run.sh` 생성 안 됨.
+- [ ] **G2 품질**: `npm run lint`(tsc) 클린, `npx vitest run` 전부 통과, 렌더 문자열 단언 테스트 27개 제거됨(`grep -c "toContain(\"OMH_LOOP" tests/unit/loop-assets.test.ts` = 0).
+- [ ] **G3 판정 정확성**: 통합 매트릭스 12케이스 녹색(§5 T-09). 특히 "프롬프트 에코 런타임에서 BLOCKED 오판 없음" 케이스.
+- [ ] **G4 프로세스 수명**: e2e(§5 T-13)에서 `omh loop start`가 detach 후 즉시 반환, `stop`이 긴 턴 중에도 15초 내 프로세스 그룹 소멸, `already-running` 배타.
+- [ ] **G5 dogfood**: 이 저장소에서 `omh sync` → SKILL.md·loop-guard·CLAUDE.md 섹션 생성, `omh sync --check` = up to date.
+- [ ] **G6 문서**: README 루프 섹션이 `omh loop` 명령·새 knob·`.omh/state/loop/` 트리 반영.
+- [ ] **G7 실 QA 통과 (stub 아님)**: tmux에서 **실제 Claude Code · Codex · Pi** 각각으로 §5 Phase F의 QA 시나리오를 완주. 런타임당 통과 기준 전부 충족: ① `omh loop start` 즉시 반환 + `run.json` 출현 ② 1회차 턴이 지시서를 구현하고 `omh-loop` 브랜치에 커밋(`progress` 이벤트 + reflog 커밋 감지) ③ 원장 체크박스 실제 갱신 ④ **가드 함정 태스크**에서 loop-guard 차단 이벤트(`.omh/state/events.jsonl`에 `catalog-loop-guard` block) 발생 + 루프가 `BLOCKED:` 표기 후 다음으로 진행 ⑤ 골 완료 시 `complete` 이벤트 + 프로세스 그룹 소멸 ⑥ 별도 실행에서 긴 턴 중 `omh loop stop` → 15s 내 그룹 소멸 ⑦ 프롬프트 에코(Codex)에서 BLOCKED 오판 없음(이벤트 로그에 근거 없는 `blocked` 0건). 결과는 §7 진행 로그에 런타임별 이벤트 발췌로 기록.
+- 골에서 제외(사용자 승인 액션): PR 머지, 릴리스 태그.
+
+## 2. 루프 프로토콜
+
+- 픽업: §5에서 가장 앞선 `[ ]` 태스크 하나. 선행 태스크(depends)가 미완이면 건너뛰지 말고 `BLOCKED: depends L-XX` 표기.
+- **TDD 강제**: 지시서의 테스트 파일을 먼저 작성 → `npx vitest run <file>`로 **실패 확인** → 최소 구현 → 통과. 실패 확인 없이 구현 금지(이 저장소의 tdd-guard 훅이 소스 편집을 차단한다).
+- 검증 없이 체크 금지: 지시서의 "검증 명령" 전부 통과해야 `[x]`.
+- 역검증: 판정 로직(L-02, L-06) 태스크는 구현을 되돌려 테스트가 실패하는지 확인 후 원복.
+- 커밋: 태스크 1개 = 커밋 1개. 메시지 첫 줄 `loop: L-XX <요약>`. 커밋 전 `npm run lint && npx vitest run`.
+- BLOCKED: 사람 액션 필요 또는 3회 실패 시 `BLOCKED: <사유>` 표기 후 다음 태스크. 전부 BLOCKED면 골 미달성 보고.
+- 자기승인 금지: 루프는 지시서를 쓰지 않는다. 지시서 부재 = BLOCKED.
+- **아키텍트 전용 영역(루프 편집 금지)**: `WORKPLAN-LOOP.md` §1~§4·§6, `docs/work-orders/*`, `harness.yaml`, `src/generators/codex-config.ts`(L-10 지시서 범위 내 1줄 제외), **Phase F 실 QA 태스크 전부(L-16~L-18)** — 실제 런타임 인증·토큰이 필요한 사용자 환경 작업.
+- 진행 로그(§7)는 매 반복 1줄 갱신.
+
+## 3. 결정 로그
+
+- **D1 슈퍼바이저는 TS, 생성 셸은 훅 하나만.** 런타임 호출은 argv 배열 spawn(셸 미경유) → quoting 결함 계급 소멸.
+- **D2 잠금 = `run.json` 하나.** `fs.linkSync(tmp, run.json)`의 원자성(EEXIST)이 잠금, 내용(pid·runId)이 소유자. stale = pid 사망 **또는** `ps -o args= -p pid`에 `--run-id <id>` 없음. 회수 = `rename(run.json, run.json.stale-<mypid>)`(한 쪽만 성공) → unlink → link 재시도 1회. 패자 exit 3.
+- **D3 프로세스 그룹.** `start`는 `detached:true`(setsid, pid==pgid)로 `run`을 띄우고, 턴 자식은 detached 없이 같은 그룹. `stop` = `kill(-pid, SIGTERM)` → 10s → `SIGKILL`. 슈퍼바이저가 SIGKILL돼도 자식 도달.
+- **D4 stop 플래그는 `start`가 지우고 `run`은 절대 지우지 않는다.** (start~잠금 사이 stop 유실 방지)
+- **D5 detached 바이너리 해석**: `spawn(process.execPath, [...process.execArgv, process.argv[1], "loop","run","--run-id",id,"-d",dir])`. `execArgv` 전달로 tsx(`npm run dev`)·npx·글로벌 모두 동작. `run.json` 출현 또는 자식 종료 확인(100ms 폴링, 15s) 후에만 `unref()`.
+- **D6 판정은 출력 grep이 아니라 상태 diff.** blocked = 원장 `BLOCKED:` 증가, progress = HEAD 이동 또는 체크 증가, idle = 둘 다 아님. sentinel은 exit 0 AND 마지막 5개 비공백 줄 전체 일치 AND **후행 원장에 미완료(미BLOCKED) 태스크 0** — 아니면 `sentinel-ignored`. limit = 패턴 AND progress 없음.
+- **D7 원장 시드는 run 시작 1회, 기준은 `seed.json{ledgerHash}`(run 간 지속).** worktree 원장 없음 또는 해시 다름 → 복사. 크래시 후 같은 골 재시작은 체크 상태 유지. 알려진 한계: 실행 중 메인 원장 편집 → 다음 재시작에 재시드(문서화).
+- **D8 worktree 엣지**: 브랜치 있음/worktree 없음 → `-b` 없이 add + `worktree-reused`; 디렉터리 있으나 미등록 → `prune` 후 비어있지 않으면 `WorktreeError`(미커밋 보호); 메인이 `omh-loop`면 프리플라이트 에러; 해제 `remove --force --force`, 브랜치 보존.
+- **D9 자산 동기화는 매 반복**(백오프 중 추가된 지시서 도달), `fs.cp(force)`, 소스 없음 skip·실패 throw. 원장은 목록에 없음(D7).
+- **D10 스키마**: `shellSafePath`→`relPath`(canonical 상대경로 refine만 유지, 따옴표 금지 제거). 추가 knob `limitBackoff:1800`, `emptyBackoff:300`, `stallStreak:3`, `turnTimeout:7200`.
+- **D11 과설계 제거**: lock.ts·backoff.ts·events.ts·paths.ts 별도 모듈 없음(7파일), 슈퍼바이저 주입은 `runTurn`·`sleep`만, `status --follow` 없음(감시는 `tail -f`), 가드 마커파일 폴백 없음(env 상속 3런타임 검증됨).
+- **D12 POSIX 전용** 선언(`win32` → exit 1 + 메시지).
+- **D13 Codex matcher 일반화**: `normalizeMatcher`가 `split("|")`에 Edit/Write 포함 시 `apply_patch` 추가.
+
+## 4. 아키텍처 요약 (`src/loop/`)
+
+| 파일 | exports |
+|---|---|
+| `state.ts` | `loopPaths`, `RunInfo`, `acquireRun/updateRun/readRun/releaseRun/isRunLive`, `appendEvent/readEvents`, `pruneRuns(keep=5)`, `atomicWrite` |
+| `ledger.ts` | `parseLedger`→`{unchecked,checked,blocked}`, `hashLedger`, `diffLedger`→`{ticked,newBlocked}` |
+| `classify.ts` | `classifyTurn(input): TurnKind`, `waitFor(kind, streak, cfg)` |
+| `runtime.ts` | `buildTurnArgv(runtime, model, prompt)`, `runTurn({argv,cwd,env,logPath,timeoutMs,shouldStop})`→`{status,signal,tail}` |
+| `worktree.ts` | `git`, `ensureWorktree`, `syncAssets`, `seedLedger`, `removeWorktree`, `headOf`, `WorktreeError` |
+| `protocol.ts` | `LOOP_RULES(cfg)` → `renderPrompt`/`renderProtocolSection`/`renderSkill` |
+| `supervisor.ts` | `runSupervisor({projectDir,cfg,runId}, deps={runTurn,sleep})` |
+| `src/cli/commands/loop.ts` | `loopStart/Run/Stop/Status/CleanCommand` → `{exitCode}`, `stopLoop(projectDir,{graceMs})` |
+
+상태 레이아웃: `.omh/state/loop/{run.json, stop, seed.json, runs/<runId>/{events.jsonl, turns/NNN.log}}`, worktree `.omh/loop/worktree`, 브랜치 `omh-loop`.
+
+## 5. 태스크 (Phase별, ID = 지시서)
+
+### Phase A — 순수 모듈 (I/O 없음, 빠른 테스트)
+- [ ] **L-01** `ledger.ts` — 테스트 `tests/unit/loop-ledger.test.ts`. `- [ ]`/`- [x]`/`- [X]` 카운트, `BLOCKED:` 카운트, sha256 해시, diff. 검증: `npx vitest run tests/unit/loop-ledger.test.ts`.
+- [ ] **L-02** `classify.ts` — 테스트 `loop-classify.test.ts` 테이블 주도: 7 kind 전부, 크래시+sentinel→error, 미완료 잔존+sentinel→ignored, rate-limit 텍스트+커밋→progress, timeout SIGKILL→crash, `waitFor` 4행. depends L-01. 역검증 필수.
+- [ ] **L-03** `protocol.ts` — 테스트 `loop-protocol.test.ts`: 세 렌더러가 `LOOP_RULES` 모든 줄 포함, 스킬이 `omh loop start`·`tail -f .omh/state/loop/runs/` 안내, architectOnly 이름 그대로 노출, **프롬프트에 `BLOCKED:` 리터럴이 있어도 판정과 무관함을 주석으로 명시**(D6).
+
+### Phase B — I/O 모듈
+- [ ] **L-04** `state.ts` — 테스트 `loop-state.test.ts`: acquire 2회→두 번째 false; 죽은 pid 회수; ps argv 불일치 회수(현재 프로세스 pid를 다른 run-id로 기록); 소유자만 release; 이벤트 append/read; prune 5; `atomicWrite` inode 교체. depends 없음.
+- [ ] **L-05** `runtime.ts` — 테스트 `loop-runtime.test.ts`: 런타임별 argv(claude `--model M --dangerously-skip-permissions -p P`, codex `exec --model M --dangerously-bypass-approvals-and-sandbox P`, pi `--print --no-session --model M P`); stub 스크립트 → status/tail/로그 파일; timeout kill→signal; `trap '' TERM` stub + `shouldStop` → SIGTERM→SIGKILL 에스컬레이션(유예 200ms 주입).
+- [ ] **L-06** `worktree.ts` — 테스트 `loop-worktree.test.ts`(temp git repo): add; 기존 브랜치 재사용 이벤트; 미등록 비어있지 않은 dir→`WorktreeError`; 메인이 omh-loop→에러; 미커밋 자산 복사(.claude/.codex/.pi/.omh/hooks/work-orders/CLAUDE.md/AGENTS.md/harness.yaml); 시드 첫/새 해시/같은 해시; dirty tree `--force --force` 해제; `--branch`. depends L-01, L-04. 역검증 필수.
+
+### Phase C — 슈퍼바이저·스키마
+- [ ] **L-07** 스키마·타입 — 테스트 `loop-config.test.ts` 갱신: `relPath`(따옴표 허용, `../x`·`/abs`·`./x`·후행 `/` 거부), knob 4개 기본값·양수, `LoopConfig` 확장. 파일: `src/core/harness-schema.ts`, `src/core/merged-config.ts`.
+- [ ] **L-08** `supervisor.ts` — 테스트 `loop-supervisor.test.ts`(in-process, `runTurn`/`sleep` 주입, stub이 temp repo를 실제 변경). depends L-01~L-07.
+- [ ] **L-09** 통합 매트릭스 12케이스(같은 테스트 파일에 추가): complete · 크래시 후 sentinel · 미완료 잔존+sentinel→ignored 후 계속 · limit → limitBackoff · 원장 BLOCKED ×3 → blockedBackoff · idle ×3 → blockedBackoff · 긴 턴 중 stop 플래그 · 동시 `runSupervisor` 2 → 하나 `already-running` · stale run.json 회수 · 실행 중 disable → run.json 소멸·worktree 제거 · 시드/재시드 3케이스 · **stub이 프롬프트를 에코해도 BLOCKED 오판 없음**. depends L-08.
+
+### Phase D — CLI·생성기 배선
+- [ ] **L-10** `codex-config.ts` `normalizeMatcher` 일반화 — 테스트 `codex-config-generator.test.ts` 케이스 추가(`Edit|Write|Bash` → `apply_patch` 포함). 지시서 범위 외 변경 금지.
+- [ ] **L-11** `loop-assets.ts` 축소 + `generator.ts`/`uninstall.ts`/`harness-converter-v2.ts` 배선 — 테스트 `loop-assets.test.ts` 재작성(SKILL.md만, plan 대칭, disable 시 `stopLoop`+worktree 제거, run.sh 부재), `uninstall-loop.test.ts` 갱신. 삭제: `renderRunner`·`runtimeCommand`·`shellSingleQuote`·`stopRunningLoop`·`renderLoopProtocol`·`renderSkill`, `loop-runner-behavior.test.ts`. depends L-03, L-06, L-08.
+- [ ] **L-12** `src/cli/commands/loop.ts` + `src/cli/index.ts` — 테스트 `cli-loop.test.ts`(mkdtemp + lazy import): 프리플라이트 에러 각각(git repo 아님·원장 없음·지시서 0·메인이 omh-loop·활성 run), win32 → exit 1, `status` 유/무, `stop` with no run → exit 0. `start`의 spawn은 D5 그대로. depends L-08.
+- [ ] **L-13** e2e `loop-e2e.test.ts`(SLOW=30s) — `node_modules/.bin/tsx bin/oh-my-harness.ts loop start` + stub `claude`(체크 후 sentinel): run.json 출현·start 즉시 반환·`stop`으로 그룹 소멸·`complete` 이벤트; 긴 턴(`sleep 30`) 중 stop → 15s 내 소멸. depends L-12.
+
+### Phase E — 문서·dogfood
+- [ ] **L-14** README 갱신(트리·`omh loop` 명령·knob·POSIX 전용·시드 한계) + 이 저장소 `omh sync` dogfood + `sync --check` up to date. depends L-11, L-12.
+
+### Phase F — 실 QA (tmux, 실제 런타임; **아키텍트 실행** — 인증·토큰 비용이 드는 사용자 환경 작업이라 루프 금지 영역)
+공통 픽스처 `L-15`가 만들고, 런타임별로 같은 시나리오를 돌린다. 모니터는 wiki 규칙대로 **기동 직후** 2개 부착(이벤트 `tail -F` + `.git/logs/HEAD` reflog tail) 후 empty commit으로 발화 테스트.
+
+- [ ] **L-15** QA 픽스처 생성 스크립트 `scripts/loop-qa-fixture.sh <runtime> <dir>` — temp git repo에: `harness.yaml`(`loop.runtime=<rt>`, `model` = 런타임별 저가 모델, `interval: 5`, `stallStreak: 2`, `blockedBackoff: 20`, `architectOnly: ["PROTECTED.md"]`), `PROTECTED.md`, 원장 `WORKPLAN.md` 4태스크, 지시서 4개:
+  - Q-1 `hello.txt`에 `hello` 한 줄 생성. 수용: `test "$(cat hello.txt)" = hello`
+  - Q-2 `hello.txt` 끝에 `world` 추가. 수용: `grep -qx world hello.txt`
+  - Q-3 **가드 함정**: `PROTECTED.md`에 한 줄 추가하라고 지시(architectOnly 위반). 기대: loop-guard 차단 → 루프가 `BLOCKED: architect-only path` 표기.
+  - Q-4 `done.txt` 생성. 수용: `test -f done.txt`
+  - 골 게이트: Q-1·Q-2·Q-4 체크 + Q-3 BLOCKED. `omh sync` 실행까지 포함. 검증: 스크립트 실행 후 `omh loop status`가 "no run"·프리플라이트 통과.
+- [ ] **L-16** 실 QA — **Claude Code**: `tmux new -d -s omh-qa-claude 'cd <dir> && omh loop start'` → G7 ①~⑥ 확인. 통과 근거(이벤트 발췌·커밋 해시)를 §7에 기록. depends L-13, L-15.
+- [ ] **L-17** 실 QA — **Codex** (`codex exec`): 동일 시나리오 + G7 ⑦(프롬프트 에코 오판 0건) 확인. depends L-16.
+- [ ] **L-18** 실 QA — **Pi** (`pi --print --no-session`): 동일 시나리오. Pi 브리지 익스텐션 경유 가드 차단(④) 확인이 핵심. depends L-16.
+- QA 실패 시: 해당 런타임의 결함을 §6 리스크에 기록하고 원인 태스크를 Phase C/D에 신규 `L-XX`로 추가(아키텍트가 지시서 작성) → 수정 → 해당 런타임 QA 재실행. **3런타임 전부 통과 전에는 G7 미달성.**
+
+## 6. 리스크·알려진 한계
+
+- `ps` 의존(정체 검증): POSIX 전용 선언으로 수용.
+- 실행 중 메인 원장 편집 → 재시작 시 재시드(D7). README에 안내.
+- 훅은 worktree의 `.omh/state`에 기록(cwd 기준) — 기존 동작, 문서화만.
+- e2e는 tsx 경유라 CI 시간 +30s.
+
+## 7. 진행 로그
+
+- 2026-08-26: 전수조사(현행 23책임·16결함), 적대적 설계 검증(구멍 4·과설계 5 반영), 원장 작성. 착수 대기.

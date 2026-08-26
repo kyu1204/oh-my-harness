@@ -61,6 +61,10 @@ _omh_bash_writes_to() {
   local cmd="\$1" target="\${2%/}"
   [[ -z "\$cmd" || -z "\$target" ]] && return 1
   [[ "\$cmd" == *"\$target"* ]] || return 1
+  # The path is interpolated into an ERE below: escape its metacharacters so
+  # "docs/[orders" cannot break the pattern (grep error = silent bypass) and
+  # "docs/o+rders" is compared literally.
+  target=$(printf '%s' "\$target" | sed -e 's/[][\\.*^$(){}?+|]/\\\\&/g')
   local WRITE_OPS='(tee|mv|cp|rm|touch|truncate|sed[[:space:]]+-i[^[:space:]]*)'
   # write op targeting the protected path directly ...
   echo "\$cmd" | grep -qE '(>|>>)[[:space:]]*[^|&;]*'"\$target"'|(^|[^[:alnum:]_])'"\$WRITE_OPS"'[[:space:]][^|&;]*'"\$target" && return 0

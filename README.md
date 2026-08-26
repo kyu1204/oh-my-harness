@@ -276,8 +276,8 @@ into a fully set-up autonomous loop, no manual wiring:
 you: "ship the remaining Phase B tasks as a loop"
         │
         ▼  omh-loop skill (the session becomes the ARCHITECT)
-  1. writes WORKPLAN.md          — goal gates + task checkboxes (single source of truth)
-  2. writes docs/work-orders/*.md — one exact work order per task
+  1. writes the `loop.ledger`     — default WORKPLAN.md; goal gates + task checkboxes
+  2. writes `loop.workOrders`/*.md — default docs/work-orders; one exact work order per task
   3. starts .omh/loop/run.sh      — background; with `isolate: true` (default), in its own git worktree
   4. attaches monitoring          — tail -f .omh/state/loop-events.jsonl
         │
@@ -288,7 +288,8 @@ you: "ship the remaining Phase B tasks as a loop"
 
 The design follows a battle-tested pattern from real autonomous runs: state
 lives in **files** (ledger + git log), never in a conversation. Each iteration
-is a fresh `-p` session on an explicit cheap model, so token use stays flat.
+is a fresh headless session (`claude -p` / `codex exec` / `pi --print --no-session`)
+on an explicit cheap model, so token use stays flat.
 
 ### Why it doesn't fall over
 

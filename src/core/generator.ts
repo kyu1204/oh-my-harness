@@ -10,7 +10,7 @@ import { generateCodexConfig, computeCodexConfig } from "../generators/codex-con
 import { generatePiExtension, computePiExtension } from "../generators/pi-extension.js";
 import { updateGitignore, computeGitignore } from "../generators/gitignore.js";
 import { computeManagedMarkdown } from "../generators/managed-md.js";
-import { computeLoopAssets, loopAssetPaths } from "../generators/loop-assets.js";
+import { computeLoopAssets, loopAssetPaths, stopRunningLoop } from "../generators/loop-assets.js";
 import { migrateLegacyState } from "../utils/state-migration.js";
 import { OMH_DIR } from "../utils/paths.js";
 
@@ -62,7 +62,9 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
     files.push(asset.path);
   }
   if (!config.loop) {
-    // The loop was disabled after a previous sync: its assets are now stale.
+    // The loop was disabled after a previous sync: stop any live runner first,
+    // then remove its now-stale assets.
+    await stopRunningLoop(projectDir);
     for (const stale of loopAssetPaths(projectDir)) {
       await fs.rm(stale, { force: true });
     }

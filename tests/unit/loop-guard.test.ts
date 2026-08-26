@@ -158,6 +158,19 @@ describe("loop-guard cd bypass (re-review R3)", () => {
   });
 });
 
+describe("loop-guard ERE safety (round 6)", () => {
+  it("treats ERE metacharacters in a protected path literally", async () => {
+    for (const target of ["docs/work-orders (legacy)", "docs/[orders", "docs/o+rders"]) {
+      const out = await runGuard({
+        command: `touch '${target}/T-1.md'`,
+        env: { OMH_LOOP: "1" },
+        params: { workOrders: target },
+      });
+      expect(out).toContain("DECISION:block");
+    }
+  });
+});
+
 describe("loop-guard wiring", () => {
   it("is added automatically when the loop engine is on", async () => {
     const harness = HarnessConfigSchema.parse({ version: "1.0" });

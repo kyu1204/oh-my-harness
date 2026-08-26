@@ -7,7 +7,13 @@ import { HookEntrySchema } from "../catalog/types.js";
 const shellSafePath = z
   .string()
   .min(1)
-  .regex(/^[^'"`$\\\n]+$/, "must not contain quotes, backticks, $ or backslashes");
+  .regex(/^[^'"`$\\\n]+$/, "must not contain quotes, backticks, $ or backslashes")
+  // loop-guard compares raw prefixes, so "./docs/x", "/abs/x" and "docs/x/"
+  // would silently fail to match the paths a tool call actually reports.
+  .refine(
+    (p) => !p.startsWith("/") && p.split("/").every((seg) => seg !== "" && seg !== "." && seg !== ".."),
+    "must be a canonical project-relative path (no leading /, ./, ../ or trailing /)",
+  );
 
 export const HarnessConfigSchema = z.object({
   version: z.literal("1.0").default("1.0"),

@@ -4,6 +4,7 @@ import path from "node:path";
 import { parse, stringify } from "smol-toml";
 import { extractManagedSections, removeManagedSection } from "../utils/markdown.js";
 import { isOmhHookCommand } from "./managed-hooks.js";
+import { stopRunningLoop } from "../generators/loop-assets.js";
 
 export interface ComputeUninstallOptions {
   projectDir: string;
@@ -211,6 +212,8 @@ export async function computeUninstall(options: ComputeUninstallOptions): Promis
     destructiveWarnings: ["백업 후 실행 권장: uninstall은 파일을 수정/삭제하는 파괴적 작업입니다."],
   };
 
+  // .omh (and with it the stop file) is about to go: stop a live runner first.
+  await stopRunningLoop(projectDir);
   for (const target of [
     path.join(projectDir, ".omh"),
     path.join(projectDir, ".claude", "oh-my-harness.json"),

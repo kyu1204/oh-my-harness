@@ -82,6 +82,21 @@ describe("loop path values are shell-safe (round 5)", () => {
   });
 });
 
+describe("loop paths must be canonical project-relative (round 6)", () => {
+  it("rejects ./, ../, absolute and trailing-slash forms the guard cannot compare", () => {
+    for (const loop of [
+      { workOrders: "./docs/work-orders" },
+      { workOrders: "../docs/work-orders" },
+      { workOrders: "/abs/docs/work-orders" },
+      { workOrders: "docs/./work-orders" },
+      { ledger: "docs/work-orders/" },
+      { architectOnly: ["./ios"] },
+    ]) {
+      expect(HarnessConfigSchema.safeParse({ version: "1.0", loop }).success).toBe(false);
+    }
+  });
+});
+
 describe("loop protocol section", () => {
   it("adds a protocol section so CLAUDE.md and AGENTS.md both carry the rules", async () => {
     const harness = HarnessConfigSchema.parse({ version: "1.0" });

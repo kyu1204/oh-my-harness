@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import type { MergedConfig } from "../core/merged-config.js";
 import type { LoopConfig } from "../core/merged-config.js";
@@ -126,9 +127,6 @@ LOG="$STATE_DIR/loop.log"
 STOP_FILE="$STATE_DIR/loop.stop"
 mkdir -p "$STATE_DIR"
 
-# A leftover stop file from the previous run would kill this one instantly.
-rm -f "$STOP_FILE"
-
 emit() {
   # kind, message — appended as JSONL so monitoring never depends on the
   # agent runtime having a notification channel of its own.
@@ -137,6 +135,26 @@ emit() {
     "$(node -p 'JSON.stringify(process.argv[1])' "$2")" \\
     >> "$EVENTS"
 }
+
+# Exclusive lock: two runners on one project would race over the same
+# worktree, ledger and git index. mkdir is atomic; a stale lock from a dead
+# runner (crash, kill -9) is reclaimed by checking its recorded pid.
+LOCK_DIR="$STATE_DIR/loop.lock"
+PID_FILE="$STATE_DIR/loop.pid"
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  other=$(cat "$PID_FILE" 2>/dev/null || true)
+  if [ -n "$other" ] && kill -0 "$other" 2>/dev/null; then
+    emit already-running "another runner (pid $other) holds the lock"
+    exit 1
+  fi
+  rm -rf "$LOCK_DIR"; mkdir "$LOCK_DIR" || exit 1
+fi
+echo $$ > "$PID_FILE"
+trap 'rm -rf "$LOCK_DIR" "$PID_FILE"' EXIT
+
+# A leftover stop file from the previous run would kill this one instantly.
+rm -f "$STOP_FILE"
+
 
 PROMPT="Autonomous loop iteration. Read $OMH_LOOP_LEDGER first.
 Pick the next unchecked ([ ]) task, read its work order in $OMH_LOOP_WORK_ORDERS/<ID>.md and implement it exactly.
@@ -262,6 +280,23 @@ your own work — the loop reports through its event log.
 
 ${renderLoopProtocol(loop)}
 `;
+}
+
+/**
+ * Ask a live runner to stop before its assets disappear from under it: write
+ * the stop file (honoured at the next iteration boundary) and SIGTERM the
+ * recorded pid. Removing run.sh alone leaves the bash process running.
+ */
+export async function stopRunningLoop(projectDir: string): Promise<void> {
+  const stateDir = path.join(projectDir, OMH_DIR, "state");
+  try {
+    await fs.mkdir(stateDir, { recursive: true });
+    await fs.writeFile(path.join(stateDir, "loop.stop"), "");
+    const pid = Number((await fs.readFile(path.join(stateDir, "loop.pid"), "utf-8")).trim());
+    if (pid > 0) process.kill(pid, "SIGTERM");
+  } catch {
+    // no runner recorded, or it is already gone
+  }
 }
 
 /** The paths computeLoopAssets can emit — used to clean up when the loop is disabled. */

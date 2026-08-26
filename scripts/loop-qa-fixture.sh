@@ -18,8 +18,13 @@ case "$RUNTIME" in
 esac
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-OMH="$REPO/dist/bin/oh-my-harness.js"
-[ -f "$OMH" ] || { echo "build the CLI first: npm run build" >&2; exit 1; }
+# Prefer the built CLI; fall back to tsx when there is no build (CI runs the
+# test suite unbuilt) or when forced.
+if [ -z "${OMH_QA_FORCE_TSX:-}" ] && [ -f "$REPO/dist/bin/oh-my-harness.js" ]; then
+  OMH=(node "$REPO/dist/bin/oh-my-harness.js"); OMH_VIA=dist
+else
+  OMH=("$REPO/node_modules/.bin/tsx" "$REPO/bin/oh-my-harness.ts"); OMH_VIA=tsx
+fi
 
 mkdir -p "$DIR" && cd "$DIR"
 git init -q -b main .
@@ -84,6 +89,6 @@ Acceptance: `test -f done.txt`
 Commit message: `Q-4: create done.txt`
 MD
 
-node "$OMH" sync >/dev/null
+OMH_SKIP_VERSION_CHECK=1 "${OMH[@]}" sync >/dev/null
 git add -A && git commit -qm "qa fixture: ledger, work orders, harness ($RUNTIME)"
-echo "fixture ready: $DIR (runtime=$RUNTIME model=$MODEL)"
+echo "fixture ready: $DIR (runtime=$RUNTIME model=$MODEL, sync via: $OMH_VIA)"

@@ -40,6 +40,14 @@ describe("scripts/loop-qa-fixture.sh", () => {
     expect(execFileSync("git", ["-C", dir, "rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf-8" }).trim()).toBe("main");
   }, 60_000);
 
+  it("works without a built dist by falling back to tsx (CI runs tests unbuilt)", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omh-qa-tsx-"));
+    const out = execFileSync("bash", [SCRIPT, "pi", dir], { encoding: "utf-8", env: { ...process.env, OMH_QA_FORCE_TSX: "1" } });
+    expect(out).toContain("sync via: tsx");
+    expect(fs.existsSync(path.join(dir, ".omh", "hooks", "catalog-loop-guard.sh"))).toBe(true);
+    expect(fs.existsSync(path.join(dir, ".claude", "skills", "omh-loop", "SKILL.md"))).toBe(true);
+  }, 90_000);
+
   it("rejects an unknown runtime", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omh-qa-bad-"));
     expect(() => execFileSync("bash", [SCRIPT, "gemini", dir], { encoding: "utf-8", stdio: "pipe" })).toThrow();

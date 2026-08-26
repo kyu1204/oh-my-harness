@@ -142,7 +142,7 @@ export async function loopStartCommand(options: LoopStartOptions = {}): Promise<
   // is a finished loop, not a failed start.
   if (acquired === 0 && readEvents(projectDir, runId).length > 0) {
     const last = readEvents(projectDir, runId).at(-1);
-    console.log(chalk.green(`omh loop: started run ${runId} — it already finished (${last?.kind ?? "done"})`));
+    console.log(chalk.green(`omh loop: started run ${runId} (pid ${child.pid ?? "?"}) — it already finished (${last?.kind ?? "done"})`));
     console.log(`  events: ${path.join(dir, "events.jsonl")}`);
     return { exitCode: 0 };
   }

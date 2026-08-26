@@ -174,7 +174,7 @@ describe("omh loop start — launch", () => {
     ledgerAndOrders();
     const r = await loopStartCommand({ projectDir: dir, spawnImpl: fakeSpawn("finishes") });
     expect(r.exitCode).toBe(0);
-    expect(logs.join("\n")).toMatch(/started run/);
+    expect(logs.join("\n")).toMatch(/started run \S+ \(pid 4242\)/);
     expect(logs.join("\n")).toMatch(/complete/);
     expect(errors).toEqual([]);
   });

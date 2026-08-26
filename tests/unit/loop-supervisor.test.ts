@@ -279,3 +279,36 @@ describe("runSupervisor — matrix", () => {
     expect(k).toEqual(["start", "idle", "idle", "stopped"]);
   }, SLOW);
 });
+
+describe("supervisor — round audit L-28", () => {
+  it("a git failure mid-run yields a failed event and a clean exit, not a crash", async () => {
+    const d = deps((cwd) => {
+      // break git for the post-turn snapshot: HEAD resolution will fail
+      fs.rmSync(path.join(cwd, ".git"), { recursive: true, force: true });
+      return { tail: "did something\n" };
+    });
+    const exit = await runSupervisor({ projectDir: repo.dir, cfg: repo.cfg, runId: "G1" }, d);
+    expect(exit).toBe("failed");
+    const kinds = readEvents(repo.dir, "G1").map((e) => e.kind);
+    expect(kinds).toContain("failed");
+    expect(readRun(repo.dir)).toBeNull();
+  }, SLOW);
+
+  it("the last turn's group is SIGKILL-swept on the way out, catching TERM-ignoring daemons", async () => {
+    const { spawn } = await import("node:child_process");
+    // a TERM-ignoring straggler in its own group, standing in for the turn's group
+    const daemon = spawn("bash", ["-c", "trap '' TERM; sleep 60"], { detached: true, stdio: "ignore" });
+    daemon.unref();
+    await new Promise((r) => setTimeout(r, 200));
+    const d = deps((cwd, _i, o) => {
+      o.onSpawn?.(daemon.pid!); // the supervisor records this as the turn pid
+      tick(cwd, "T-1");
+      return { tail: "OMH_GOAL_COMPLETE\n" };
+    });
+    const exit = await runSupervisor({ projectDir: repo.dir, cfg: repo.cfg, runId: "G2" }, d);
+    expect(exit).toBe("complete");
+    await new Promise((r) => setTimeout(r, 300));
+    const alive = (() => { try { process.kill(daemon.pid!, 0); return true; } catch { return false; } })();
+    expect(alive, "TERM-ignoring daemon survived the final sweep").toBe(false);
+  }, SLOW);
+});

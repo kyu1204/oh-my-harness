@@ -168,6 +168,18 @@ describe("omh loop start — orphaned turn (L-27f)", () => {
   }, 20_000);
 });
 
+describe("omh loop start — unborn HEAD (L-28c)", () => {
+  it("fails with a message, not an unhandled WorktreeError, in a repo with no commits", async () => {
+    const { loopStartCommand } = await import("../../src/cli/commands/loop.js");
+    execFileSync("git", ["init", "-q", "-b", "main", dir]);
+    harness();
+    ledgerAndOrders();
+    const r = await loopStartCommand({ projectDir: dir, spawnImpl: fakeSpawn("runs") });
+    expect(r.exitCode).toBe(1);
+    expect(errors.join("\n")).toMatch(/commit|HEAD/i);
+  });
+});
+
 describe("omh loop start — launch", () => {
   it("spawns a detached supervisor, waits for run.json, then unrefs and reports", async () => {
     const { loopStartCommand } = await import("../../src/cli/commands/loop.js");

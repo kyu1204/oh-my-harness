@@ -84,8 +84,13 @@ export async function loopStartCommand(options: LoopStartOptions = {}): Promise<
   if (isResult(cfg)) return cfg;
 
   const p = loopPaths(projectDir);
-  if ((await currentBranch(projectDir)) === p.branch) {
-    return fail(`the main tree is checked out on ${p.branch}; switch branches first`);
+  try {
+    if ((await currentBranch(projectDir)) === p.branch) {
+      return fail(`the main tree is checked out on ${p.branch}; switch branches first`);
+    }
+  } catch {
+    // An unborn HEAD (no commits) cannot host a worktree or be diffed.
+    return fail("the repository has no commits yet (unborn HEAD) — make an initial commit first");
   }
   if (!fs.existsSync(path.join(projectDir, cfg.ledger))) {
     return fail(`ledger ${cfg.ledger} not found — write it first (see the omh-loop skill)`);

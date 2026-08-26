@@ -65,6 +65,7 @@ export async function runSupervisor(o: SupervisorOptions, deps: SupervisorDeps =
   }
 
   let childPid: number | undefined;
+  let lastTurnPid: number | undefined;
   const onSignal = () => {
     // Synchronous only: we are inside a signal handler.
     if (childPid !== undefined) {
@@ -122,7 +123,13 @@ export async function runSupervisor(o: SupervisorOptions, deps: SupervisorDeps =
       }
 
       const ledgerBefore = parseLedger(readOr(ledgerPath));
-      const headBefore = await headOf(cwd);
+      let headBefore: string;
+      try {
+        headBefore = await headOf(cwd);
+      } catch (err) {
+        event("failed", { iteration, message: `git failed: ${(err as Error).message}` });
+        return "failed";
+      }
       iteration++;
       updateRun(projectDir, runId, { iteration });
 
@@ -135,6 +142,7 @@ export async function runSupervisor(o: SupervisorOptions, deps: SupervisorDeps =
         shouldStop: () => fs.existsSync(p.stopFlag),
         onSpawn: (pid) => {
           childPid = pid;
+          lastTurnPid = pid;
           updateRun(projectDir, runId, { childPid: pid });
         },
       });
@@ -144,7 +152,13 @@ export async function runSupervisor(o: SupervisorOptions, deps: SupervisorDeps =
       updateRun(projectDir, runId, { childPid: undefined });
 
       const ledgerAfter = parseLedger(readOr(ledgerPath));
-      const headAfter = await headOf(cwd);
+      let headAfter: string;
+      try {
+        headAfter = await headOf(cwd);
+      } catch (err) {
+        event("failed", { iteration, message: `git failed after the turn: ${(err as Error).message}` });
+        return "failed";
+      }
       const c = classifyTurn({
         status: result.status,
         signal: result.signal,
@@ -190,6 +204,16 @@ export async function runSupervisor(o: SupervisorOptions, deps: SupervisorDeps =
   } finally {
     process.off("SIGTERM", onSignal);
     process.off("SIGINT", onSignal);
+    // Each turn runs in its own session, so sweepOwnGroup cannot reach its
+    // descendants; a TERM-ignoring daemon (codex parks one) gets a hard
+    // sweep of the last turn's group here instead.
+    if (lastTurnPid !== undefined) {
+      try {
+        process.kill(-lastTurnPid, "SIGKILL");
+      } catch {
+        // group already gone
+      }
+    }
     releaseRun(projectDir, runId);
   }
 }

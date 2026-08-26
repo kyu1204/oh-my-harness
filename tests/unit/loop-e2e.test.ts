@@ -83,9 +83,17 @@ describe("omh loop e2e", () => {
       echo "OMH_GOAL_COMPLETE"`);
     const started = Date.now();
     const r = omh(["loop", "start"]);
-    expect(r.status, r.stderr).toBe(0);
+    const diag = () => {
+      const p = loopPaths(dir);
+      let runs: string[] = [];
+      let supLog = "";
+      try { runs = fs.readdirSync(p.runsDir); } catch { /* none */ }
+      try { supLog = fs.readFileSync(path.join(p.runsDir, runs[0] ?? "", "supervisor.log"), "utf-8"); } catch { /* none */ }
+      return `status=${r.status} signal=${r.signal}\nstdout=${JSON.stringify(r.stdout)}\nstderr=${JSON.stringify(r.stderr)}\nruns=${runs.join(",")}\nrun.json=${JSON.stringify(readRun(dir))}\nsupervisor.log=${supLog.slice(0, 2000)}`;
+    };
+    expect(r.status, diag()).toBe(0);
     expect(Date.now() - started).toBeLessThan(20_000);
-    expect(r.stdout).toContain("started run");
+    expect(r.stdout, diag()).toContain("started run");
     const runId = /started run (\S+)/.exec(r.stdout)![1];
 
     const done = await waitFor(() => readEvents(dir, runId).some((e) => e.kind === "complete"), 25_000);

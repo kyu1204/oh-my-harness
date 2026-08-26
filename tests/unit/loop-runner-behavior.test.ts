@@ -110,20 +110,85 @@ describe("generated runner, executed", () => {
 
 describe("disabling the loop stops a live runner", () => {
   it("writes the stop file and signals the recorded pid before removing assets", async () => {
-    const { dir } = await makeProject();
+    const { dir, bin } = await makeProject();
     const stateDir = path.join(dir, ".omh", "state");
-    // a long-lived process standing in for the runner
+    // a real runner whose turn is long-lived
+    await stubClaude(bin, "sleep 60");
     const { spawn } = await import("node:child_process");
-    const fake = spawn("sleep", ["60"]);
+    const fake = spawn("bash", [path.join(dir, ".omh", "loop", "run.sh")], {
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    });
     const exited = new Promise<boolean>((r) => {
-      const t = setTimeout(() => r(false), 3000);
+      const t = setTimeout(() => r(false), 8000);
       fake.on("exit", () => { clearTimeout(t); r(true); });
     });
-    await fs.writeFile(path.join(stateDir, "loop.pid"), String(fake.pid));
+    for (let i = 0; i < 50; i++) {
+      try { await fs.access(path.join(stateDir, "loop.pid")); break; } catch { await new Promise((r) => setTimeout(r, 100)); }
+    }
     const harness = HarnessConfigSchema.parse({ version: "1.0", loop: { enabled: false } });
     const merged = await harnessToMergedConfigV2(harness, undefined, dir);
     await generate({ projectDir: dir, config: merged });
     expect(await exited).toBe(true);
     await expect(fs.access(path.join(stateDir, "loop.stop"))).resolves.toBeUndefined();
+  });
+});
+
+describe("round seven: lock reclaim race and pid hygiene", () => {
+  it("exactly one of two runners racing for a stale lock starts", async () => {
+    const { dir, bin } = await makeProject();
+    const stateDir = path.join(dir, ".omh", "state");
+    // a stale lock left by a dead runner (pid that no longer exists)
+    await fs.mkdir(path.join(stateDir, "loop.lock"), { recursive: true });
+    await fs.writeFile(path.join(stateDir, "loop.pid"), "999999");
+    await stubClaude(bin, 'sleep 2; echo "OMH_GOAL_COMPLETE"');
+    const { spawn } = await import("node:child_process");
+    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+    const a = spawn("bash", [path.join(dir, ".omh", "loop", "run.sh")], { env });
+    const b = spawn("bash", [path.join(dir, ".omh", "loop", "run.sh")], { env });
+    const done = Promise.all([a, b].map((c) => new Promise<number | null>((r) => c.on("exit", (code) => r(code)))));
+    const codes = await done;
+    expect(codes.filter((c) => c === 0)).toHaveLength(1);
+    const kinds = await events(dir);
+    expect(kinds.filter((k) => k === "start")).toHaveLength(1);
+    expect(kinds.filter((k) => k === "complete")).toHaveLength(1);
+  });
+
+  it("stopRunningLoop refuses to signal a pid that is not a runner", async () => {
+    const { dir } = await makeProject();
+    const stateDir = path.join(dir, ".omh", "state");
+    const { spawn } = await import("node:child_process");
+    const bystander = spawn("sleep", ["30"]);
+    const exited = new Promise<boolean>((r) => {
+      const t = setTimeout(() => r(false), 2500);
+      bystander.on("exit", () => { clearTimeout(t); r(true); });
+    });
+    // pid file points at an unrelated process (pid reuse after SIGKILL)
+    await fs.writeFile(path.join(stateDir, "loop.pid"), String(bystander.pid));
+    const { stopRunningLoop } = await import("../../src/generators/loop-assets.js");
+    await stopRunningLoop(dir);
+    expect(await exited).toBe(false);
+    bystander.kill();
+  });
+
+  it("stopping the runner also stops its in-flight runtime child", async () => {
+    const { dir, bin } = await makeProject();
+    // the child records its pid then sleeps far longer than the test
+    await stubClaude(bin, 'echo $$ > "$OMH_TEST_CHILD_PID"; sleep 60');
+    const childPidFile = path.join(dir, "child.pid");
+    const { spawn } = await import("node:child_process");
+    const runner = spawn("bash", [path.join(dir, ".omh", "loop", "run.sh")], {
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, OMH_TEST_CHILD_PID: childPidFile },
+    });
+    const runnerExited = new Promise<void>((r) => runner.on("exit", () => r()));
+    for (let i = 0; i < 50; i++) {
+      try { await fs.access(childPidFile); break; } catch { await new Promise((r) => setTimeout(r, 100)); }
+    }
+    const childPid = Number((await fs.readFile(childPidFile, "utf-8")).trim());
+    const { stopRunningLoop } = await import("../../src/generators/loop-assets.js");
+    await stopRunningLoop(dir);
+    await runnerExited;
+    await new Promise((r) => setTimeout(r, 300));
+    const alive = (() => { try { process.kill(childPid, 0); return true; } catch { return false; } })();
+    expect(alive).toBe(false);
   });
 });

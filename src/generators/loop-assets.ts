@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { MergedConfig } from "../core/merged-config.js";
@@ -147,10 +148,28 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
     emit already-running "another runner (pid $other) holds the lock"
     exit 1
   fi
-  rm -rf "$LOCK_DIR"; mkdir "$LOCK_DIR" || exit 1
+  # Stale lock. Claim it with an atomic rename so two runners that both saw
+  # it stale cannot both proceed: only one mv succeeds, and the loser's
+  # mkdir then fails against the winner's fresh lock.
+  mv "$LOCK_DIR" "$LOCK_DIR.stale.$$" 2>/dev/null && rm -rf "$LOCK_DIR.stale.$$"
+  if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    emit already-running "lost the race for a stale lock"
+    exit 1
+  fi
 fi
 echo $$ > "$PID_FILE"
-trap 'rm -rf "$LOCK_DIR" "$PID_FILE"' EXIT
+echo $$ > "$LOCK_DIR/owner"
+# Runtime child, tracked so a TERM to the runner takes it down too.
+CHILD=""
+cleanup() {
+  [ -n "$CHILD" ] && kill "$CHILD" 2>/dev/null
+  # Only the owner removes the lock — never a later runner's.
+  if [ "$(cat "$LOCK_DIR/owner" 2>/dev/null)" = "$$" ]; then
+    rm -rf "$LOCK_DIR" "$PID_FILE"
+  fi
+}
+trap cleanup EXIT
+trap 'exit 143' TERM INT
 
 # A leftover stop file from the previous run would kill this one instantly.
 rm -f "$STOP_FILE"
@@ -174,8 +193,14 @@ while true; do
     break
   fi
 
-${isolateSync}  OUT="$(${runtimeCommand(loop)} 2>&1)"
+${isolateSync}  TURN_OUT="$STATE_DIR/loop.turn.$$"
+  ${runtimeCommand(loop)} > "$TURN_OUT" 2>&1 &
+  CHILD=$!
+  wait "$CHILD"
   STATUS=$?
+  CHILD=""
+  OUT="$(cat "$TURN_OUT" 2>/dev/null)"
+  rm -f "$TURN_OUT"
   printf '%s\\n' "$OUT" >> "$LOG"
 
   if printf '%s' "$OUT" | grep -qiE "usage limit|limit reached|rate.?limit"; then
@@ -293,7 +318,22 @@ export async function stopRunningLoop(projectDir: string): Promise<void> {
     await fs.mkdir(stateDir, { recursive: true });
     await fs.writeFile(path.join(stateDir, "loop.stop"), "");
     const pid = Number((await fs.readFile(path.join(stateDir, "loop.pid"), "utf-8")).trim());
-    if (pid > 0) process.kill(pid, "SIGTERM");
+    if (!(pid > 0)) return;
+    // A pid file can outlive a SIGKILLed runner and the pid be reused; only
+    // signal a process that is actually our runner.
+    const args = execFileSync("ps", ["-o", "args=", "-p", String(pid)], { encoding: "utf-8" });
+    if (!args.includes("loop/run.sh")) return;
+    process.kill(pid, "SIGTERM");
+    // The runner's TERM trap takes its runtime child down; give it a moment
+    // to release the lock before the caller deletes the assets.
+    for (let i = 0; i < 50; i++) {
+      try {
+        process.kill(pid, 0);
+      } catch {
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
   } catch {
     // no runner recorded, or it is already gone
   }

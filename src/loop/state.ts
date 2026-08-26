@@ -132,21 +132,56 @@ export function acquireRun(projectDir: string, info: RunInfo, deps: LivenessDeps
     if (tryLink(tmp, p.runJson)) return true;
 
     const existing = readRun(projectDir);
-    if (existing && isRunLive(existing, deps)) return false;
-
-    // Stale. Claim it with an atomic rename: of two runners that both judged
-    // it stale, only one rename succeeds; the other's link then fails
-    // against the winner's fresh run.json.
-    const stale = `${p.runJson}.stale-${process.pid}`;
-    try {
-      fs.renameSync(p.runJson, stale);
-      fs.unlinkSync(stale);
-    } catch {
-      // someone else reclaimed it first
-    }
+    if (!existing) return tryLink(tmp, p.runJson);
+    if (isRunLive(existing, deps)) return false;
+    if (!reclaimStaleRun(projectDir, existing)) return false;
     return tryLink(tmp, p.runJson);
   } finally {
     fs.rmSync(tmp, { force: true });
+  }
+}
+
+/**
+ * Remove a stale run.json — but only the exact record that was observed to
+ * be stale. Two runners that both judged the lock stale must not both win:
+ * a reclaim lock (atomic mkdir) serialises them, and re-reading under that
+ * lock rejects the case where the first winner has already installed a
+ * fresh record that the second would otherwise steal.
+ */
+export function reclaimStaleRun(projectDir: string, observed: RunInfo): boolean {
+  const p = loopPaths(projectDir);
+  const lock = `${p.runJson}.reclaim`;
+  const pidFile = path.join(lock, "pid");
+  const takeLock = (): boolean => {
+    try {
+      fs.mkdirSync(lock);
+      fs.writeFileSync(pidFile, String(process.pid));
+      return true;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+      return false;
+    }
+  };
+  if (!takeLock()) {
+    let holder = NaN;
+    try {
+      holder = Number(fs.readFileSync(pidFile, "utf-8"));
+    } catch {
+      // half-written lock; treat as dead
+    }
+    if (Number.isFinite(holder) && pidAlive(holder)) return false;
+    fs.rmSync(lock, { recursive: true, force: true });
+    if (!takeLock()) return false;
+  }
+  try {
+    const now = readRun(projectDir);
+    const same =
+      now !== null && now.runId === observed.runId && now.pid === observed.pid && now.startedAt === observed.startedAt;
+    if (!same) return false;
+    fs.rmSync(p.runJson, { force: true });
+    return true;
+  } finally {
+    fs.rmSync(lock, { recursive: true, force: true });
   }
 }
 

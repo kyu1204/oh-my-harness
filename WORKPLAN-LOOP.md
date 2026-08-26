@@ -92,10 +92,10 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - [x] **L-21** 종료 시 프로세스 그룹 잔존자 정리 — Codex가 남긴 데몬으로 pgid가 살아남음. depends L-20.
 
 ### Phase D'' — PR 체크에서 발견 (2026-08-26, CI 실패 1 + CodeRabbit 미해결 3)
-- [ ] **L-22** QA 픽스처 스크립트 dist 폴백 — CI(빌드 없음)에서 테스트 실패.
-- [ ] **L-23** 명시적 `loop-guard` 항목이 loop 경로를 무효화하지 못하게 강제.
-- [ ] **L-24** `computeUninstall` 계획 단계의 `stopLoop`/worktree 해제 부작용 → 적용 단계로 이동.
-- [ ] **L-25** `acquireRun` stale 회수 레이스: 회수 잠금 + 관측 레코드 재검증.
+- [x] **L-22** QA 픽스처 스크립트 dist 폴백 — CI(빌드 없음)에서 테스트 실패.
+- [x] **L-23** 명시적 `loop-guard` 항목이 loop 경로를 무효화하지 못하게 강제.
+- [x] **L-24** `computeUninstall` 계획 단계의 `stopLoop`/worktree 해제 부작용 → 적용 단계로 이동.
+- [x] **L-25** `acquireRun` stale 회수 레이스: 회수 잠금 + 관측 레코드 재검증.
 
 ### Phase E — 문서·dogfood
 - [x] **L-14** README 갱신(트리·`omh loop` 명령·knob·POSIX 전용·시드 한계) + 이 저장소 `omh sync` dogfood + `sync --check` up to date. depends L-11, L-12.
@@ -162,3 +162,4 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
   - 관찰: haiku가 4태스크를 한 턴에 처리하고 `[BLOCKED]` 비표준 형식 사용(§6 기록).
 - 2026-08-26: **골 G1~G7 전부 달성.** 테스트 1182개, 생성 셸 러너 0, 3런타임 실 QA 통과. 남은 것은 PR 머지(사용자 승인 액션).
 - 2026-08-26: PR 체크 — CI Node20 실패(fixture 테스트, dist 부재) + CodeRabbit 미해결 3건(명시적 loop-guard 파라미터·uninstall 계획 부작용·stale 회수 레이스 — 마지막은 bash 코드 대상이었으나 새 acquireRun에도 같은 창이 있어 수용). L-22~L-25 신설.
+- 2026-08-26: L-22~L-25 완료 (픽스처 tsx 폴백·명시적 loop-guard 경로 강제·uninstall 부작용을 적용 단계로·reclaimStaleRun 회수 잠금+관측 재검증). 전체 테스트 2회 녹색.

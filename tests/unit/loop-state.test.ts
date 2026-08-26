@@ -15,6 +15,7 @@ import {
   readEvents,
   pruneRuns,
   atomicWrite,
+  reclaimStaleRun,
 } from "../../src/loop/state.js";
 import type { RunInfo } from "../../src/loop/state.js";
 
@@ -132,5 +133,45 @@ describe("atomicWrite", () => {
     expect(fs.statSync(f).ino).not.toBe(ino);
     expect(fs.statSync(f).mode & 0o111).toBeTruthy();
     expect(fs.readdirSync(dir).filter((n) => n.includes(".tmp-"))).toEqual([]);
+  });
+});
+
+describe("reclaimStaleRun (L-25)", () => {
+  const stale = () => info({ runId: "DEAD", pid: 999999, startedAt: "2020-01-01T00:00:00Z" });
+
+  it("reclaims only when the record on disk still matches what was observed", () => {
+    const p = loopPaths(dir);
+    fs.mkdirSync(p.dir, { recursive: true });
+    fs.writeFileSync(p.runJson, JSON.stringify(stale()));
+    expect(reclaimStaleRun(dir, stale())).toBe(true);
+    expect(fs.existsSync(p.runJson)).toBe(false);
+    expect(fs.existsSync(`${p.runJson}.reclaim`)).toBe(false);
+  });
+
+  it("refuses when another runner already replaced the stale record (the steal window)", () => {
+    const p = loopPaths(dir);
+    fs.mkdirSync(p.dir, { recursive: true });
+    const fresh = info({ runId: "FRESH", pid: process.pid });
+    fs.writeFileSync(p.runJson, JSON.stringify(fresh));
+    expect(reclaimStaleRun(dir, stale())).toBe(false);
+    expect(readRun(dir)?.runId).toBe("FRESH");
+  });
+
+  it("refuses while a live reclaimer holds the reclaim lock, and clears a dead reclaimer's", () => {
+    const p = loopPaths(dir);
+    fs.mkdirSync(`${p.runJson}.reclaim`, { recursive: true });
+    fs.writeFileSync(`${p.runJson}.reclaim/pid`, String(process.pid));
+    fs.writeFileSync(p.runJson, JSON.stringify(stale()));
+    expect(reclaimStaleRun(dir, stale())).toBe(false);
+    fs.writeFileSync(`${p.runJson}.reclaim/pid`, "999999");
+    expect(reclaimStaleRun(dir, stale())).toBe(true);
+  });
+
+  it("acquireRun still reclaims a dead runner's record end to end", () => {
+    const p = loopPaths(dir);
+    fs.mkdirSync(p.dir, { recursive: true });
+    fs.writeFileSync(p.runJson, JSON.stringify(stale()));
+    expect(acquireRun(dir, info({ runId: "NEW" }), { psArgs: () => "omh loop run --run-id NEW" })).toBe(true);
+    expect(readRun(dir)?.runId).toBe("NEW");
   });
 });

@@ -1,15 +1,14 @@
 import { z } from "zod";
 import { HookEntrySchema } from "../catalog/types.js";
 
-// Loop path values are interpolated into generated shell (the runner and the
-// loop-guard template). Rejecting shell metacharacters up front keeps a stray
-// quote in harness.yaml from breaking — or, worse, executing inside — a hook.
-const shellSafePath = z
+// Loop paths are compared as raw prefixes by loop-guard, so they must be in
+// the canonical project-relative form a tool call reports: no leading "/",
+// no "." or ".." segments, no trailing "/". Nothing is ever interpolated into
+// shell (the supervisor spawns argv arrays), so shell metacharacters are fine.
+const relPath = z
   .string()
   .min(1)
-  .regex(/^[^'"`$\\\n]+$/, "must not contain quotes, backticks, $ or backslashes")
-  // loop-guard compares raw prefixes, so "./docs/x", "/abs/x" and "docs/x/"
-  // would silently fail to match the paths a tool call actually reports.
+  .refine((p) => !p.includes("\n"), "must be a single line")
   .refine(
     (p) => !p.startsWith("/") && p.split("/").every((seg) => seg !== "" && seg !== "." && seg !== ".."),
     "must be a canonical project-relative path (no leading /, ./, ../ or trailing /)",
@@ -67,13 +66,17 @@ export const HarnessConfigSchema = z.object({
   // setup is already in place the moment someone asks for one.
   loop: z.object({
     enabled: z.boolean().default(true),
-    ledger: shellSafePath.default("WORKPLAN.md"),
-    workOrders: shellSafePath.default("docs/work-orders"),
+    ledger: relPath.default("WORKPLAN.md"),
+    workOrders: relPath.default("docs/work-orders"),
     model: z.string().default("sonnet"),
     sentinel: z.string().min(1).default("OMH_GOAL_COMPLETE"),
     interval: z.number().positive().default(120),
     blockedBackoff: z.number().positive().default(1800),
-    architectOnly: z.array(shellSafePath).default([]),
+    limitBackoff: z.number().positive().default(1800),
+    emptyBackoff: z.number().positive().default(300),
+    stallStreak: z.number().int().positive().default(3),
+    turnTimeout: z.number().positive().default(7200),
+    architectOnly: z.array(relPath).default([]),
     isolate: z.boolean().default(true),
     runtime: z.enum(["claude", "codex", "pi"]).default("claude"),
   }).default({}),

@@ -59,26 +59,14 @@ describe("loop numeric constraints (round 4 N2)", () => {
   });
 });
 
-describe("loop path values are shell-safe (round 5)", () => {
-  it("rejects quotes, command substitution and backslashes in path fields", () => {
-    for (const loop of [
-      { workOrders: "docs/it's" },
-      { workOrders: 'a"b' },
-      { ledger: "$(id)" },
-      { ledger: "`id`" },
-      { architectOnly: ["ios/x'y"] },
-      { architectOnly: ["a\\b"] },
-    ]) {
-      expect(HarnessConfigSchema.safeParse({ version: "1.0", loop }).success).toBe(false);
+describe("loop path values accept shell metacharacters (argv spawn, no shell)", () => {
+  it("accepts quotes, $ and backticks now that nothing is interpolated into shell", () => {
+    for (const loop of [{ workOrders: "docs/it's" }, { ledger: "plan $(x).md" }, { architectOnly: ["ios/`x`"] }]) {
+      expect(HarnessConfigSchema.safeParse({ version: "1.0", loop }).success).toBe(true);
     }
   });
-
-  it("still accepts ordinary paths", () => {
-    const ok = HarnessConfigSchema.safeParse({
-      version: "1.0",
-      loop: { ledger: "planning/WORKPLAN-v2.md", workOrders: "docs/work orders", architectOnly: ["ios/Runner.xcodeproj"] },
-    });
-    expect(ok.success).toBe(true);
+  it("still rejects a newline inside a path", () => {
+    expect(HarnessConfigSchema.safeParse({ version: "1.0", loop: { ledger: "a\nb.md" } }).success).toBe(false);
   });
 });
 
@@ -92,6 +80,20 @@ describe("loop paths must be canonical project-relative (round 6)", () => {
       { ledger: "docs/work-orders/" },
       { architectOnly: ["./ios"] },
     ]) {
+      expect(HarnessConfigSchema.safeParse({ version: "1.0", loop }).success).toBe(false);
+    }
+  });
+});
+
+describe("supervisor knobs (L-07)", () => {
+  it("defaults limitBackoff/emptyBackoff/stallStreak/turnTimeout and reaches MergedConfig", async () => {
+    const parsed = HarnessConfigSchema.parse({ version: "1.0" });
+    expect(parsed.loop).toMatchObject({ limitBackoff: 1800, emptyBackoff: 300, stallStreak: 3, turnTimeout: 7200 });
+    const merged = await harnessToMergedConfigV2(parsed);
+    expect(merged.loop).toMatchObject({ limitBackoff: 1800, emptyBackoff: 300, stallStreak: 3, turnTimeout: 7200 });
+  });
+  it("rejects zero, negative and (for stallStreak) fractional values", () => {
+    for (const loop of [{ limitBackoff: 0 }, { emptyBackoff: -1 }, { stallStreak: 0 }, { stallStreak: 1.5 }, { turnTimeout: 0 }]) {
       expect(HarnessConfigSchema.safeParse({ version: "1.0", loop }).success).toBe(false);
     }
   });

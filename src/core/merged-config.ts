@@ -52,6 +52,14 @@ export interface LoopConfig {
    *  separate from the limit and empty-output backoffs: a task waiting on the
    *  architect is not a failure, and conflating them burns tokens spinning. */
   blockedBackoff: number;
+  /** Seconds to wait after the provider reports a usage limit. */
+  limitBackoff: number;
+  /** Seconds to wait after a crashed (empty-output or timed-out) turn. */
+  emptyBackoff: number;
+  /** Consecutive blocked/idle turns before blockedBackoff kicks in. */
+  stallStreak: number;
+  /** Hard per-turn timeout in seconds; the turn is SIGKILLed past this. */
+  turnTimeout: number;
   /** Paths and task ids the loop must never touch (architect-owned). */
   architectOnly: string[];
   /** Run the loop in its own git worktree so the architect can keep working. */

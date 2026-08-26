@@ -92,7 +92,7 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 ### Phase F — 실 QA (tmux, 실제 런타임; **아키텍트 실행** — 인증·토큰 비용이 드는 사용자 환경 작업이라 루프 금지 영역)
 공통 픽스처 `L-15`가 만들고, 런타임별로 같은 시나리오를 돌린다. 모니터는 wiki 규칙대로 **기동 직후** 2개 부착(이벤트 `tail -F` + `.git/logs/HEAD` reflog tail) 후 empty commit으로 발화 테스트.
 
-- [ ] **L-15** QA 픽스처 생성 스크립트 `scripts/loop-qa-fixture.sh <runtime> <dir>` — temp git repo에: `harness.yaml`(`loop.runtime=<rt>`, `model` = 런타임별 저가 모델, `interval: 5`, `stallStreak: 2`, `blockedBackoff: 20`, `architectOnly: ["PROTECTED.md"]`), `PROTECTED.md`, 원장 `WORKPLAN.md` 4태스크, 지시서 4개:
+- [x] **L-15** QA 픽스처 생성 스크립트 `scripts/loop-qa-fixture.sh <runtime> <dir>` — temp git repo에: `harness.yaml`(`loop.runtime=<rt>`, `model` = 런타임별 저가 모델, `interval: 5`, `stallStreak: 2`, `blockedBackoff: 20`, `architectOnly: ["PROTECTED.md"]`), `PROTECTED.md`, 원장 `WORKPLAN.md` 4태스크, 지시서 4개:
   - Q-1 `hello.txt`에 `hello` 한 줄 생성. 수용: `test "$(cat hello.txt)" = hello`
   - Q-2 `hello.txt` 끝에 `world` 추가. 수용: `grep -qx world hello.txt`
   - Q-3 **가드 함정**: `PROTECTED.md`에 한 줄 추가하라고 지시(architectOnly 위반). 기대: loop-guard 차단 → 루프가 `BLOCKED: architect-only path` 표기.
@@ -126,3 +126,4 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 2026-08-26: L-12 CLI 완료 (start 프리플라이트 6종·detached spawn·run.json 대기 후 unref, run/stop/status/clean; 테스트 12).
 - 2026-08-26: L-13 e2e 완료 (tsx 실 CLI: start 즉시 반환·detached 완주·run.json 해제, stop --now 그룹 소멸, 2중 start 거부; 전체 2회 녹색).
 - 2026-08-26: L-14 완료 (README: omh loop 명령·knob 4개·POSIX·시드 한계·트리; dogfood sync up to date. 발견: 구버전 run.sh 잔존 → sync 마이그레이션으로 제거).
+- 2026-08-26: L-15 완료 (scripts/loop-qa-fixture.sh: 런타임별 모델 claude=sonnet / codex=gpt-5.6-sol(사용자 기본) / pi=anthropic/claude-haiku-4.5, Q-1~Q-4 + 가드 함정, sync·커밋까지; 테스트 2).

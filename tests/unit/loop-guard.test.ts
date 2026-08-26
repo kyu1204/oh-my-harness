@@ -210,6 +210,20 @@ describe("loop-guard Codex apply_patch payloads (L-19)", () => {
   });
 });
 
+describe("loop-guard apply_patch Move to (L-30c)", () => {
+  it("blocks a patch that MOVES a file into a protected path", async () => {
+    const cmd = ["*** Begin Patch", "*** Update File: src/app.ts", "*** Move to: docs/work-orders/T-9.md", "@@", "-a", "+b", "*** End Patch"].join("\n");
+    const out = await runGuard({ toolName: "apply_patch", command: cmd, env: { OMH_LOOP: "1" } });
+    expect(out).toContain("DECISION:block");
+  });
+
+  it("blocks a move whose destination is architect-only", async () => {
+    const cmd = ["*** Begin Patch", "*** Update File: notes.md", "*** Move to: ios/Runner.xcodeproj/x.md", "@@", "*** End Patch"].join("\n");
+    const out = await runGuard({ toolName: "apply_patch", command: cmd, env: { OMH_LOOP: "1" }, params: { architectOnly: ["ios/Runner.xcodeproj"] } });
+    expect(out).toContain("DECISION:block");
+  });
+});
+
 describe("loop-guard wiring", () => {
   it("is added automatically when the loop engine is on", async () => {
     const harness = HarnessConfigSchema.parse({ version: "1.0" });

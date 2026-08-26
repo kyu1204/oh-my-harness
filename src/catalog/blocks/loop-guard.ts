@@ -52,7 +52,7 @@ if [[ "\$TOOL_NAME" == "apply_patch" && -n "\$COMMAND" ]]; then
   while IFS= read -r _p; do
     _p="\${_p%$'\\r'}"
     [[ -n "\$_p" ]] && PATCH_PATHS+=("\$_p")
-  done < <(printf '%s\\n' "\$COMMAND" | sed -nE 's/^\\*\\*\\* (Add|Update|Delete) File: (.+)$/\\2/p')
+  done < <(printf '%s\\n' "\$COMMAND" | sed -nE 's/^\\*\\*\\* ((Add|Update|Delete) File|Move to): (.+)$/\\3/p')
   COMMAND=""
 fi
 [[ -z "\$FILE_PATH" && -z "\$COMMAND" && \${#PATCH_PATHS[@]} -eq 0 ]] && exit 0

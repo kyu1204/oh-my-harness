@@ -59,14 +59,26 @@ describe("loop numeric constraints (round 4 N2)", () => {
   });
 });
 
-describe("loop path values accept shell metacharacters (argv spawn, no shell)", () => {
-  it("accepts quotes, $ and backticks now that nothing is interpolated into shell", () => {
-    for (const loop of [{ workOrders: "docs/it's" }, { ledger: "plan $(x).md" }, { architectOnly: ["ios/`x`"] }]) {
-      expect(HarnessConfigSchema.safeParse({ version: "1.0", loop }).success).toBe(true);
+describe("loop path values are shell-safe again (L-30a)", () => {
+  // The argv spawn made quotes safe for the RUNNER, but these values are also
+  // rendered into loop-guard's bash template — a quote there kills or
+  // bypasses the guard. Critical audit finding; the ban is back.
+  it("rejects quotes, backticks, $ and backslashes in path fields", () => {
+    for (const loop of [{ workOrders: "docs/it's" }, { ledger: 'a"b.md' }, { architectOnly: ["ios/`x`"] }, { workOrders: "a$b" }, { ledger: "a\\b.md" }]) {
+      expect(HarnessConfigSchema.safeParse({ version: "1.0", loop }).success).toBe(false);
     }
   });
-  it("still rejects a newline inside a path", () => {
-    expect(HarnessConfigSchema.safeParse({ version: "1.0", loop: { ledger: "a\nb.md" } }).success).toBe(false);
+  it("still accepts ordinary paths including spaces", () => {
+    expect(HarnessConfigSchema.safeParse({ version: "1.0", loop: { workOrders: "docs/work orders" } }).success).toBe(true);
+  });
+});
+
+describe("sentinel must be matchable (L-30b)", () => {
+  it("rejects sentinels with surrounding whitespace or embedded newlines — they could never match a trimmed line", () => {
+    for (const sentinel of [" OMH_DONE", "OMH_DONE ", "OMH\nDONE", "\tOMH_DONE"]) {
+      expect(HarnessConfigSchema.safeParse({ version: "1.0", loop: { sentinel } }).success).toBe(false);
+    }
+    expect(HarnessConfigSchema.safeParse({ version: "1.0", loop: { sentinel: "ALL DONE NOW" } }).success).toBe(true);
   });
 });
 

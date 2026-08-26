@@ -8,7 +8,10 @@ import { HookEntrySchema } from "../catalog/types.js";
 const relPath = z
   .string()
   .min(1)
-  .refine((p) => !p.includes("\n"), "must be a single line")
+  // These values are rendered into loop-guard's bash template; a quote,
+  // backtick, $ or backslash there kills or bypasses the guard. (The runner
+  // itself spawns argv arrays and would not care.)
+  .regex(/^[^'"`$\\\n]+$/, "must not contain quotes, backticks, $ or backslashes")
   .refine(
     (p) => !p.startsWith("/") && p.split("/").every((seg) => seg !== "" && seg !== "." && seg !== ".."),
     "must be a canonical project-relative path (no leading /, ./, ../ or trailing /)",
@@ -69,7 +72,13 @@ export const HarnessConfigSchema = z.object({
     ledger: relPath.default("WORKPLAN.md"),
     workOrders: relPath.default("docs/work-orders"),
     model: z.string().default("sonnet"),
-    sentinel: z.string().min(1).default("OMH_GOAL_COMPLETE"),
+    sentinel: z
+      .string()
+      .min(1)
+      // Matched against TRIMMED output lines; surrounding whitespace or an
+      // embedded newline could never match, so completion would be unreachable.
+      .refine((v) => v === v.trim() && !/[\r\n\t]/.test(v), "must be a single trimmed line")
+      .default("OMH_GOAL_COMPLETE"),
     interval: z.number().positive().default(120),
     blockedBackoff: z.number().positive().default(1800),
     limitBackoff: z.number().positive().default(1800),

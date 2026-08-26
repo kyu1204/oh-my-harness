@@ -98,7 +98,7 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - [x] **L-25** `acquireRun` stale 회수 레이스: 회수 잠금 + 관측 레코드 재검증.
 
 ### Phase D''' — ultracode 심층 감사 확정 결함 (2026-08-27, 26에이전트 6렌즈+반박검증: 확정 17·기각 3·미검증 1)
-- [ ] **L-26** classify/ledger: limit 순서·error 백오프·'+' 불릿
+- [x] **L-26** classify/ledger: limit 순서·error 백오프·'+' 불릿
 - [ ] **L-27** state/stop 동시성: updateRun 소유권·rm 재확인·stop 플래그 무조건·reclaim 원자 생성·childPid 정리+정체·고아 턴 회수 거부
 - [ ] **L-28** supervisor/runtime: 최종 턴그룹 KILL 스윕·git 실패 graceful·unborn HEAD
 - [ ] **L-29** worktree/generator: 재시드 백업·비활성화 시 dirty worktree 보호
@@ -174,3 +174,4 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 2026-08-26: CI 플레이키 원인 수정 — 골이 100ms 안에 끝나면 슈퍼바이저가 start의 첫 폴링 전에 run.json을 해제하고 exit 0 → start가 "시작 전 종료"로 오판. exit 0 + 해당 run 이벤트 존재면 성공으로 처리.
 - 2026-08-26: CodeRabbit 재지적 수용 — reclaim 잠금의 dead-holder 정리(rm→mkdir)에도 같은 레이스 → `takeoverReclaimLock`: atomic rename으로 인수 후 관측 소유자 pid 일치 시에만 삭제, 불일치면 원복.
 - 2026-08-26: CodeRabbit 전체 재리뷰 15건 — 14 수용(턴을 자기 프로세스 그룹으로 실행해 timeout/stop/턴 종료 시 손자까지 정리, spawn 동기 예외 TDZ, start 획득 실패 시 unref·exit 0 무이벤트=실패, `[BLOCKED]`/`[-]` 파싱, ledger⊂workOrders 스키마 거부, 레거시 run.sh plan 대칭, 픽스처 비어있지 않은 dir 거부, 문서/원장 정정), 1 부분 기각(blocked>0이면 complete 금지 — BLOCKED는 사람에게 넘긴 태스크라 루프가 기다리면 공회전; 파서 확장만 수용).
+- 2026-08-27: L-26 완료 (limit 판정을 exit 분기 앞으로·error도 stall 백오프·`+` 불릿 인식).

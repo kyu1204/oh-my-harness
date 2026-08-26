@@ -192,7 +192,7 @@ export async function runSupervisor(o: SupervisorOptions, deps: SupervisorDeps =
 }
 
 function isStall(kind: TurnKind): boolean {
-  return kind === "blocked" || kind === "idle";
+  return kind === "blocked" || kind === "idle" || kind === "error";
 }
 
 function readOr(file: string): string {

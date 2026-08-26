@@ -22,6 +22,11 @@ function input(over: Partial<TurnInput> = {}): TurnInput {
 
 describe("classifyTurn (table)", () => {
   const cases: Array<[string, Partial<TurnInput>, TurnKind, boolean?]> = [
+    ["usage limit with a NON-ZERO exit (the usual case) → limit, not error",
+      { status: 1, tail: "Usage limit reached. Resets at 3pm.\n" }, "limit"],
+    ["usage limit with a commit is still progress even on exit 1 → error path",
+      { status: 1, tail: "rate limit note\n", headAfter: "bbb" }, "error"],
+    ["timeout beats the limit pattern", { status: null, signal: "SIGKILL", timedOut: true, tail: "usage limit" }, "crash"],
     ["clean exit, sentinel, nothing left → complete",
       { tail: "done\nOMH_GOAL_COMPLETE\n", ledgerAfter: { unchecked: 0, checked: 2, blocked: 0 }, headAfter: "bbb" }, "complete"],
     ["crashed turn (exit 1, no output) → crash", { status: 1, tail: "   \n" }, "crash"],
@@ -65,7 +70,7 @@ describe("waitFor", () => {
     expect(waitFor("limit", 0, knobs)).toBe(1800_000);
     expect(waitFor("crash", 0, knobs)).toBe(300_000);
     expect(waitFor("progress", 0, knobs)).toBe(120_000);
-    expect(waitFor("error", 5, knobs)).toBe(120_000);
+    expect(waitFor("error", 5, knobs)).toBe(900_000);
     expect(waitFor("complete", 0, knobs)).toBe(120_000);
   });
   it("backs off on blocked/idle only once the stall streak is reached", () => {
@@ -73,5 +78,9 @@ describe("waitFor", () => {
     expect(waitFor("blocked", 3, knobs)).toBe(900_000);
     expect(waitFor("idle", 2, knobs)).toBe(120_000);
     expect(waitFor("idle", 4, knobs)).toBe(900_000);
+  });
+  it("persistent errors reach the stall backoff too — no full-pace retry forever", () => {
+    expect(waitFor("error", 2, knobs)).toBe(120_000);
+    expect(waitFor("error", 3, knobs)).toBe(900_000);
   });
 });

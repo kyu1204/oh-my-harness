@@ -49,10 +49,14 @@ export function classifyTurn(i: TurnInput): Classification {
   const none = { sentinelIgnored: false };
 
   if (i.timedOut || (i.status !== 0 && i.tail.trim() === "")) return { kind: "crash", ...none };
-  // Any non-zero exit is not a completed goal, whatever the output says.
-  if (i.status !== 0) return { kind: "error", ...none };
 
   const progress = i.headAfter !== i.headBefore || i.ledgerAfter.checked > i.ledgerBefore.checked;
+
+  // A provider limit usually arrives WITH a non-zero exit, so it is judged
+  // before the generic error branch — but never over real progress.
+  if (LIMIT.test(i.tail) && !progress) return { kind: "limit", ...none };
+  // Any non-zero exit is not a completed goal, whatever the output says.
+  if (i.status !== 0) return { kind: "error", ...none };
 
   let sentinelIgnored = false;
   if (sentinelSeen(i.tail, i.sentinel)) {
@@ -60,7 +64,6 @@ export function classifyTurn(i: TurnInput): Classification {
     sentinelIgnored = true;
   }
 
-  if (LIMIT.test(i.tail) && !progress) return { kind: "limit", sentinelIgnored };
   if (i.ledgerAfter.blocked > i.ledgerBefore.blocked && !progress) return { kind: "blocked", sentinelIgnored };
   if (progress) return { kind: "progress", sentinelIgnored };
   return { kind: "idle", sentinelIgnored };
@@ -74,6 +77,9 @@ export function waitFor(kind: TurnKind, stallStreak: number, k: WaitKnobs): numb
       return k.emptyBackoff * 1000;
     case "blocked":
     case "idle":
+    // Persistent errors must not retry at full pace forever; they share the
+    // stall backoff once the streak is reached.
+    case "error":
       return (stallStreak >= k.stallStreak ? k.blockedBackoff : k.interval) * 1000;
     default:
       return k.interval * 1000;

@@ -7,8 +7,8 @@ describe("parseLedger", () => {
   });
 
   it("counts unchecked and checked boxes with -, * and x/X markers", () => {
-    const text = ["- [ ] a", "- [x] b", "- [X] c", "* [ ] d", "not a task", "  - [ ] indented"].join("\n");
-    expect(parseLedger(text)).toEqual({ unchecked: 3, checked: 2, blocked: 0 });
+    const text = ["- [ ] a", "- [x] b", "- [X] c", "* [ ] d", "+ [ ] plus", "not a task", "  - [ ] indented"].join("\n");
+    expect(parseLedger(text)).toEqual({ unchecked: 4, checked: 2, blocked: 0 });
   });
 
   it("counts BLOCKED tasks separately and not as unchecked", () => {

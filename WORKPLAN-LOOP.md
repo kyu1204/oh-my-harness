@@ -103,7 +103,7 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - [x] **L-28** supervisor/runtime: 최종 턴그룹 KILL 스윕·git 실패 graceful·unborn HEAD
 - [x] **L-29** worktree/generator: 재시드 백업·비활성화 시 dirty worktree 보호
 - [x] **L-30** guard/schema: 셸 메타문자 금지 재도입(critical)·sentinel trim·Move to 파싱
-- [ ] **L-31** 원장·리스크 기록
+- [x] **L-31** 원장·리스크 기록
 
 ### Phase E — 문서·dogfood
 - [x] **L-14** README 갱신(트리·`omh loop` 명령·knob·POSIX 전용·시드 한계) + 이 저장소 `omh sync` dogfood + `sync --check` up to date. depends L-11, L-12.
@@ -129,6 +129,7 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 훅은 worktree의 `.omh/state`에 기록(cwd 기준) — 기존 동작, 문서화만.
 - e2e는 tsx 경유라 CI 시간 +30s.
 - 원장 파서는 `- [ ]`/`- [x]`만 인식한다. Pi(haiku-4.5)가 BLOCKED를 `- [BLOCKED] …` 형식으로 쓴 사례가 있음 — 그 줄은 unchecked/blocked 어느 쪽에도 안 잡혀 완료 판정엔 무해하지만 stall 감지에서 빠진다. 후속: 파서가 `[BLOCKED]`·`[-]` 형식도 blocked로 인식하도록 확장(작은 하드닝).
+- (감사 미검증 1건) `hooks.ts`의 ask-모드 런타임 감지가 `transcript_path` 유무에 의존 — codex가 이 필드를 싣기 시작하면 ask가 codex에서 무시돼 자동 승인될 수 있음. 루프 밖 훅 인프라 사안, 별도 이슈 후보.
 - Codex `--dangerously-bypass-hook-trust`는 프로젝트 훅을 검토 없이 실행한다 — 루프는 신뢰 환경 전제(approval/sandbox 우회와 같은 수준).
 
 ## 7. 진행 로그
@@ -179,3 +180,4 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 2026-08-27: L-28 완료 (git 실패 → failed 이벤트+정상 종료, unborn HEAD 프리플라이트 메시지, 종료 시 마지막 턴 그룹 SIGKILL 스윕 — TERM 무시 데몬까지).
 - 2026-08-27: L-29 완료 (재시드 전 worktree 원장 .pre-seed 백업, sync 비활성화 경로는 dirty worktree를 경고와 함께 보존).
 - 2026-08-27: L-30 완료 (critical: 셸 메타문자 금지 재도입 — 값이 loop-guard bash에 렌더됨; sentinel trim·개행 금지; apply_patch `Move to:` 목적지 검사).
+- 2026-08-27: L-31 완료. ultracode 감사 확정 17건 전부 수정(L-26~L-30), 기각 3건은 검증 근거 보존, 미검증 1건 §6 리스크 기록. 테스트 1219개.

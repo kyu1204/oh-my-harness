@@ -104,10 +104,10 @@ your-project/
 │   │   ├── catalog-lint-on-save.sh    # Auto-lint on save
 │   │   └── catalog-auto-pr.sh         # Auto-create PR after push
 │   ├── loop/
-│   │   └── run.sh                     # Autonomous loop runner (see Loop Engine)
+│   │   └── worktree/                  # gitignored — the loop's isolated git worktree (see Loop Engine)
 │   ├── state/                         # gitignored — log/runtime data
 │   │   ├── events.jsonl               # Unified hook event log (powers omh stats)
-│   │   ├── loop-events.jsonl          # Loop runner event stream
+│   │   ├── loop/                      # run.json (lock + identity), stop flag, runs/<id>/events.jsonl
 │   │   └── tdd-edits.json             # TDD guard working state
 │   └── manifest.json                  # Generated-files manifest
 ├── .claude/
@@ -278,8 +278,8 @@ you: "ship the remaining Phase B tasks as a loop"
         ▼  omh-loop skill (the session becomes the ARCHITECT)
   1. writes the `loop.ledger`     — default WORKPLAN.md; goal gates + task checkboxes
   2. writes `loop.workOrders`/*.md — default docs/work-orders; one exact work order per task
-  3. starts .omh/loop/run.sh      — background; with `isolate: true` (default), in its own git worktree
-  4. attaches monitoring          — tail -f .omh/state/loop-events.jsonl
+  3. runs `omh loop start`        — a detached supervisor; with `isolate: true` (default), in its own git worktree
+  4. attaches monitoring          — omh loop status, then tail -f .omh/state/loop/runs/<id>/events.jsonl
         │
         ▼  loop (fresh headless session per iteration, cheap model)
   pick next unchecked task → implement its work order exactly → run its
@@ -316,7 +316,11 @@ loop:
   model: sonnet                # cheap implementation model (always explicit)
   sentinel: OMH_GOAL_COMPLETE  # whole-line completion signal
   interval: 120                # seconds between iterations
-  blockedBackoff: 1800         # backoff after 3 consecutive BLOCKED turns
+  blockedBackoff: 1800         # backoff once stallStreak blocked/idle turns pile up
+  limitBackoff: 1800           # backoff after a provider usage limit
+  emptyBackoff: 300            # backoff after a crashed (empty-output / timed-out) turn
+  stallStreak: 3               # consecutive blocked/idle turns before blockedBackoff
+  turnTimeout: 7200            # hard per-turn timeout (seconds); the turn is killed past this
   architectOnly: []            # paths the loop must never touch (name them!)
   isolate: true                # run in .omh/loop/worktree on branch omh-loop
   runtime: claude              # claude | codex | pi
@@ -325,10 +329,23 @@ loop:
 ### Operating it
 
 ```bash
-nohup bash .omh/loop/run.sh >/dev/null 2>&1 &   # start (the skill does this for you)
-tail -f .omh/state/loop-events.jsonl             # watch progress / BLOCKED / limits
-touch .omh/state/loop.stop                       # stop after the current iteration
+omh loop start            # preflight, then a detached supervisor (the skill does this for you)
+omh loop status           # run id, pid, iteration, last event, events path
+tail -f .omh/state/loop/runs/<id>/events.jsonl   # progress / blocked / idle / limit / crash
+omh loop stop [--now]     # stop flag + SIGTERM to the whole process group (--now: 1s grace)
+omh loop clean [--branch] # remove the worktree and stale state (and optionally the omh-loop branch)
 ```
+
+The supervisor is TypeScript (`src/loop/`), not a generated script: the runtime
+is spawned from an argv array (no shell), each turn is judged by the **ledger
+diff and git HEAD** rather than by grepping output, and the run lock is a single
+`run.json` created atomically with `link(2)`. POSIX only — it relies on process
+groups and `ps` for identity checks.
+
+Known limit: the ledger is seeded into the worktree once per goal (by content
+hash). Editing the main-tree ledger mid-run does nothing until the next start,
+which then re-seeds it — add mid-run tasks as new work orders instead, and edit
+the worktree's ledger if you must.
 
 A task the loop cannot finish (needs a human, or 3 failed attempts) is marked
 `BLOCKED: <reason>` in the ledger and skipped — the loop never idles waiting

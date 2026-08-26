@@ -91,3 +91,13 @@ describe("generate / planGenerate", () => {
     expect(fs.existsSync(loopPaths(dir).stopFlag)).toBe(false);
   }, 20_000);
 });
+
+describe("legacy cleanup", () => {
+  it("removes a run.sh left behind by the old generated runner on sync", async () => {
+    const legacy = path.join(dir, ".omh", "loop", "run.sh");
+    fs.mkdirSync(path.dirname(legacy), { recursive: true });
+    fs.writeFileSync(legacy, "#!/bin/bash\n");
+    await generate({ projectDir: dir, config: await merged({}) });
+    expect(fs.existsSync(legacy)).toBe(false);
+  });
+});

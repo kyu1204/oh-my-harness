@@ -57,6 +57,10 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   // Loop-engine assets (runner, and later the skill/monitor/templates). Emitted
   // through the same compute function as the plan path so drift detection sees
   // them; skipped entirely when the loop engine is not configured.
+  // Migration: versions before the TypeScript supervisor generated a shell
+  // runner here. It is no longer a managed asset, so remove it explicitly.
+  await fs.rm(path.join(projectDir, OMH_DIR, "loop", "run.sh"), { force: true });
+
   const loopAssets = await computeLoopAssets({ projectDir, config });
   for (const asset of loopAssets) {
     atomicWrite(asset.path, asset.content, asset.chmod);

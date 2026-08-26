@@ -87,7 +87,7 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - [x] **L-13** e2e `loop-e2e.test.ts`(SLOW=30s) — `node_modules/.bin/tsx bin/oh-my-harness.ts loop start` + stub `claude`(체크 후 sentinel): run.json 출현·start 즉시 반환·`stop`으로 그룹 소멸·`complete` 이벤트; 긴 턴(`sleep 30`) 중 stop → 15s 내 소멸. depends L-12.
 
 ### Phase E — 문서·dogfood
-- [ ] **L-14** README 갱신(트리·`omh loop` 명령·knob·POSIX 전용·시드 한계) + 이 저장소 `omh sync` dogfood + `sync --check` up to date. depends L-11, L-12.
+- [x] **L-14** README 갱신(트리·`omh loop` 명령·knob·POSIX 전용·시드 한계) + 이 저장소 `omh sync` dogfood + `sync --check` up to date. depends L-11, L-12.
 
 ### Phase F — 실 QA (tmux, 실제 런타임; **아키텍트 실행** — 인증·토큰 비용이 드는 사용자 환경 작업이라 루프 금지 영역)
 공통 픽스처 `L-15`가 만들고, 런타임별로 같은 시나리오를 돌린다. 모니터는 wiki 규칙대로 **기동 직후** 2개 부착(이벤트 `tail -F` + `.git/logs/HEAD` reflog tail) 후 empty commit으로 발화 테스트.
@@ -125,3 +125,4 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 2026-08-26: L-11 완료 (생성 셸 러너·stopRunningLoop 삭제, 자산=SKILL.md만, disable/uninstall이 stopLoop+worktree 해제; 매트릭스 케이스 10 활성, 구 러너 테스트 파일 삭제).
 - 2026-08-26: L-12 CLI 완료 (start 프리플라이트 6종·detached spawn·run.json 대기 후 unref, run/stop/status/clean; 테스트 12).
 - 2026-08-26: L-13 e2e 완료 (tsx 실 CLI: start 즉시 반환·detached 완주·run.json 해제, stop --now 그룹 소멸, 2중 start 거부; 전체 2회 녹색).
+- 2026-08-26: L-14 완료 (README: omh loop 명령·knob 4개·POSIX·시드 한계·트리; dogfood sync up to date. 발견: 구버전 run.sh 잔존 → sync 마이그레이션으로 제거).

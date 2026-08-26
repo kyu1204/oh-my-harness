@@ -13,6 +13,7 @@ import { harnessToMergedConfigV2 } from "../../src/core/harness-converter-v2.js"
 async function runGuard(opts: {
   filePath?: string;
   command?: string;
+  toolName?: string;
   env?: Record<string, string>;
   params?: Record<string, unknown>;
 }): Promise<string> {
@@ -26,6 +27,7 @@ async function runGuard(opts: {
   await fs.writeFile(script, body, "utf-8");
   return execFileSync("bash", [script], {
     input: JSON.stringify({
+      ...(opts.toolName ? { tool_name: opts.toolName } : {}),
       tool_input: opts.command !== undefined ? { command: opts.command } : { file_path: opts.filePath },
     }),
     env: { ...process.env, ...opts.env },
@@ -168,6 +170,43 @@ describe("loop-guard ERE safety (round 6)", () => {
       });
       expect(out).toContain("DECISION:block");
     }
+  });
+});
+
+describe("loop-guard Codex apply_patch payloads (L-19)", () => {
+  const patch = (header: string, eol = "\n") =>
+    ["*** Begin Patch", header, "@@", "-scratch", "+scratch", "+edited", "*** End Patch"].join(eol);
+
+  it("blocks an apply_patch that updates an architect-only file", async () => {
+    const out = await runGuard({
+      toolName: "apply_patch", command: patch("*** Update File: PROTECTED.md"),
+      env: { OMH_LOOP: "1" }, params: { architectOnly: ["PROTECTED.md"] },
+    });
+    expect(out).toContain("DECISION:block");
+  });
+
+  it("blocks an apply_patch that adds a work order", async () => {
+    const out = await runGuard({
+      toolName: "apply_patch", command: patch("*** Add File: docs/work-orders/T-9.md"), env: { OMH_LOOP: "1" },
+    });
+    expect(out).toContain("DECISION:block");
+  });
+
+  it("allows an apply_patch on an ordinary source file even if the patch text mentions tee or BLOCKED:", async () => {
+    const out = await runGuard({
+      toolName: "apply_patch",
+      command: patch("*** Update File: src/app.ts") + "\n+// tee docs/work-orders BLOCKED: nothing",
+      env: { OMH_LOOP: "1" },
+    });
+    expect(out).not.toContain("DECISION:block");
+  });
+
+  it("handles CRLF patch headers", async () => {
+    const out = await runGuard({
+      toolName: "apply_patch", command: patch("*** Update File: PROTECTED.md", "\r\n"),
+      env: { OMH_LOOP: "1" }, params: { architectOnly: ["PROTECTED.md"] },
+    });
+    expect(out).toContain("DECISION:block");
   });
 });
 

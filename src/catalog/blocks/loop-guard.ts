@@ -39,9 +39,23 @@ INPUT=$(cat)
 # Architect sessions pass through untouched; only the runner exports this.
 [[ "\${OMH_LOOP:-}" != "1" ]] && exit 0
 
+TOOL_NAME=$(echo "\$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 FILE_PATH=$(echo "\$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null)
 COMMAND=$(echo "\$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
-[[ -z "\$FILE_PATH" && -z "\$COMMAND" ]] && exit 0
+
+# Codex apply_patch ships the whole patch in tool_input.command and names the
+# files in "*** {Add|Update|Delete} File: <path>" headers. Collect those
+# paths and treat them like file_path; the Bash write heuristic must NOT run
+# over patch text (it would fire on words inside the diff).
+PATCH_PATHS=()
+if [[ "\$TOOL_NAME" == "apply_patch" && -n "\$COMMAND" ]]; then
+  while IFS= read -r _p; do
+    _p="\${_p%$'\\r'}"
+    [[ -n "\$_p" ]] && PATCH_PATHS+=("\$_p")
+  done < <(printf '%s\\n' "\$COMMAND" | sed -nE 's/^\\*\\*\\* (Add|Update|Delete) File: (.+)$/\\2/p')
+  COMMAND=""
+fi
+[[ -z "\$FILE_PATH" && -z "\$COMMAND" && \${#PATCH_PATHS[@]} -eq 0 ]] && exit 0
 
 # Component-boundary matching: wrap both sides in slashes so 'ios' matches
 # ios/App.swift and /repo/ios/... but never src/kiosk.ts.
@@ -74,8 +88,18 @@ _omh_bash_writes_to() {
     && echo "\$cmd" | grep -qE '>|(^|[^[:alnum:]_])'"\$WRITE_OPS"'[[:space:]]' 
 }
 
+# Any path a tool call names: the direct file_path plus apply_patch headers.
+_omh_any_path_under() {
+  local prefix="\$1" f
+  [[ -n "\$FILE_PATH" ]] && _omh_path_under "\$FILE_PATH" "\$prefix" && return 0
+  for f in "\${PATCH_PATHS[@]+"\${PATCH_PATHS[@]}"}"; do
+    _omh_path_under "\$f" "\$prefix" && return 0
+  done
+  return 1
+}
+
 WORK_ORDERS='{{{workOrders}}}'
-if _omh_path_under "\$FILE_PATH" "\$WORK_ORDERS" || _omh_bash_writes_to "\$COMMAND" "\$WORK_ORDERS"; then
+if _omh_any_path_under "\$WORK_ORDERS" || _omh_bash_writes_to "\$COMMAND" "\$WORK_ORDERS"; then
   REASON="oh-my-harness: loop-guard — the loop must not write its own work orders. Mark the task 'BLOCKED: no work order' and move on; the architect writes work orders."
   _log_event "block" "\$REASON"
   _emit_decision "block" "\$REASON"
@@ -85,7 +109,7 @@ fi
 ARCHITECT_ONLY=({{#each architectOnly}}"{{{this}}}" {{/each}})
 for prefix in "\${ARCHITECT_ONLY[@]+"\${ARCHITECT_ONLY[@]}"}"; do
   [[ -z "\$prefix" ]] && continue
-  if _omh_path_under "\$FILE_PATH" "\$prefix" || _omh_bash_writes_to "\$COMMAND" "\$prefix"; then
+  if _omh_any_path_under "\$prefix" || _omh_bash_writes_to "\$COMMAND" "\$prefix"; then
     REASON="oh-my-harness: loop-guard — \$prefix is architect-only. Mark the task 'BLOCKED: architect-only path' and move on."
     _log_event "block" "\$REASON"
     _emit_decision "block" "\$REASON"

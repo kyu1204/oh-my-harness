@@ -288,7 +288,7 @@ you: "ship the remaining Phase B tasks as a loop"
 
 The design follows a battle-tested pattern from real autonomous runs: state
 lives in **files** (ledger + git log), never in a conversation. Each iteration
-is a fresh headless session (`claude -p` / `codex exec` / `pi --print --no-session`)
+is a fresh headless session (`claude -p` / `codex exec --dangerously-bypass-hook-trust` / `pi --print --no-session`)
 on an explicit cheap model, so token use stays flat.
 
 ### Why it doesn't fall over

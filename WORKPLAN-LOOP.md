@@ -87,8 +87,8 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - [x] **L-13** e2e `loop-e2e.test.ts`(SLOW=30s) — `node_modules/.bin/tsx bin/oh-my-harness.ts loop start` + stub `claude`(체크 후 sentinel): run.json 출현·start 즉시 반환·`stop`으로 그룹 소멸·`complete` 이벤트; 긴 턴(`sleep 30`) 중 stop → 15s 내 소멸. depends L-12.
 
 ### Phase D' — 실 QA(Codex)에서 발견된 결함 (2026-08-26 추가)
-- [ ] **L-19** loop-guard: Codex `apply_patch` 페이로드(`*** Update File:` 헤더) 파싱·차단 — 실 QA에서 PROTECTED.md 편집이 통과함.
-- [ ] **L-20** Codex argv에 `--dangerously-bypass-hook-trust` — trust 미저장 프로젝트 훅은 조용히 무시됨.
+- [x] **L-19** loop-guard: Codex `apply_patch` 페이로드(`*** Update File:` 헤더) 파싱·차단 — 실 QA에서 PROTECTED.md 편집이 통과함.
+- [x] **L-20** Codex argv에 `--dangerously-bypass-hook-trust` — trust 미저장 프로젝트 훅은 조용히 무시됨.
 - [ ] **L-21** 종료 시 프로세스 그룹 잔존자 정리 — Codex가 남긴 데몬으로 pgid가 살아남음. depends L-20.
 
 ### Phase E — 문서·dogfood
@@ -143,3 +143,4 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
   - 실패 ④: 고립 프로브에서 `apply_patch`로 PROTECTED.md 편집 통과. 원인 2단: (a) Codex는 trust 미저장 프로젝트 훅을 실행하지 않음(`--dangerously-bypass-hook-trust` 필요) (b) 우회 시 훅은 돌지만 loop-guard가 apply_patch 페이로드를 파싱 못해 allow.
   - 실패 ⑤ 부분: 완료 후 pgid 38499에 Codex의 `SkyComputerUseClient` 데몬 잔존.
   - 조치: L-19·L-20·L-21 신설 → 수정 후 L-17 재실행.
+- 2026-08-26: L-19 완료 (apply_patch 헤더 경로 추출·차단, 패치 본문엔 Bash 휴리스틱 미적용; 테스트 4). L-20 완료 (codex argv에 --dangerously-bypass-hook-trust).

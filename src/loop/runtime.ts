@@ -15,7 +15,14 @@ export type LoopRuntime = "claude" | "codex" | "pi";
 export function buildTurnArgv(runtime: LoopRuntime, model: string, prompt: string): string[] {
   switch (runtime) {
     case "codex":
-      return ["codex", "exec", "--model", model, "--dangerously-bypass-approvals-and-sandbox", prompt];
+      // Codex silently skips project hooks whose trust has not been persisted;
+      // an unattended loop cannot answer that prompt, and without the hooks
+      // loop-guard never fires.
+      return [
+        "codex", "exec", "--model", model,
+        "--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust",
+        prompt,
+      ];
     case "pi":
       return ["pi", "--print", "--no-session", "--model", model, prompt];
     case "claude":

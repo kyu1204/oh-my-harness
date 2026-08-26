@@ -23,7 +23,9 @@ describe("buildTurnArgv", () => {
       "claude", "--model", "sonnet", "--dangerously-skip-permissions", "-p", "P",
     ]);
     expect(buildTurnArgv("codex", "gpt-5.5-mini", "P")).toEqual([
-      "codex", "exec", "--model", "gpt-5.5-mini", "--dangerously-bypass-approvals-and-sandbox", "P",
+      // Codex skips untrusted project hooks unless trust is bypassed; an
+      // unattended loop cannot answer a trust prompt.
+      "codex", "exec", "--model", "gpt-5.5-mini", "--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", "P",
     ]);
     expect(buildTurnArgv("pi", "google/gemini-2.5-flash", "P")).toEqual([
       "pi", "--print", "--no-session", "--model", "google/gemini-2.5-flash", "P",

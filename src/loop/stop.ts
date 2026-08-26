@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import { loopPaths, readRun, isRunLive } from "./state.js";
 
 /**
@@ -55,4 +56,35 @@ export async function stopLoop(projectDir: string, opts: StopOptions = {}): Prom
   }
   // Stale, refused (pid reuse), or now stopped: the run record is done either way.
   fs.rmSync(p.runJson, { force: true });
+}
+
+/** True when `pid` leads its own process group (a detached supervisor does). */
+export function isGroupLeader(pid = process.pid): boolean {
+  try {
+    const pgid = Number(execFileSync("ps", ["-o", "pgid=", "-p", String(pid)], { encoding: "utf-8" }).trim());
+    return pgid === pid;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Signal every other member of our own process group. A runtime turn can
+ * leave daemons behind (codex parks a computer-use helper there); the
+ * supervisor sweeps them on its way out so the group really is gone when
+ * `omh loop stop`/`status` look. Only a group leader may do this — in any
+ * other process (a test worker, an interactive shell) the group is not ours.
+ */
+export function sweepOwnGroup(): void {
+  if (!isGroupLeader()) return;
+  const ignore = () => undefined;
+  process.on("SIGTERM", ignore);
+  try {
+    process.kill(-process.pid, "SIGTERM");
+  } catch {
+    // nothing else in the group
+  } finally {
+    // Give the signal a tick to be delivered to us before removing the guard.
+    setTimeout(() => process.off("SIGTERM", ignore), 100).unref();
+  }
 }

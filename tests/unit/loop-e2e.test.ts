@@ -73,8 +73,11 @@ beforeEach(() => {
 describe("omh loop e2e", () => {
   it("start returns at once, the detached supervisor completes the goal, run.json is released", async () => {
     // The stub agent ticks the task, commits, and prints the sentinel.
+    // The stub also leaves a straggler behind in the process group, the way
+    // codex leaves its computer-use daemon; the supervisor must sweep it.
     stubClaude(`
       cd "$PWD"
+      nohup sleep 300 >/dev/null 2>&1 &
       sed -i '' 's/- \\[ \\] T-1/- [x] T-1/' WORKPLAN.md 2>/dev/null || sed -i 's/- \\[ \\] T-1/- [x] T-1/' WORKPLAN.md
       git add -A && git commit -qm "done T-1"
       echo "OMH_GOAL_COMPLETE"`);
@@ -89,6 +92,8 @@ describe("omh loop e2e", () => {
     expect(done, JSON.stringify(readEvents(dir, runId))).toBe(true);
     expect(await waitFor(() => readRun(dir) === null, 5000)).toBe(true);
     expect(sh(["log", "--oneline"])).toContain("done T-1");
+    const pid = Number(/pid (\d+)/.exec(r.stdout)![1]);
+    expect(await waitFor(() => !groupAlive(pid), 5000), "straggler left the group alive").toBe(true);
   }, SLOW);
 
   it("stop --now takes a long-running turn's process group down", async () => {

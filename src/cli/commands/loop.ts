@@ -8,7 +8,7 @@ import { HarnessConfigSchema } from "../../core/harness-schema.js";
 import type { LoopConfig } from "../../core/merged-config.js";
 import { loopPaths, readRun, isRunLive, pruneRuns, runDir, readEvents } from "../../loop/state.js";
 import type { LivenessDeps } from "../../loop/state.js";
-import { stopLoop } from "../../loop/stop.js";
+import { stopLoop, sweepOwnGroup } from "../../loop/stop.js";
 import { runSupervisor } from "../../loop/supervisor.js";
 import type { SupervisorExit } from "../../loop/supervisor.js";
 import { currentBranch, git, removeWorktree, WorktreeError } from "../../loop/worktree.js";
@@ -161,6 +161,7 @@ export interface LoopRunOptions {
   projectDir?: string;
   runId: string;
   supervisorImpl?: (o: { projectDir: string; cfg: LoopConfig; runId: string }) => Promise<SupervisorExit>;
+  sweepImpl?: () => void;
 }
 
 export async function loopRunCommand(options: LoopRunOptions): Promise<LoopResult> {
@@ -169,6 +170,8 @@ export async function loopRunCommand(options: LoopRunOptions): Promise<LoopResul
   if (isResult(cfg)) return cfg;
   const run = options.supervisorImpl ?? ((o) => runSupervisor(o));
   const exit = await run({ projectDir, cfg, runId: options.runId });
+  // Whatever a turn left behind in our process group goes with us.
+  (options.sweepImpl ?? sweepOwnGroup)();
   switch (exit) {
     case "complete":
     case "stopped":

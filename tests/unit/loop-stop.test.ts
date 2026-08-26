@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
-import { stopLoop } from "../../src/loop/stop.js";
+import { stopLoop, isGroupLeader, sweepOwnGroup } from "../../src/loop/stop.js";
 import { loopPaths, readRun } from "../../src/loop/state.js";
 import type { RunInfo } from "../../src/loop/state.js";
 
@@ -66,4 +66,20 @@ describe("stopLoop", () => {
     expect(readRun(dir)).toBeNull();
     expect(fs.existsSync(loopPaths(dir).stopFlag)).toBe(true);
   }, SLOW);
+});
+
+describe("group hygiene (L-21)", () => {
+  it("isGroupLeader is false for this test process and true for a detached child", async () => {
+    expect(isGroupLeader(process.pid)).toBe(false);
+    const child = spawn("sleep", ["30"], { detached: true, stdio: "ignore" });
+    child.unref();
+    await new Promise((r) => setTimeout(r, 200));
+    expect(isGroupLeader(child.pid!)).toBe(true);
+    child.kill();
+  }, SLOW);
+
+  it("sweepOwnGroup is a no-op when this process is not a group leader", () => {
+    // If it signalled our group it would kill the vitest worker; surviving is the assertion.
+    expect(() => sweepOwnGroup()).not.toThrow();
+  });
 });

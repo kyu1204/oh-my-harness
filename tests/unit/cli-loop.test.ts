@@ -214,9 +214,12 @@ describe("omh loop status / stop / clean / run", () => {
     gitRepo();
     harness();
     ledgerAndOrders();
+    const sweepImpl = vi.fn();
     for (const [exit, code] of [["complete", 0], ["stopped", 0], ["already-running", 3], ["failed", 1]] as const) {
-      const r = await loopRunCommand({ projectDir: dir, runId: "R", supervisorImpl: async () => exit });
+      const r = await loopRunCommand({ projectDir: dir, runId: "R", supervisorImpl: async () => exit, sweepImpl });
       expect(r.exitCode).toBe(code);
     }
+    // stragglers a turn left in our process group are swept after every run
+    expect(sweepImpl).toHaveBeenCalledTimes(4);
   });
 });

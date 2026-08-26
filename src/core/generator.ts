@@ -13,7 +13,7 @@ import { computeManagedMarkdown } from "../generators/managed-md.js";
 import { computeLoopAssets, loopAssetPaths } from "../generators/loop-assets.js";
 import { atomicWrite } from "../loop/state.js";
 import { stopLoop } from "../loop/stop.js";
-import { removeWorktree } from "../loop/worktree.js";
+import { removeWorktreeIfClean } from "../loop/worktree.js";
 import { migrateLegacyState } from "../utils/state-migration.js";
 import { OMH_DIR } from "../utils/paths.js";
 
@@ -73,7 +73,10 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
     // The stop flag has served its purpose once the loop is down; a leftover
     // would otherwise just be cleared by the next start.
     await fs.rm(path.join(projectDir, OMH_DIR, "state", "loop", "stop"), { force: true });
-    await removeWorktree(projectDir).catch(() => undefined);
+    // A routine sync must never destroy uncommitted loop work. A dirty
+    // worktree stays in place with a warning; explicit destruction remains
+    // the job of `omh loop clean` and uninstall.
+    await removeWorktreeIfClean(projectDir);
     for (const stale of loopAssetPaths(projectDir)) {
       await fs.rm(stale, { recursive: true, force: true });
     }

@@ -150,3 +150,20 @@ describe("removeWorktree", () => {
     await removeWorktree(dir, { branch: true });
   }, SLOW);
 });
+
+describe("seedLedger — reseed backup (L-29a)", () => {
+  it("saves the worktree ledger aside before a new goal overwrites it", async () => {
+    const { path: wt } = await ensureWorktree(dir);
+    fs.rmSync(path.join(wt, "WORKPLAN.md"));
+    await seedLedger(dir, wt, "WORKPLAN.md");
+    // the loop makes uncommitted progress
+    fs.writeFileSync(path.join(wt, "WORKPLAN.md"), "- [x] T-1\n");
+    // architect writes a new goal → reseed must not silently destroy the ticks
+    fs.writeFileSync(path.join(dir, "WORKPLAN.md"), "- [ ] N-1\n");
+    const r = await seedLedger(dir, wt, "WORKPLAN.md");
+    expect(r.seeded).toBe(true);
+    const backups = fs.readdirSync(wt).filter((n) => n.startsWith("WORKPLAN.md.pre-seed-"));
+    expect(backups).toHaveLength(1);
+    expect(fs.readFileSync(path.join(wt, backups[0]), "utf-8")).toBe("- [x] T-1\n");
+  }, SLOW);
+});

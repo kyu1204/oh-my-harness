@@ -109,3 +109,19 @@ describe("legacy cleanup", () => {
     expect(fs.existsSync(legacy)).toBe(false);
   });
 });
+
+describe("disable protects uncommitted loop work (L-29b)", () => {
+  it("leaves a dirty worktree in place with a warning instead of force-removing it", async () => {
+    execFileSync("git", ["init", "-q", "-b", "main", dir]);
+    execFileSync("git", ["-C", dir, "config", "user.email", "t@t"]);
+    execFileSync("git", ["-C", dir, "config", "user.name", "t"]);
+    fs.writeFileSync(path.join(dir, "README.md"), "x");
+    execFileSync("git", ["-C", dir, "add", "."]);
+    execFileSync("git", ["-C", dir, "commit", "-qm", "init"]);
+    await generate({ projectDir: dir, config: await merged({ isolate: true }) });
+    const wt = (await ensureWorktree(dir)).path;
+    fs.writeFileSync(path.join(wt, "uncommitted-loop-work.ts"), "precious");
+    await generate({ projectDir: dir, config: await merged({ enabled: false }) });
+    expect(fs.existsSync(path.join(wt, "uncommitted-loop-work.ts")), "uncommitted work was destroyed").toBe(true);
+  }, 20_000);
+});

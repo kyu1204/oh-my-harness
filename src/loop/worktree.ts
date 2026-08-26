@@ -135,6 +135,12 @@ export async function seedLedger(projectDir: string, worktree: string, ledger: s
   const target = path.join(worktree, ledger);
   if (fs.existsSync(target) && previous === hash) return { seeded: false, hash };
 
+  // A reseed replaces the loop's own copy (new goal); any un-pushed ticks in
+  // it are saved aside rather than silently destroyed.
+  if (fs.existsSync(target)) {
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    fs.copyFileSync(target, `${target}.pre-seed-${stamp}`);
+  }
   atomicWrite(target, content);
   atomicWrite(p.seedJson, JSON.stringify({ ledgerHash: hash }, null, 2));
   return { seeded: true, hash };
@@ -150,5 +156,28 @@ export async function removeWorktree(projectDir: string, opts: { branch?: boolea
   await git(projectDir, ["worktree", "prune"]);
   if (opts.branch && (await branchExists(projectDir, p.branch))) {
     await git(projectDir, ["branch", "-D", p.branch]);
+  }
+}
+
+/**
+ * Remove the worktree only when it holds no uncommitted work; otherwise warn
+ * and leave it. Routine paths (sync with the loop disabled) use this;
+ * explicit destruction stays with `omh loop clean` and uninstall.
+ */
+export async function removeWorktreeIfClean(projectDir: string): Promise<void> {
+  const p = loopPaths(projectDir);
+  if (!fs.existsSync(p.worktree)) return;
+  try {
+    const status = await git(p.worktree, ["status", "--porcelain"]);
+    if (status !== "") {
+      console.warn(
+        `oh-my-harness: loop worktree at ${p.worktree} has uncommitted work — left in place; ` +
+          `commit or discard it, then run \`omh loop clean\``,
+      );
+      return;
+    }
+    await removeWorktree(projectDir);
+  } catch {
+    // an unreadable worktree is not something a routine sync should force away
   }
 }

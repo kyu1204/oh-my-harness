@@ -101,7 +101,7 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - [x] **L-26** classify/ledger: limit 순서·error 백오프·'+' 불릿
 - [x] **L-27** state/stop 동시성: updateRun 소유권·rm 재확인·stop 플래그 무조건·reclaim 원자 생성·childPid 정리+정체·고아 턴 회수 거부
 - [x] **L-28** supervisor/runtime: 최종 턴그룹 KILL 스윕·git 실패 graceful·unborn HEAD
-- [ ] **L-29** worktree/generator: 재시드 백업·비활성화 시 dirty worktree 보호
+- [x] **L-29** worktree/generator: 재시드 백업·비활성화 시 dirty worktree 보호
 - [ ] **L-30** guard/schema: 셸 메타문자 금지 재도입(critical)·sentinel trim·Move to 파싱
 - [ ] **L-31** 원장·리스크 기록
 
@@ -177,3 +177,4 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 2026-08-27: L-26 완료 (limit 판정을 exit 분기 앞으로·error도 stall 백오프·`+` 불릿 인식).
 - 2026-08-27: L-27 완료 (updateRun 소유권·stop/clean rm 스냅샷 재확인·stop 플래그 무조건 기록·reclaim 잠금 rename 원자 생성·childPid 턴 종료 시 제거+ps 정체 검증·고아 턴 잔존 시 start 거부).
 - 2026-08-27: L-28 완료 (git 실패 → failed 이벤트+정상 종료, unborn HEAD 프리플라이트 메시지, 종료 시 마지막 턴 그룹 SIGKILL 스윕 — TERM 무시 데몬까지).
+- 2026-08-27: L-29 완료 (재시드 전 worktree 원장 .pre-seed 백업, sync 비활성화 경로는 dirty worktree를 경고와 함께 보존).

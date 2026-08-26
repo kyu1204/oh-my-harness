@@ -104,7 +104,7 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
   - Q-4 `done.txt` 생성. 수용: `test -f done.txt`
   - 골 게이트: Q-1·Q-2·Q-4 체크 + Q-3 BLOCKED. `omh sync` 실행까지 포함. 검증: 스크립트 실행 후 `omh loop status`가 "no run"·프리플라이트 통과.
 - [x] **L-16** 실 QA — **Claude Code**: `tmux new -d -s omh-qa-claude 'cd <dir> && omh loop start'` → G7 ①~⑥ 확인. 통과 근거(이벤트 발췌·커밋 해시)를 §7에 기록. depends L-13, L-15.
-- [ ] **L-17** 실 QA — **Codex** (`codex exec`): 동일 시나리오 + G7 ⑦(프롬프트 에코 오판 0건) 확인. depends L-16.
+- [x] **L-17** 실 QA — **Codex** (`codex exec`): 동일 시나리오 + G7 ⑦(프롬프트 에코 오판 0건) 확인. depends L-16.
 - [ ] **L-18** 실 QA — **Pi** (`pi --print --no-session`): 동일 시나리오. Pi 브리지 익스텐션 경유 가드 차단(④) 확인이 핵심. depends L-16.
 - QA 실패 시: 해당 런타임의 결함을 §6 리스크에 기록하고 원인 태스크를 Phase C/D에 신규 `L-XX`로 추가(아키텍트가 지시서 작성) → 수정 → 해당 런타임 QA 재실행. **3런타임 전부 통과 전에는 G7 미달성.**
 
@@ -145,3 +145,6 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
   - 조치: L-19·L-20·L-21 신설 → 수정 후 L-17 재실행.
 - 2026-08-26: L-19 완료 (apply_patch 헤더 경로 추출·차단, 패치 본문엔 Bash 휴리스틱 미적용; 테스트 4). L-20 완료 (codex argv에 --dangerously-bypass-hook-trust).
 - 2026-08-26: L-21 완료 (isGroupLeader/sweepOwnGroup: 그룹 리더일 때만 종료 직전 그룹 SIGTERM; e2e에 잔존 프로세스 케이스 추가).
+- 2026-08-26: **L-17 Codex 실 QA 2차 통과** (run 20260826-144854-530e, codex 0.149.1 / gpt-5.6-sol, L-19~21 반영 빌드).
+  - ① 즉시 반환·run.json(pid 64027, child 64104) ② it1 progress ticked=1 커밋 92da5fc ③ 원장 체크 ④ 고립 프로브: 실 `codex exec --dangerously-bypass-hook-trust` + apply_patch → `catalog-loop-guard.sh decision=block`(05:49:13Z), PROTECTED.md 불변·free.md 통과; 루프 턴 로그에 `hook: SessionStart/UserPromptSubmit` — 프로젝트 훅이 턴 안에서 실행됨. 루프 내 Q-3는 모델 자기거부로 BLOCKED 표기.
+  - ⑤ it4 complete, 그룹 64027 소멸(L-21 sweep), run.json 해제 ⑥ run …-c4c7: 실 codex 자식 실행 중 `stop --now` → 0초 그룹 소멸·`stopped` ⑦ 턴 로그 `BLOCKED:` 에코 32줄, `blocked` 이벤트 0건.

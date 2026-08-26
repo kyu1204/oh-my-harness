@@ -84,7 +84,7 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - [x] **L-10** `codex-config.ts` `normalizeMatcher` 일반화 — 테스트 `codex-config-generator.test.ts` 케이스 추가(`Edit|Write|Bash` → `apply_patch` 포함). 지시서 범위 외 변경 금지.
 - [x] **L-11** `loop-assets.ts` 축소 + `generator.ts`/`uninstall.ts`/`harness-converter-v2.ts` 배선 — 테스트 `loop-assets.test.ts` 재작성(SKILL.md만, plan 대칭, disable 시 `stopLoop`+worktree 제거, run.sh 부재), `uninstall-loop.test.ts` 갱신. 삭제: `renderRunner`·`runtimeCommand`·`shellSingleQuote`·`stopRunningLoop`·`renderLoopProtocol`·`renderSkill`, `loop-runner-behavior.test.ts`. depends L-03, L-06, L-08.
 - [x] **L-12** `src/cli/commands/loop.ts` + `src/cli/index.ts` — 테스트 `cli-loop.test.ts`(mkdtemp + lazy import): 프리플라이트 에러 각각(git repo 아님·원장 없음·지시서 0·메인이 omh-loop·활성 run), win32 → exit 1, `status` 유/무, `stop` with no run → exit 0. `start`의 spawn은 D5 그대로. depends L-08.
-- [ ] **L-13** e2e `loop-e2e.test.ts`(SLOW=30s) — `node_modules/.bin/tsx bin/oh-my-harness.ts loop start` + stub `claude`(체크 후 sentinel): run.json 출현·start 즉시 반환·`stop`으로 그룹 소멸·`complete` 이벤트; 긴 턴(`sleep 30`) 중 stop → 15s 내 소멸. depends L-12.
+- [x] **L-13** e2e `loop-e2e.test.ts`(SLOW=30s) — `node_modules/.bin/tsx bin/oh-my-harness.ts loop start` + stub `claude`(체크 후 sentinel): run.json 출현·start 즉시 반환·`stop`으로 그룹 소멸·`complete` 이벤트; 긴 턴(`sleep 30`) 중 stop → 15s 내 소멸. depends L-12.
 
 ### Phase E — 문서·dogfood
 - [ ] **L-14** README 갱신(트리·`omh loop` 명령·knob·POSIX 전용·시드 한계) + 이 저장소 `omh sync` dogfood + `sync --check` up to date. depends L-11, L-12.
@@ -124,3 +124,4 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 2026-08-26: L-10 완료 (Edit/Write 포함 모든 matcher에 apply_patch 별칭 → Codex에서 loop-guard 발동).
 - 2026-08-26: L-11 완료 (생성 셸 러너·stopRunningLoop 삭제, 자산=SKILL.md만, disable/uninstall이 stopLoop+worktree 해제; 매트릭스 케이스 10 활성, 구 러너 테스트 파일 삭제).
 - 2026-08-26: L-12 CLI 완료 (start 프리플라이트 6종·detached spawn·run.json 대기 후 unref, run/stop/status/clean; 테스트 12).
+- 2026-08-26: L-13 e2e 완료 (tsx 실 CLI: start 즉시 반환·detached 완주·run.json 해제, stop --now 그룹 소멸, 2중 start 거부; 전체 2회 녹색).

@@ -86,6 +86,11 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - [x] **L-12** `src/cli/commands/loop.ts` + `src/cli/index.ts` — 테스트 `cli-loop.test.ts`(mkdtemp + lazy import): 프리플라이트 에러 각각(git repo 아님·원장 없음·지시서 0·메인이 omh-loop·활성 run), win32 → exit 1, `status` 유/무, `stop` with no run → exit 0. `start`의 spawn은 D5 그대로. depends L-08.
 - [x] **L-13** e2e `loop-e2e.test.ts`(SLOW=30s) — `node_modules/.bin/tsx bin/oh-my-harness.ts loop start` + stub `claude`(체크 후 sentinel): run.json 출현·start 즉시 반환·`stop`으로 그룹 소멸·`complete` 이벤트; 긴 턴(`sleep 30`) 중 stop → 15s 내 소멸. depends L-12.
 
+### Phase D' — 실 QA(Codex)에서 발견된 결함 (2026-08-26 추가)
+- [ ] **L-19** loop-guard: Codex `apply_patch` 페이로드(`*** Update File:` 헤더) 파싱·차단 — 실 QA에서 PROTECTED.md 편집이 통과함.
+- [ ] **L-20** Codex argv에 `--dangerously-bypass-hook-trust` — trust 미저장 프로젝트 훅은 조용히 무시됨.
+- [ ] **L-21** 종료 시 프로세스 그룹 잔존자 정리 — Codex가 남긴 데몬으로 pgid가 살아남음. depends L-20.
+
 ### Phase E — 문서·dogfood
 - [x] **L-14** README 갱신(트리·`omh loop` 명령·knob·POSIX 전용·시드 한계) + 이 저장소 `omh sync` dogfood + `sync --check` up to date. depends L-11, L-12.
 
@@ -133,3 +138,8 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
   - ⑤ it3 `complete`(ticked=1, 원장 unchecked 0·Q-3 BLOCKED), sentinel 마지막 줄, 그룹 2023 소멸, run.json 해제
   - ⑥ 별도 run 20260826-143709-d8d9: 실 claude 자식(21598) 실행 중 `stop --now` → 1초 내 그룹 소멸, `stopped` 이벤트, run.json 해제
   - 관찰(비결함): it2에서 모델이 Q-2·Q-3를 한 턴에 처리(ticked 1 + newBlocked 1 → progress 판정 정확). ⑥ 런의 it1은 모델이 sleep을 실행하지 않아 idle로 판정됨(판정 정확).
+- 2026-08-26: **L-17 Codex 실 QA 1차 — 결함 2건 발견, 미통과** (run 20260826-143839-5514, codex 0.149.1 / gpt-5.6-sol).
+  - 통과: ① 즉시 반환·run.json ② it1 progress + 커밋 49412ae ③ 원장 체크 ⑤ it4 complete·run.json 해제 ⑦ **codex는 프롬프트를 에코(턴 로그에 `BLOCKED:` 2줄)했으나 판정은 progress — 오판 0건**. 루프 내 Q-3는 모델 자기거부로 BLOCKED 표기.
+  - 실패 ④: 고립 프로브에서 `apply_patch`로 PROTECTED.md 편집 통과. 원인 2단: (a) Codex는 trust 미저장 프로젝트 훅을 실행하지 않음(`--dangerously-bypass-hook-trust` 필요) (b) 우회 시 훅은 돌지만 loop-guard가 apply_patch 페이로드를 파싱 못해 allow.
+  - 실패 ⑤ 부분: 완료 후 pgid 38499에 Codex의 `SkyComputerUseClient` 데몬 잔존.
+  - 조치: L-19·L-20·L-21 신설 → 수정 후 L-17 재실행.

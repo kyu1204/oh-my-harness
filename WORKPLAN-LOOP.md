@@ -164,3 +164,4 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 2026-08-26: PR 체크 — CI Node20 실패(fixture 테스트, dist 부재) + CodeRabbit 미해결 3건(명시적 loop-guard 파라미터·uninstall 계획 부작용·stale 회수 레이스 — 마지막은 bash 코드 대상이었으나 새 acquireRun에도 같은 창이 있어 수용). L-22~L-25 신설.
 - 2026-08-26: L-22~L-25 완료 (픽스처 tsx 폴백·명시적 loop-guard 경로 강제·uninstall 부작용을 적용 단계로·reclaimStaleRun 회수 잠금+관측 재검증). 전체 테스트 2회 녹색.
 - 2026-08-26: CI 플레이키 원인 수정 — 골이 100ms 안에 끝나면 슈퍼바이저가 start의 첫 폴링 전에 run.json을 해제하고 exit 0 → start가 "시작 전 종료"로 오판. exit 0 + 해당 run 이벤트 존재면 성공으로 처리.
+- 2026-08-26: CodeRabbit 재지적 수용 — reclaim 잠금의 dead-holder 정리(rm→mkdir)에도 같은 레이스 → `takeoverReclaimLock`: atomic rename으로 인수 후 관측 소유자 pid 일치 시에만 삭제, 불일치면 원복.

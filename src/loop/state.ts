@@ -167,10 +167,10 @@ export function reclaimStaleRun(projectDir: string, observed: RunInfo): boolean 
     try {
       holder = Number(fs.readFileSync(pidFile, "utf-8"));
     } catch {
-      // half-written lock; treat as dead
+      // half-written lock; treat as dead (holder stays NaN)
     }
     if (Number.isFinite(holder) && pidAlive(holder)) return false;
-    fs.rmSync(lock, { recursive: true, force: true });
+    if (!takeoverReclaimLock(lock, holder)) return false;
     if (!takeLock()) return false;
   }
   try {
@@ -183,6 +183,40 @@ export function reclaimStaleRun(projectDir: string, observed: RunInfo): boolean 
   } finally {
     fs.rmSync(lock, { recursive: true, force: true });
   }
+}
+
+/**
+ * Remove a reclaim lock left by a dead reclaimer — atomically. rm+mkdir would
+ * let two cleaners race and one delete the other's fresh lock, so the dead
+ * lock is first renamed to a private name (only one renamer succeeds), then
+ * its recorded holder is checked against what we observed; a mismatch means
+ * a live reclaimer took it meanwhile, and it is put back untouched.
+ */
+export function takeoverReclaimLock(lock: string, observedHolder: number): boolean {
+  const mine = `${lock}.stale-${process.pid}`;
+  try {
+    fs.renameSync(lock, mine);
+  } catch {
+    return false; // already taken over by someone else, or gone
+  }
+  let holder = NaN;
+  try {
+    holder = Number(fs.readFileSync(path.join(mine, "pid"), "utf-8"));
+  } catch {
+    // unreadable: treat as the half-written lock we observed
+  }
+  const sameHolder = (Number.isNaN(holder) && Number.isNaN(observedHolder)) || holder === observedHolder;
+  if (!sameHolder) {
+    // Not the dead lock we judged — a fresh reclaimer's. Give it back.
+    try {
+      fs.renameSync(mine, lock);
+    } catch {
+      fs.rmSync(mine, { recursive: true, force: true });
+    }
+    return false;
+  }
+  fs.rmSync(mine, { recursive: true, force: true });
+  return true;
 }
 
 export function updateRun(projectDir: string, patch: Partial<RunInfo>): void {

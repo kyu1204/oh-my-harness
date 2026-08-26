@@ -16,6 +16,7 @@ import {
   pruneRuns,
   atomicWrite,
   reclaimStaleRun,
+  takeoverReclaimLock,
 } from "../../src/loop/state.js";
 import type { RunInfo } from "../../src/loop/state.js";
 
@@ -173,5 +174,32 @@ describe("reclaimStaleRun (L-25)", () => {
     fs.writeFileSync(p.runJson, JSON.stringify(stale()));
     expect(acquireRun(dir, info({ runId: "NEW" }), { psArgs: () => "omh loop run --run-id NEW" })).toBe(true);
     expect(readRun(dir)?.runId).toBe("NEW");
+  });
+});
+
+describe("takeoverReclaimLock — dead reclaimer cleanup is itself atomic", () => {
+  it("takes over a reclaim lock only if it still belongs to the dead holder that was observed", () => {
+    const lock = path.join(dir, "run.json.reclaim");
+    fs.mkdirSync(lock);
+    fs.writeFileSync(path.join(lock, "pid"), "999999");
+    // observed holder matches → we own it and it is gone
+    expect(takeoverReclaimLock(lock, 999999)).toBe(true);
+    expect(fs.existsSync(lock)).toBe(false);
+  });
+
+  it("refuses — and restores — a lock that a fresh reclaimer installed after we judged the old one dead", () => {
+    const lock = path.join(dir, "run.json.reclaim");
+    fs.mkdirSync(lock);
+    fs.writeFileSync(path.join(lock, "pid"), String(process.pid)); // someone alive took it meanwhile
+    expect(takeoverReclaimLock(lock, 999999)).toBe(false);
+    expect(fs.existsSync(lock)).toBe(true);
+    expect(fs.readFileSync(path.join(lock, "pid"), "utf-8")).toBe(String(process.pid));
+    expect(fs.readdirSync(dir).filter((n) => n.includes(".stale-"))).toEqual([]);
+  });
+
+  it("loses cleanly when another reclaimer already moved the dead lock away", () => {
+    const lock = path.join(dir, "run.json.reclaim");
+    // nothing there: the rename that would claim it must fail, not throw
+    expect(takeoverReclaimLock(lock, 999999)).toBe(false);
   });
 });

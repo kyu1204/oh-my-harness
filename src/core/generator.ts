@@ -57,8 +57,12 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   const loopAssets = await computeLoopAssets({ projectDir, config });
   for (const asset of loopAssets) {
     await fs.mkdir(path.dirname(asset.path), { recursive: true });
-    await fs.writeFile(asset.path, asset.content, "utf-8");
-    if (asset.chmod !== undefined) await fs.chmod(asset.path, asset.chmod);
+    // A live runner reads run.sh by offset; truncating it in place would make
+    // bash parse the new bytes mid-script. rename swaps the inode instead.
+    const tmp = `${asset.path}.tmp-${process.pid}`;
+    await fs.writeFile(tmp, asset.content, "utf-8");
+    if (asset.chmod !== undefined) await fs.chmod(tmp, asset.chmod);
+    await fs.rename(tmp, asset.path);
     files.push(asset.path);
   }
   if (!config.loop) {

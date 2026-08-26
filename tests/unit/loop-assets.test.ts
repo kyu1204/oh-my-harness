@@ -361,3 +361,19 @@ describe("CodeRabbit round-4 fixes", () => {
     expect(loopBody).not.toContain('cp "$PROJECT_ROOT/$OMH_LOOP_LEDGER"');
   });
 });
+
+describe("round eight: atomic runner replacement", () => {
+  it("replaces run.sh via rename so a live bash keeps its old inode", async () => {
+    const { generate } = await import("../../src/core/generator.js");
+    const os = await import("node:os");
+    const fs = await import("node:fs/promises");
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omh-inode-"));
+    await generate({ projectDir: dir, config: baseConfig(LOOP) });
+    const runner = path.join(dir, ".omh", "loop", "run.sh");
+    const before = (await fs.stat(runner)).ino;
+    await generate({ projectDir: dir, config: baseConfig(LOOP) });
+    const after = (await fs.stat(runner)).ino;
+    expect(after).not.toBe(before);
+    expect((await fs.stat(runner)).mode & 0o111).toBeTruthy();
+  });
+});

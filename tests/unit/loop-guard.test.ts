@@ -217,6 +217,20 @@ describe("loop-guard wiring", () => {
     expect(merged.hooks.preToolUse.some((h) => h.id === "catalog-loop-guard")).toBe(true);
   });
 
+  it("an explicit loop-guard entry cannot lose the loop's paths (L-23)", async () => {
+    const harness = HarnessConfigSchema.parse({
+      version: "1.0",
+      loop: { workOrders: "orders", architectOnly: ["ios/App"] },
+      hooks: [{ block: "loop-guard", params: {}, mode: "ask" }],
+    });
+    const merged = await harnessToMergedConfigV2(harness);
+    const guards = merged.hooks.preToolUse.filter((h) => h.id.startsWith("catalog-loop-guard"));
+    expect(guards).toHaveLength(1);
+    expect(guards[0].inline).toContain("WORK_ORDERS='orders'");
+    expect(guards[0].inline).toContain('"ios/App"');
+    expect(guards[0].mode).toBe("ask");
+  });
+
   it("is absent when the loop engine is off", async () => {
     const harness = HarnessConfigSchema.parse({ version: "1.0", loop: { enabled: false } });
     const merged = await harnessToMergedConfigV2(harness);

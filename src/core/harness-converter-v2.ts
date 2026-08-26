@@ -89,13 +89,18 @@ export async function harnessToMergedConfigV2(
   // Merge enforcement-derived hooks with explicit hooks (dedup by block id)
   const allHookEntries = mergeEnforcementAndHooks(harness);
 
-  // The loop engine brings its guard along; explicit config wins on conflict.
-  if (harness.loop?.enabled && !allHookEntries.some((h) => h.block === "loop-guard")) {
-    allHookEntries.push({
-      block: "loop-guard",
-      params: { workOrders: harness.loop.workOrders, architectOnly: harness.loop.architectOnly },
-      mode: "block",
-    });
+  // The loop engine brings its guard along. An explicit loop-guard entry may
+  // choose its mode, but the paths it protects always come from the loop
+  // config — otherwise an empty explicit entry would silently unguard the
+  // real work-order directory.
+  if (harness.loop?.enabled) {
+    const loopParams = { workOrders: harness.loop.workOrders, architectOnly: harness.loop.architectOnly };
+    const explicit = allHookEntries.find((h) => h.block === "loop-guard");
+    if (explicit) {
+      explicit.params = { ...explicit.params, ...loopParams };
+    } else {
+      allHookEntries.push({ block: "loop-guard", params: loopParams, mode: "block" });
+    }
   }
 
   // If no hook entries at all, return base config unchanged

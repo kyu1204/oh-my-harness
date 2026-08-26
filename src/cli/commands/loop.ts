@@ -137,6 +137,15 @@ export async function loopStartCommand(options: LoopStartOptions = {}): Promise<
   });
   fs.closeSync(logFd);
 
+  // A very fast goal can run to completion — and release run.json — before
+  // our first poll ever sees the record. Exit 0 plus events for this run id
+  // is a finished loop, not a failed start.
+  if (acquired === 0 && readEvents(projectDir, runId).length > 0) {
+    const last = readEvents(projectDir, runId).at(-1);
+    console.log(chalk.green(`omh loop: started run ${runId} — it already finished (${last?.kind ?? "done"})`));
+    console.log(`  events: ${path.join(dir, "events.jsonl")}`);
+    return { exitCode: 0 };
+  }
   if (acquired !== "acquired") {
     console.error(
       chalk.red(

@@ -37,7 +37,7 @@ function ledgerAndOrders(): void {
 }
 
 /** A fake detached supervisor: writes run.json for the run id it was given, or exits. */
-function fakeSpawn(behaviour: "runs" | "exits3" | "never"): SpawnLike & { calls: string[][]; unrefs: number } {
+function fakeSpawn(behaviour: "runs" | "exits3" | "never" | "finishes"): SpawnLike & { calls: string[][]; unrefs: number } {
   const spy = Object.assign(
     (_cmd: string, args: string[]): ChildLike => {
       spy.calls.push(args);
@@ -54,6 +54,15 @@ function fakeSpawn(behaviour: "runs" | "exits3" | "never"): SpawnLike & { calls:
         } else if (behaviour === "exits3") {
           child.exitCode = 3;
           child.emit("exit", 3);
+        } else if (behaviour === "finishes") {
+          // a very fast goal: the supervisor ran, completed, released run.json
+          // and exited 0 before start ever saw the record
+          const p = loopPaths(dir);
+          fs.mkdirSync(path.join(p.runsDir, runId), { recursive: true });
+          fs.writeFileSync(path.join(p.runsDir, runId, "events.jsonl"),
+            JSON.stringify({ ts: "t", runId, kind: "start" }) + "\n" + JSON.stringify({ ts: "t", runId, kind: "complete" }) + "\n");
+          child.exitCode = 0;
+          child.emit("exit", 0);
         }
       }, 50);
       return child;
@@ -156,6 +165,18 @@ describe("omh loop start — launch", () => {
     expect(fs.existsSync(p.stopFlag)).toBe(false);
     expect(logs.join("\n")).toMatch(/omh loop status/);
     expect(readRun(dir)?.runId).toBe(args[args.indexOf("--run-id") + 1]);
+  });
+
+  it("treats a supervisor that finished the goal before start saw run.json as success", async () => {
+    const { loopStartCommand } = await import("../../src/cli/commands/loop.js");
+    gitRepo();
+    harness();
+    ledgerAndOrders();
+    const r = await loopStartCommand({ projectDir: dir, spawnImpl: fakeSpawn("finishes") });
+    expect(r.exitCode).toBe(0);
+    expect(logs.join("\n")).toMatch(/started run/);
+    expect(logs.join("\n")).toMatch(/complete/);
+    expect(errors).toEqual([]);
   });
 
   it("surfaces the child's exit code when it dies before acquiring the run", async () => {

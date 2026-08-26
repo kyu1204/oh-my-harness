@@ -71,7 +71,7 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - [x] **L-03** `protocol.ts` — 테스트 `loop-protocol.test.ts`: 세 렌더러가 `LOOP_RULES` 모든 줄 포함, 스킬이 `omh loop start`·`tail -f .omh/state/loop/runs/` 안내, architectOnly 이름 그대로 노출, **프롬프트에 `BLOCKED:` 리터럴이 있어도 판정과 무관함을 주석으로 명시**(D6).
 
 ### Phase B — I/O 모듈
-- [ ] **L-04** `state.ts` — 테스트 `loop-state.test.ts`: acquire 2회→두 번째 false; 죽은 pid 회수; ps argv 불일치 회수(현재 프로세스 pid를 다른 run-id로 기록); 소유자만 release; 이벤트 append/read; prune 5; `atomicWrite` inode 교체. depends 없음.
+- [x] **L-04** `state.ts` — 테스트 `loop-state.test.ts`: acquire 2회→두 번째 false; 죽은 pid 회수; ps argv 불일치 회수(현재 프로세스 pid를 다른 run-id로 기록); 소유자만 release; 이벤트 append/read; prune 5; `atomicWrite` inode 교체. depends 없음.
 - [ ] **L-05** `runtime.ts` — 테스트 `loop-runtime.test.ts`: 런타임별 argv(claude `--model M --dangerously-skip-permissions -p P`, codex `exec --model M --dangerously-bypass-approvals-and-sandbox P`, pi `--print --no-session --model M P`); stub 스크립트 → status/tail/로그 파일; timeout kill→signal; `trap '' TERM` stub + `shouldStop` → SIGTERM→SIGKILL 에스컬레이션(유예 200ms 주입).
 - [ ] **L-06** `worktree.ts` — 테스트 `loop-worktree.test.ts`(temp git repo): add; 기존 브랜치 재사용 이벤트; 미등록 비어있지 않은 dir→`WorktreeError`; 메인이 omh-loop→에러; 미커밋 자산 복사(.claude/.codex/.pi/.omh/hooks/work-orders/CLAUDE.md/AGENTS.md/harness.yaml); 시드 첫/새 해시/같은 해시; dirty tree `--force --force` 해제; `--branch`. depends L-01, L-04. 역검증 필수.
 
@@ -116,3 +116,4 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 2026-08-26: L-01 ledger.ts 완료 (테스트 6, 체크박스 라인만 BLOCKED 집계).
 - 2026-08-26: L-02 classify.ts 완료 (테이블 18케이스, 역검증: limit의 !progress 제거 시 해당 케이스만 실패 확인 후 원복).
 - 2026-08-26: L-03 protocol.ts 완료 (규칙 8개 단일 소스, 프롬프트·섹션·스킬 3렌더러 일치 테스트).
+- 2026-08-26: L-04 state.ts 완료 (run.json link 잠금·stale 회수·정체 검증·이벤트·prune·atomicWrite, 테스트 10).

@@ -22,6 +22,13 @@ describe("parseLedger", () => {
   });
 });
 
+describe("parseLedger — non-standard BLOCKED forms", () => {
+  it("counts [BLOCKED] and [-] boxes as blocked, not as unchecked", () => {
+    const text = ["- [BLOCKED] a needs a human", "- [-] b skipped", "- [ ] c"].join("\n");
+    expect(parseLedger(text)).toEqual({ unchecked: 1, checked: 0, blocked: 2 });
+  });
+});
+
 describe("hashLedger", () => {
   it("is deterministic, 64 hex chars, and sensitive to a single character", () => {
     const a = hashLedger("- [ ] a");

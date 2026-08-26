@@ -99,6 +99,13 @@ describe("supervisor knobs (L-07)", () => {
   });
 });
 
+describe("ledger must not live inside workOrders (round 9)", () => {
+  it("rejects a ledger path under the work-orders directory — the sync would roll its progress back", () => {
+    expect(HarnessConfigSchema.safeParse({ version: "1.0", loop: { workOrders: "docs/plan", ledger: "docs/plan/WORKPLAN.md" } }).success).toBe(false);
+    expect(HarnessConfigSchema.safeParse({ version: "1.0", loop: { workOrders: "docs/plan", ledger: "docs/planning.md" } }).success).toBe(true);
+  });
+});
+
 describe("loop protocol section", () => {
   it("adds a protocol section so CLAUDE.md and AGENTS.md both carry the rules", async () => {
     const harness = HarnessConfigSchema.parse({ version: "1.0" });

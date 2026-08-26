@@ -147,14 +147,21 @@ export async function loopStartCommand(options: LoopStartOptions = {}): Promise<
     return { exitCode: 0 };
   }
   if (acquired !== "acquired") {
+    // Always let go of the handle: a still-running child would otherwise keep
+    // this CLI process alive until the whole loop finished.
+    child.unref();
+    const stillRunning = child.exitCode === null;
     console.error(
       chalk.red(
         acquired === 3
           ? "omh loop: another loop is already running"
-          : `omh loop: the supervisor exited with code ${acquired} before starting — see ${path.join(dir, "supervisor.log")}`,
+          : stillRunning
+            ? `omh loop: the supervisor did not acquire the run within the timeout — see ${path.join(dir, "supervisor.log")}`
+            : `omh loop: the supervisor exited with code ${acquired} before starting — see ${path.join(dir, "supervisor.log")}`,
       ),
     );
-    return { exitCode: acquired };
+    // Exit 0 without any recorded event is not a success we can vouch for.
+    return { exitCode: acquired === 0 ? 1 : acquired };
   }
   child.unref();
   console.log(chalk.green(`omh loop: started run ${runId} (pid ${child.pid ?? "?"})`));

@@ -3,11 +3,12 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
 import { HarnessConfigSchema } from "../../src/core/harness-schema.js";
 import { parseLedger } from "../../src/loop/ledger.js";
 
-const REPO = path.resolve(__dirname, "..", "..");
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SCRIPT = path.join(REPO, "scripts", "loop-qa-fixture.sh");
 
 describe("scripts/loop-qa-fixture.sh", () => {
@@ -47,6 +48,13 @@ describe("scripts/loop-qa-fixture.sh", () => {
     expect(fs.existsSync(path.join(dir, ".omh", "hooks", "catalog-loop-guard.sh"))).toBe(true);
     expect(fs.existsSync(path.join(dir, ".claude", "skills", "omh-loop", "SKILL.md"))).toBe(true);
   }, 90_000);
+
+  it("refuses to build inside a non-empty directory", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omh-qa-busy-"));
+    fs.writeFileSync(path.join(dir, "precious.txt"), "keep");
+    expect(() => execFileSync("bash", [SCRIPT, "claude", dir], { encoding: "utf-8", stdio: "pipe" })).toThrow();
+    expect(fs.readFileSync(path.join(dir, "precious.txt"), "utf-8")).toBe("keep");
+  });
 
   it("rejects an unknown runtime", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omh-qa-bad-"));

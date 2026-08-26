@@ -93,6 +93,14 @@ describe("generate / planGenerate", () => {
 });
 
 describe("legacy cleanup", () => {
+  it("planGenerate reports the legacy run.sh in wouldDelete so --check and diff agree with sync", async () => {
+    const legacy = path.join(dir, ".omh", "loop", "run.sh");
+    fs.mkdirSync(path.dirname(legacy), { recursive: true });
+    fs.writeFileSync(legacy, "#!/bin/bash\n");
+    const plan = await planGenerate({ projectDir: dir, config: await merged({}) });
+    expect(plan.wouldDelete).toContain(legacy);
+  });
+
   it("removes a run.sh left behind by the old generated runner on sync", async () => {
     const legacy = path.join(dir, ".omh", "loop", "run.sh");
     fs.mkdirSync(path.dirname(legacy), { recursive: true });

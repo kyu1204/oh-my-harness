@@ -26,6 +26,10 @@ else
   OMH=("$REPO/node_modules/.bin/tsx" "$REPO/bin/oh-my-harness.ts"); OMH_VIA=tsx
 fi
 
+# Never build on top of an existing project: the fixture writes files and commits.
+if [ -e "$DIR" ] && [ -n "$(ls -A "$DIR" 2>/dev/null)" ]; then
+  echo "refusing to build a fixture in a non-empty directory: $DIR" >&2; exit 2
+fi
 mkdir -p "$DIR" && cd "$DIR"
 git init -q -b main .
 git config user.email qa@omh.local

@@ -18,7 +18,9 @@ export interface LedgerDiff {
   newBlocked: number;
 }
 
-const CHECKBOX = /^\s*[-*]\s+\[( |x|X)\]/;
+// [BLOCKED] and [-] are non-standard forms real agents write for a skipped
+// task; they count as blocked, never as open work.
+const CHECKBOX = /^\s*[-*]\s+\[( |x|X|-|BLOCKED)\]/;
 
 export function parseLedger(text: string): LedgerCounts {
   const counts: LedgerCounts = { unchecked: 0, checked: 0, blocked: 0 };
@@ -27,9 +29,9 @@ export function parseLedger(text: string): LedgerCounts {
     // Only checkbox lines count: protocol prose and echoed prompts also
     // contain the literal "BLOCKED:" and must not register.
     if (!m) continue;
-    if (m[1] !== " ") {
+    if (m[1] === "x" || m[1] === "X") {
       counts.checked++;
-    } else if (line.includes("BLOCKED:")) {
+    } else if (m[1] !== " " || line.includes("BLOCKED:")) {
       counts.blocked++;
     } else {
       counts.unchecked++;

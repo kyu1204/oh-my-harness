@@ -37,7 +37,7 @@ function ledgerAndOrders(): void {
 }
 
 /** A fake detached supervisor: writes run.json for the run id it was given, or exits. */
-function fakeSpawn(behaviour: "runs" | "exits3" | "never" | "finishes"): SpawnLike & { calls: string[][]; unrefs: number } {
+function fakeSpawn(behaviour: "runs" | "exits3" | "never" | "finishes" | "exits0"): SpawnLike & { calls: string[][]; unrefs: number } {
   const spy = Object.assign(
     (_cmd: string, args: string[]): ChildLike => {
       spy.calls.push(args);
@@ -54,6 +54,9 @@ function fakeSpawn(behaviour: "runs" | "exits3" | "never" | "finishes"): SpawnLi
         } else if (behaviour === "exits3") {
           child.exitCode = 3;
           child.emit("exit", 3);
+        } else if (behaviour === "exits0") {
+          child.exitCode = 0;
+          child.emit("exit", 0);
         } else if (behaviour === "finishes") {
           // a very fast goal: the supervisor ran, completed, released run.json
           // and exited 0 before start ever saw the record
@@ -177,6 +180,29 @@ describe("omh loop start — launch", () => {
     expect(logs.join("\n")).toMatch(/started run \S+ \(pid 4242\)/);
     expect(logs.join("\n")).toMatch(/complete/);
     expect(errors).toEqual([]);
+  });
+
+  it("gives up on an acquisition timeout without hanging: exit 1 and the child is unref'd", async () => {
+    const { loopStartCommand } = await import("../../src/cli/commands/loop.js");
+    gitRepo();
+    harness();
+    ledgerAndOrders();
+    const spawnImpl = fakeSpawn("never");
+    const r = await loopStartCommand({ projectDir: dir, spawnImpl, acquireTimeoutMs: 300 });
+    expect(r.exitCode).toBe(1);
+    expect(spawnImpl.unrefs).toBe(1);
+    expect(errors.join("\n")).toMatch(/did not acquire|before starting/);
+  });
+
+  it("an exit 0 with no events for the run is a failed start, not a success", async () => {
+    const { loopStartCommand } = await import("../../src/cli/commands/loop.js");
+    gitRepo();
+    harness();
+    ledgerAndOrders();
+    const spawnImpl = fakeSpawn("exits0");
+    const r = await loopStartCommand({ projectDir: dir, spawnImpl });
+    expect(r.exitCode).toBe(1);
+    expect(spawnImpl.unrefs).toBe(1);
   });
 
   it("surfaces the child's exit code when it dies before acquiring the run", async () => {

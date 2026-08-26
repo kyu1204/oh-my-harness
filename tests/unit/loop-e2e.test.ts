@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
 import { loopPaths, readRun, readEvents } from "../../src/loop/state.js";
 
@@ -12,7 +13,7 @@ import { loopPaths, readRun, readEvents } from "../../src/loop/state.js";
  * takes a long-running turn's whole process group down.
  */
 const SLOW = 60_000;
-const REPO = path.resolve(__dirname, "..", "..");
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const TSX = path.join(REPO, "node_modules", ".bin", "tsx");
 const BIN = path.join(REPO, "bin", "oh-my-harness.ts");
 

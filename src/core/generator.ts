@@ -127,6 +127,14 @@ export async function planGenerate(options: GenerateOptions): Promise<Generation
   if (gitignore) files.push(gitignore);
 
   const wouldDelete = [...hooksPlan.wouldDelete];
+  // Mirror generate(): the legacy shell runner is removed on sync.
+  const legacyRunner = path.join(projectDir, OMH_DIR, "loop", "run.sh");
+  try {
+    await fs.access(legacyRunner);
+    wouldDelete.push(legacyRunner);
+  } catch {
+    // not present
+  }
   if (!config.loop) {
     for (const stale of loopAssetPaths(projectDir)) {
       try {

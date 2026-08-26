@@ -79,7 +79,15 @@ export const HarnessConfigSchema = z.object({
     architectOnly: z.array(relPath).default([]),
     isolate: z.boolean().default(true),
     runtime: z.enum(["claude", "codex", "pi"]).default("claude"),
-  }).default({}),
+  })
+    // Architect assets (the work-orders directory) are re-synced into the
+    // worktree every iteration; a ledger inside it would be rolled back to
+    // the architect's copy each turn, erasing the loop's progress.
+    .refine((l) => !(l.ledger === l.workOrders || l.ledger.startsWith(`${l.workOrders}/`)), {
+      message: "loop.ledger must not live inside loop.workOrders",
+      path: ["ledger"],
+    })
+    .default({}),
 
   // Permissions
   permissions: z.object({

@@ -68,7 +68,7 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 ### Phase A — 순수 모듈 (I/O 없음, 빠른 테스트)
 - [x] **L-01** `ledger.ts` — 테스트 `tests/unit/loop-ledger.test.ts`. `- [ ]`/`- [x]`/`- [X]` 카운트, `BLOCKED:` 카운트, sha256 해시, diff. 검증: `npx vitest run tests/unit/loop-ledger.test.ts`.
 - [x] **L-02** `classify.ts` — 테스트 `loop-classify.test.ts` 테이블 주도: 7 kind 전부, 크래시+sentinel→error, 미완료 잔존+sentinel→ignored, rate-limit 텍스트+커밋→progress, timeout SIGKILL→crash, `waitFor` 4행. depends L-01. 역검증 필수.
-- [ ] **L-03** `protocol.ts` — 테스트 `loop-protocol.test.ts`: 세 렌더러가 `LOOP_RULES` 모든 줄 포함, 스킬이 `omh loop start`·`tail -f .omh/state/loop/runs/` 안내, architectOnly 이름 그대로 노출, **프롬프트에 `BLOCKED:` 리터럴이 있어도 판정과 무관함을 주석으로 명시**(D6).
+- [x] **L-03** `protocol.ts` — 테스트 `loop-protocol.test.ts`: 세 렌더러가 `LOOP_RULES` 모든 줄 포함, 스킬이 `omh loop start`·`tail -f .omh/state/loop/runs/` 안내, architectOnly 이름 그대로 노출, **프롬프트에 `BLOCKED:` 리터럴이 있어도 판정과 무관함을 주석으로 명시**(D6).
 
 ### Phase B — I/O 모듈
 - [ ] **L-04** `state.ts` — 테스트 `loop-state.test.ts`: acquire 2회→두 번째 false; 죽은 pid 회수; ps argv 불일치 회수(현재 프로세스 pid를 다른 run-id로 기록); 소유자만 release; 이벤트 append/read; prune 5; `atomicWrite` inode 교체. depends 없음.
@@ -115,3 +115,4 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 2026-08-26: 전수조사(현행 23책임·16결함), 적대적 설계 검증(구멍 4·과설계 5 반영), 원장 작성.
 - 2026-08-26: L-01 ledger.ts 완료 (테스트 6, 체크박스 라인만 BLOCKED 집계).
 - 2026-08-26: L-02 classify.ts 완료 (테이블 18케이스, 역검증: limit의 !progress 제거 시 해당 케이스만 실패 확인 후 원복).
+- 2026-08-26: L-03 protocol.ts 완료 (규칙 8개 단일 소스, 프롬프트·섹션·스킬 3렌더러 일치 테스트).

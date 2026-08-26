@@ -504,7 +504,7 @@ oh-my-harness/
 │   │   ├── template-engine.ts # Handlebars rendering + applyDefaults
 │   │   └── converter.ts    # HookEntry[] → rendered scripts
 │   ├── cli/
-│   │   ├── commands/       # init, doctor, catalog, hook, sync, test
+│   │   ├── commands/       # init, doctor, catalog, hook, sync, test, loop (start/run/stop/status/clean)
 │   │   ├── stats/          # TUI dashboard (ink/React)
 │   │   │   ├── App.tsx     # App shell (tab bar, keyboard nav)
 │   │   │   ├── data.ts     # Data aggregation layer
@@ -515,6 +515,14 @@ oh-my-harness/
 │   │   ├── tui/               # Interactive provider & model selection
 │   │   ├── provider-setup.ts  # Provider configuration UI
 │   │   └── tool-checker.ts    # Command executable checks
+│   ├── loop/               # autonomous loop supervisor (TypeScript, no generated shell)
+│   │   ├── supervisor.ts   # one run: lock → worktree/seed → turns → release
+│   │   ├── state.ts        # run.json link-lock, events, atomic writes
+│   │   ├── classify.ts     # turn verdict from ledger diff + HEAD; wait policy
+│   │   ├── runtime.ts      # argv per runtime, turn execution in its own process group
+│   │   ├── worktree.ts     # git worktree lifecycle, asset sync, ledger seeding
+│   │   ├── protocol.ts     # the rules, rendered into prompt / CLAUDE.md / skill
+│   │   └── stop.ts         # identity-checked group stop, group sweep
 │   ├── core/
 │   │   ├── harness-schema.ts      # harness.yaml Zod schema
 │   │   ├── merged-config.ts       # MergedConfig + HooksConfig interfaces

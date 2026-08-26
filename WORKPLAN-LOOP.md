@@ -72,7 +72,7 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 
 ### Phase B — I/O 모듈
 - [x] **L-04** `state.ts` — 테스트 `loop-state.test.ts`: acquire 2회→두 번째 false; 죽은 pid 회수; ps argv 불일치 회수(현재 프로세스 pid를 다른 run-id로 기록); 소유자만 release; 이벤트 append/read; prune 5; `atomicWrite` inode 교체. depends 없음.
-- [ ] **L-05** `runtime.ts` — 테스트 `loop-runtime.test.ts`: 런타임별 argv(claude `--model M --dangerously-skip-permissions -p P`, codex `exec --model M --dangerously-bypass-approvals-and-sandbox P`, pi `--print --no-session --model M P`); stub 스크립트 → status/tail/로그 파일; timeout kill→signal; `trap '' TERM` stub + `shouldStop` → SIGTERM→SIGKILL 에스컬레이션(유예 200ms 주입).
+- [x] **L-05** `runtime.ts` — 테스트 `loop-runtime.test.ts`: 런타임별 argv(claude `--model M --dangerously-skip-permissions -p P`, codex `exec --model M --dangerously-bypass-approvals-and-sandbox P`, pi `--print --no-session --model M P`); stub 스크립트 → status/tail/로그 파일; timeout kill→signal; `trap '' TERM` stub + `shouldStop` → SIGTERM→SIGKILL 에스컬레이션(유예 200ms 주입).
 - [x] **L-06** `worktree.ts` — 테스트 `loop-worktree.test.ts`(temp git repo): add; 기존 브랜치 재사용 이벤트; 미등록 비어있지 않은 dir→`WorktreeError`; 메인이 omh-loop→에러; 미커밋 자산 복사(.claude/.codex/.pi/.omh/hooks/work-orders/CLAUDE.md/AGENTS.md/harness.yaml); 시드 첫/새 해시/같은 해시; dirty tree `--force --force` 해제; `--branch`. depends L-01, L-04. 역검증 필수.
 
 ### Phase C — 슈퍼바이저·스키마
@@ -165,3 +165,4 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 2026-08-26: L-22~L-25 완료 (픽스처 tsx 폴백·명시적 loop-guard 경로 강제·uninstall 부작용을 적용 단계로·reclaimStaleRun 회수 잠금+관측 재검증). 전체 테스트 2회 녹색.
 - 2026-08-26: CI 플레이키 원인 수정 — 골이 100ms 안에 끝나면 슈퍼바이저가 start의 첫 폴링 전에 run.json을 해제하고 exit 0 → start가 "시작 전 종료"로 오판. exit 0 + 해당 run 이벤트 존재면 성공으로 처리.
 - 2026-08-26: CodeRabbit 재지적 수용 — reclaim 잠금의 dead-holder 정리(rm→mkdir)에도 같은 레이스 → `takeoverReclaimLock`: atomic rename으로 인수 후 관측 소유자 pid 일치 시에만 삭제, 불일치면 원복.
+- 2026-08-26: CodeRabbit 전체 재리뷰 15건 — 14 수용(턴을 자기 프로세스 그룹으로 실행해 timeout/stop/턴 종료 시 손자까지 정리, spawn 동기 예외 TDZ, start 획득 실패 시 unref·exit 0 무이벤트=실패, `[BLOCKED]`/`[-]` 파싱, ledger⊂workOrders 스키마 거부, 레거시 run.sh plan 대칭, 픽스처 비어있지 않은 dir 거부, 문서/원장 정정), 1 부분 기각(blocked>0이면 complete 금지 — BLOCKED는 사람에게 넘긴 태스크라 루프가 기다리면 공회전; 파서 확장만 수용).

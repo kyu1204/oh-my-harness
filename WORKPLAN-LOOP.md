@@ -97,6 +97,14 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - [x] **L-24** `computeUninstall` 계획 단계의 `stopLoop`/worktree 해제 부작용 → 적용 단계로 이동.
 - [x] **L-25** `acquireRun` stale 회수 레이스: 회수 잠금 + 관측 레코드 재검증.
 
+### Phase D''' — ultracode 심층 감사 확정 결함 (2026-08-27, 26에이전트 6렌즈+반박검증: 확정 17·기각 3·미검증 1)
+- [ ] **L-26** classify/ledger: limit 순서·error 백오프·'+' 불릿
+- [ ] **L-27** state/stop 동시성: updateRun 소유권·rm 재확인·stop 플래그 무조건·reclaim 원자 생성·childPid 정리+정체·고아 턴 회수 거부
+- [ ] **L-28** supervisor/runtime: 최종 턴그룹 KILL 스윕·git 실패 graceful·unborn HEAD
+- [ ] **L-29** worktree/generator: 재시드 백업·비활성화 시 dirty worktree 보호
+- [ ] **L-30** guard/schema: 셸 메타문자 금지 재도입(critical)·sentinel trim·Move to 파싱
+- [ ] **L-31** 원장·리스크 기록
+
 ### Phase E — 문서·dogfood
 - [x] **L-14** README 갱신(트리·`omh loop` 명령·knob·POSIX 전용·시드 한계) + 이 저장소 `omh sync` dogfood + `sync --check` up to date. depends L-11, L-12.
 

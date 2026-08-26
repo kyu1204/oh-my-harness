@@ -147,6 +147,63 @@ export function createCli(): Command {
       await catalogInfoCommand(blockId);
     });
 
+  const loopCmd = program
+    .command("loop")
+    .description("Run the autonomous loop (see the omh-loop skill)");
+
+  loopCmd
+    .command("start")
+    .description("Start the loop supervisor in the background")
+    .option("-d, --project-dir <dir>", "Project directory")
+    .action(async (options: { projectDir?: string }) => {
+      const { loopStartCommand } = await import("./commands/loop.js");
+      const result = await loopStartCommand(options);
+      if (result.exitCode !== 0) process.exitCode = result.exitCode;
+    });
+
+  loopCmd
+    .command("run")
+    .description("Run the loop supervisor in the foreground (used by start)")
+    .requiredOption("--run-id <id>", "Run identifier")
+    .option("-d, --project-dir <dir>", "Project directory")
+    .action(async (options: { runId: string; projectDir?: string }) => {
+      const { loopRunCommand } = await import("./commands/loop.js");
+      const result = await loopRunCommand(options);
+      if (result.exitCode !== 0) process.exitCode = result.exitCode;
+    });
+
+  loopCmd
+    .command("stop")
+    .description("Stop the running loop")
+    .option("--now", "Skip the grace period")
+    .option("-d, --project-dir <dir>", "Project directory")
+    .action(async (options: { now?: boolean; projectDir?: string }) => {
+      const { loopStopCommand } = await import("./commands/loop.js");
+      const result = await loopStopCommand(options);
+      if (result.exitCode !== 0) process.exitCode = result.exitCode;
+    });
+
+  loopCmd
+    .command("status")
+    .description("Show the current loop run")
+    .option("-d, --project-dir <dir>", "Project directory")
+    .action(async (options: { projectDir?: string }) => {
+      const { loopStatusCommand } = await import("./commands/loop.js");
+      const result = await loopStatusCommand(options);
+      if (result.exitCode !== 0) process.exitCode = result.exitCode;
+    });
+
+  loopCmd
+    .command("clean")
+    .description("Remove the loop worktree and stale state")
+    .option("--branch", "Also delete the omh-loop branch")
+    .option("-d, --project-dir <dir>", "Project directory")
+    .action(async (options: { branch?: boolean; projectDir?: string }) => {
+      const { loopCleanCommand } = await import("./commands/loop.js");
+      const result = await loopCleanCommand(options);
+      if (result.exitCode !== 0) process.exitCode = result.exitCode;
+    });
+
   const hookCmd = program
     .command("hook")
     .description("Manage hooks");

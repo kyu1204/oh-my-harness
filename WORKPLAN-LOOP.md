@@ -77,7 +77,7 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 
 ### Phase C — 슈퍼바이저·스키마
 - [x] **L-07** 스키마·타입 — 테스트 `loop-config.test.ts` 갱신: `relPath`(따옴표 허용, `../x`·`/abs`·`./x`·후행 `/` 거부), knob 4개 기본값·양수, `LoopConfig` 확장. 파일: `src/core/harness-schema.ts`, `src/core/merged-config.ts`.
-- [ ] **L-08** `supervisor.ts` — 테스트 `loop-supervisor.test.ts`(in-process, `runTurn`/`sleep` 주입, stub이 temp repo를 실제 변경). depends L-01~L-07.
+- [x] **L-08** `supervisor.ts` — 테스트 `loop-supervisor.test.ts`(in-process, `runTurn`/`sleep` 주입, stub이 temp repo를 실제 변경). depends L-01~L-07.
 - [ ] **L-09** 통합 매트릭스 12케이스(같은 테스트 파일에 추가): complete · 크래시 후 sentinel · 미완료 잔존+sentinel→ignored 후 계속 · limit → limitBackoff · 원장 BLOCKED ×3 → blockedBackoff · idle ×3 → blockedBackoff · 긴 턴 중 stop 플래그 · 동시 `runSupervisor` 2 → 하나 `already-running` · stale run.json 회수 · 실행 중 disable → run.json 소멸·worktree 제거 · 시드/재시드 3케이스 · **stub이 프롬프트를 에코해도 BLOCKED 오판 없음**. depends L-08.
 
 ### Phase D — CLI·생성기 배선
@@ -119,3 +119,4 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 2026-08-26: L-04 state.ts 완료 (run.json link 잠금·stale 회수·정체 검증·이벤트·prune·atomicWrite, 테스트 10).
 - 2026-08-26: L-06 worktree.ts 완료 (엣지 5종·자산 동기화·해시 시드·force 해제, 테스트 11; 역검증: 해시 비교 제거 시 재시드 케이스만 실패 확인 후 원복).
 - 2026-08-26: L-07 스키마 완료 (relPath: 셸 메타문자 허용·canonical만 강제, knob 4개 추가).
+- 2026-08-26: L-08 supervisor.ts 완료 (잠금→worktree/시드→시그널→반복→해제; in-process 뼈대 테스트 6).

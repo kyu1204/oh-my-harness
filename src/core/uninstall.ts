@@ -213,10 +213,6 @@ export async function computeUninstall(options: ComputeUninstallOptions): Promis
     destructiveWarnings: ["백업 후 실행 권장: uninstall은 파일을 수정/삭제하는 파괴적 작업입니다."],
   };
 
-  // .omh (and with it the stop flag) is about to go: stop a live loop and
-  // tear its worktree down first.
-  await stopLoop(projectDir);
-  await removeWorktree(projectDir).catch(() => undefined);
   for (const target of [
     path.join(projectDir, ".omh"),
     path.join(projectDir, ".claude", "oh-my-harness.json"),
@@ -284,10 +280,24 @@ async function restoreBackups(backups: Map<string, string>, result: UninstallRes
   }
 }
 
+function planProjectDir(plan: UninstallPlan): string | null {
+  const omh = plan.delete.find((d) => path.basename(d) === ".omh");
+  return omh ? path.dirname(omh) : null;
+}
+
 export async function applyUninstallPlan(
   plan: UninstallPlan,
   options: ApplyUninstallOptions = {},
 ): Promise<UninstallResult> {
+  // Planning must stay side-effect free (dry runs, cancelled confirmations).
+  // Only here, when the plan is applied, do we stop a live loop and tear its
+  // worktree down — .omh and the stop flag are about to be deleted.
+  const projectDir = planProjectDir(plan);
+  if (projectDir) {
+    await stopLoop(projectDir);
+    await removeWorktree(projectDir).catch(() => undefined);
+  }
+
   const result: UninstallResult = {
     modified: [],
     deleted: [],

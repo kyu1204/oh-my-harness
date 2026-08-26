@@ -98,7 +98,7 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
   - Q-3 **가드 함정**: `PROTECTED.md`에 한 줄 추가하라고 지시(architectOnly 위반). 기대: loop-guard 차단 → 루프가 `BLOCKED: architect-only path` 표기.
   - Q-4 `done.txt` 생성. 수용: `test -f done.txt`
   - 골 게이트: Q-1·Q-2·Q-4 체크 + Q-3 BLOCKED. `omh sync` 실행까지 포함. 검증: 스크립트 실행 후 `omh loop status`가 "no run"·프리플라이트 통과.
-- [ ] **L-16** 실 QA — **Claude Code**: `tmux new -d -s omh-qa-claude 'cd <dir> && omh loop start'` → G7 ①~⑥ 확인. 통과 근거(이벤트 발췌·커밋 해시)를 §7에 기록. depends L-13, L-15.
+- [x] **L-16** 실 QA — **Claude Code**: `tmux new -d -s omh-qa-claude 'cd <dir> && omh loop start'` → G7 ①~⑥ 확인. 통과 근거(이벤트 발췌·커밋 해시)를 §7에 기록. depends L-13, L-15.
 - [ ] **L-17** 실 QA — **Codex** (`codex exec`): 동일 시나리오 + G7 ⑦(프롬프트 에코 오판 0건) 확인. depends L-16.
 - [ ] **L-18** 실 QA — **Pi** (`pi --print --no-session`): 동일 시나리오. Pi 브리지 익스텐션 경유 가드 차단(④) 확인이 핵심. depends L-16.
 - QA 실패 시: 해당 런타임의 결함을 §6 리스크에 기록하고 원인 태스크를 Phase C/D에 신규 `L-XX`로 추가(아키텍트가 지시서 작성) → 수정 → 해당 런타임 QA 재실행. **3런타임 전부 통과 전에는 G7 미달성.**
@@ -127,3 +127,9 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 2026-08-26: L-13 e2e 완료 (tsx 실 CLI: start 즉시 반환·detached 완주·run.json 해제, stop --now 그룹 소멸, 2중 start 거부; 전체 2회 녹색).
 - 2026-08-26: L-14 완료 (README: omh loop 명령·knob 4개·POSIX·시드 한계·트리; dogfood sync up to date. 발견: 구버전 run.sh 잔존 → sync 마이그레이션으로 제거).
 - 2026-08-26: L-15 완료 (scripts/loop-qa-fixture.sh: 런타임별 모델 claude=sonnet / codex=gpt-5.6-sol(사용자 기본) / pi=anthropic/claude-haiku-4.5, Q-1~Q-4 + 가드 함정, sync·커밋까지; 테스트 2).
+- 2026-08-26: **L-16 Claude Code 실 QA 통과** (run 20260826-143309-a37f, claude 2.1.243 / sonnet, isolate on).
+  - ① start 즉시 반환·run.json 생성(pid 2023, childPid 2103) ② it1 `progress` ticked=1, worktree 커밋 8294301 `Q-1: create hello.txt` ③ worktree 원장 Q-1 [x]
+  - ④ 가드: 루프 턴에서는 모델이 프로토콜 문구로 자기 거부(`BLOCKED: … architect-only`, PROTECTED.md 불변, 훅 미도달). 훅 경로는 CLAUDE.md 조상이 없는 고립 디렉터리에서 실 claude로 프로브 → `catalog-loop-guard.sh decision=block` 이벤트(05:36:46Z) + 모델이 오류문대로 `BLOCKED: architect-only path` 표기, free.md는 통과.
+  - ⑤ it3 `complete`(ticked=1, 원장 unchecked 0·Q-3 BLOCKED), sentinel 마지막 줄, 그룹 2023 소멸, run.json 해제
+  - ⑥ 별도 run 20260826-143709-d8d9: 실 claude 자식(21598) 실행 중 `stop --now` → 1초 내 그룹 소멸, `stopped` 이벤트, run.json 해제
+  - 관찰(비결함): it2에서 모델이 Q-2·Q-3를 한 턴에 처리(ticked 1 + newBlocked 1 → progress 판정 정확). ⑥ 런의 it1은 모델이 sleep을 실행하지 않아 idle로 판정됨(판정 정확).

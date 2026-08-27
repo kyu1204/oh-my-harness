@@ -181,3 +181,19 @@ describe("removeWorktreeIfClean uses non-force removal (round 10)", () => {
     expect(fs.existsSync(path.join(wt2, "precious.ts"))).toBe(true);
   }, SLOW);
 });
+
+describe("removeWorktreeIfClean messaging (round 11)", () => {
+  it("a clean removal emits no left-in-place warning", async () => {
+    const { path: wt } = await ensureWorktree(dir);
+    const warns: string[] = [];
+    const orig = console.warn;
+    console.warn = (...a: unknown[]) => { warns.push(a.join(" ")); };
+    try {
+      await removeWorktreeIfClean(dir);
+    } finally {
+      console.warn = orig;
+    }
+    expect(fs.existsSync(wt)).toBe(false);
+    expect(warns.join("\n")).not.toMatch(/left in place|uncommitted/);
+  }, SLOW);
+});

@@ -185,6 +185,34 @@ describe("omh loop start — unborn HEAD (L-28c)", () => {
   });
 });
 
+describe("omh loop start — leaderless turn group (round 11)", () => {
+  it("refuses when the turn's group leader died but group members remain — they are our remnants", async () => {
+    const { loopStartCommand } = await import("../../src/cli/commands/loop.js");
+    gitRepo();
+    harness();
+    ledgerAndOrders();
+    const { spawn } = await import("node:child_process");
+    // leader exits immediately; a member (sleep) stays in the group
+    const leader = spawn("bash", ["-c", "sleep 30 & disown; exit 0"], { detached: true, stdio: "ignore" });
+    leader.unref();
+    const lp = leader.pid!;
+    // wait for the leader to be gone while the group persists
+    for (let i = 0; i < 40; i++) {
+      const leaderDead = (() => { try { process.kill(lp, 0); return false; } catch { return true; } })();
+      const groupAlive = (() => { try { process.kill(-lp, 0); return true; } catch { return false; } })();
+      if (leaderDead && groupAlive) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    const p = loopPaths(dir);
+    fs.mkdirSync(p.dir, { recursive: true });
+    fs.writeFileSync(p.runJson, JSON.stringify({ runId: "DEAD", pid: 999999, startedAt: "", runtime: "claude", iteration: 1, childPid: lp, cwd: dir }));
+    const r = await loopStartCommand({ projectDir: dir, spawnImpl: fakeSpawn("runs") });
+    expect(r.exitCode).toBe(1);
+    expect(errors.join("\n")).toMatch(/omh loop stop/);
+    try { process.kill(-lp, "SIGKILL"); } catch { /* gone */ }
+  }, 20_000);
+});
+
 describe("omh loop start — launch", () => {
   it("spawns a detached supervisor, waits for run.json, then unrefs and reports", async () => {
     const { loopStartCommand } = await import("../../src/cli/commands/loop.js");

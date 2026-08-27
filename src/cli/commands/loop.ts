@@ -8,7 +8,7 @@ import { HarnessConfigSchema } from "../../core/harness-schema.js";
 import type { LoopConfig } from "../../core/merged-config.js";
 import { loopPaths, readRun, isRunLive, pruneRuns, runDir, readEvents } from "../../loop/state.js";
 import type { LivenessDeps } from "../../loop/state.js";
-import { stopLoop, sweepOwnGroup, isTurnProcess } from "../../loop/stop.js";
+import { stopLoop, sweepOwnGroup, isOurTurnGroup } from "../../loop/stop.js";
 import { runSupervisor } from "../../loop/supervisor.js";
 import type { SupervisorExit } from "../../loop/supervisor.js";
 import { currentBranch, git, removeWorktree, WorktreeError } from "../../loop/worktree.js";
@@ -108,9 +108,11 @@ export async function loopStartCommand(options: LoopStartOptions = {}): Promise<
     // share the worktree, so the orphan has to be stopped first.
     try {
       process.kill(-existing.childPid, 0);
-      // The group exists — but only refuse if the pid is really our runtime;
-      // a reused pid on an unrelated group is safe to reclaim past.
-      if (isTurnProcess(existing.childPid, existing.runtime)) {
+      // The group exists. A dead leader with surviving members can only be
+      // our own turn's remnants (pid reuse needs a living leader), and a
+      // living leader must actually be the runtime; only a reused pid on an
+      // unrelated group is safe to reclaim past.
+      if (isOurTurnGroup(existing.childPid, existing.runtime)) {
         return fail(`run ${existing.runId} left an orphaned turn still running (pid ${existing.childPid}); \`omh loop stop\` first`);
       }
     } catch {

@@ -160,3 +160,21 @@ describe("childPid identity is token-exact (round 10)", () => {
     bystander.kill();
   }, SLOW);
 });
+
+describe("stopLoop — leaderless turn group (round 11)", () => {
+  it("signals a group whose leader is dead — members are the turn's remnants", async () => {
+    const leader = spawn("bash", ["-c", "sleep 30 & disown; exit 0"], { detached: true, stdio: "ignore" });
+    leader.unref();
+    const lp = leader.pid!;
+    for (let i = 0; i < 40; i++) {
+      const leaderDead = (() => { try { process.kill(lp, 0); return false; } catch { return true; } })();
+      if (leaderDead) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    writeRun({ runId: "X", pid: 999999, childPid: lp, runtime: "claude" });
+    await stopLoop(dir, { graceMs: 300 });
+    await new Promise((r) => setTimeout(r, 200));
+    const groupAlive = (() => { try { process.kill(-lp, 0); return true; } catch { return false; } })();
+    expect(groupAlive, "leaderless turn remnants survived stop").toBe(false);
+  }, SLOW);
+});

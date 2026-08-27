@@ -171,11 +171,17 @@ export async function removeWorktreeIfClean(projectDir: string): Promise<void> {
     // Non-force removal: git itself refuses a dirty worktree, so a write that
     // lands between any status check and the removal cannot be destroyed.
     await git(projectDir, ["worktree", "remove", p.worktree]);
-    await git(projectDir, ["worktree", "prune"]);
-  } catch {
+  } catch (err) {
     console.warn(
-      `oh-my-harness: loop worktree at ${p.worktree} has uncommitted work — left in place; ` +
-        `commit or discard it, then run \`omh loop clean\``,
+      `oh-my-harness: loop worktree at ${p.worktree} was not removed (${(err as Error).message.split("\n")[0]}); ` +
+        `if it holds uncommitted work, commit or discard it, then run \`omh loop clean\``,
     );
+    return;
+  }
+  try {
+    await git(projectDir, ["worktree", "prune"]);
+  } catch (err) {
+    // The worktree itself is gone; only the metadata sweep failed.
+    console.warn(`oh-my-harness: git worktree prune failed: ${(err as Error).message.split("\n")[0]}`);
   }
 }

@@ -50,7 +50,7 @@ export async function stopLoop(projectDir: string, opts: StopOptions = {}): Prom
   // The in-flight turn runs in its own process group (see runtime.ts). Take
   // it down whether or not the supervisor is still alive — a SIGKILLed
   // supervisor leaves the turn orphaned.
-  if (run.childPid !== undefined && groupAlive(run.childPid) && isTurnProcess(run.childPid, run.runtime)) {
+  if (run.childPid !== undefined && groupAlive(run.childPid) && isOurTurnGroup(run.childPid, run.runtime)) {
     signalGroup(run.childPid, "SIGTERM");
     const deadline = Date.now() + graceMs;
     while (groupAlive(run.childPid) && Date.now() < deadline) await sleep(100);
@@ -78,6 +78,20 @@ export async function stopLoop(projectDir: string, opts: StopOptions = {}): Prom
  * from isRunLive: signal it only if ps says the pid is actually running the
  * configured agent runtime.
  */
+/**
+ * A live group whose LEADER is gone can only be our own turn's remnants:
+ * pid reuse would require a new, living leader with that pid. A live leader
+ * is checked against the runtime by name.
+ */
+export function isOurTurnGroup(pid: number, runtime: string): boolean {
+  try {
+    process.kill(pid, 0);
+  } catch {
+    return true; // leader dead, group alive (caller checked) — our remnants
+  }
+  return isTurnProcess(pid, runtime);
+}
+
 export function isTurnProcess(pid: number, runtime: string): boolean {
   try {
     const args = execFileSync("ps", ["-o", "args=", "-p", String(pid)], { encoding: "utf-8" });

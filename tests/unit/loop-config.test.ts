@@ -68,6 +68,12 @@ describe("loop path values are shell-safe again (L-30a)", () => {
       expect(HarnessConfigSchema.safeParse({ version: "1.0", loop }).success).toBe(false);
     }
   });
+  it("rejects carriage returns too — a path ending in \\r never matches a real tool path", () => {
+    for (const loop of [{ workOrders: "docs/work-orders\r" }, { architectOnly: ["ios\r"] }, { ledger: "a\rb.md" }]) {
+      expect(HarnessConfigSchema.safeParse({ version: "1.0", loop }).success).toBe(false);
+    }
+  });
+
   it("still accepts ordinary paths including spaces", () => {
     expect(HarnessConfigSchema.safeParse({ version: "1.0", loop: { workOrders: "docs/work orders" } }).success).toBe(true);
   });

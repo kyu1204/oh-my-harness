@@ -144,3 +144,19 @@ describe("stop/clean vs a concurrent acquire (L-27b,e,f)", () => {
     bystander.kill();
   }, SLOW);
 });
+
+describe("childPid identity is token-exact (round 10)", () => {
+  it("does not treat 'pip' as the 'pi' runtime — substring matches are not identity", async () => {
+    const bystander = spawn("bash", ["-c", "exec -a pip-unrelated-job sleep 30"], { detached: true, stdio: "ignore" });
+    bystander.unref();
+    const exited = new Promise<boolean>((r) => {
+      const t = setTimeout(() => r(false), 2000);
+      bystander.on("exit", () => { clearTimeout(t); r(true); });
+    });
+    await new Promise((r) => setTimeout(r, 200));
+    writeRun({ runId: "X", pid: 999999, childPid: bystander.pid!, runtime: "pi" });
+    await stopLoop(dir, { graceMs: 300 });
+    expect(await exited, "a pip process was killed as if it were the pi runtime").toBe(false);
+    bystander.kill();
+  }, SLOW);
+});

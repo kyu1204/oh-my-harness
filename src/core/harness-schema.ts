@@ -11,7 +11,7 @@ const relPath = z
   // These values are rendered into loop-guard's bash template; a quote,
   // backtick, $ or backslash there kills or bypasses the guard. (The runner
   // itself spawns argv arrays and would not care.)
-  .regex(/^[^'"`$\\\n]+$/, "must not contain quotes, backticks, $ or backslashes")
+  .regex(/^[^'"`$\\\r\n]+$/, "must not contain quotes, backticks, $, backslashes or CR/LF")
   .refine(
     (p) => !p.startsWith("/") && p.split("/").every((seg) => seg !== "" && seg !== "." && seg !== ".."),
     "must be a canonical project-relative path (no leading /, ./, ../ or trailing /)",

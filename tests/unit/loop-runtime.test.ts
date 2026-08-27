@@ -112,8 +112,8 @@ describe("runTurn — review round 9", () => {
     });
     expect(r.timedOut).toBe(true);
     const gc = Number(fs.readFileSync(pidFile, "utf-8").trim());
-    await new Promise((res) => setTimeout(res, 300));
-    expect(() => process.kill(gc, 0), "grandchild survived the timeout").toThrow();
+    const gone = async () => { for (let i = 0; i < 40; i++) { try { process.kill(gc, 0); } catch { return true; } await new Promise((res) => setTimeout(res, 50)); } return false; };
+    expect(await gone(), "grandchild survived the timeout").toBe(true);
   }, SLOW);
 
   it("a stop request takes the turn's whole process tree down too", async () => {
@@ -125,7 +125,7 @@ describe("runTurn — review round 9", () => {
     });
     expect(r.stoppedByRequest).toBe(true);
     const gc = Number(fs.readFileSync(pidFile, "utf-8").trim());
-    await new Promise((res) => setTimeout(res, 300));
-    expect(() => process.kill(gc, 0), "grandchild survived the stop").toThrow();
+    const gone = async () => { for (let i = 0; i < 40; i++) { try { process.kill(gc, 0); } catch { return true; } await new Promise((res) => setTimeout(res, 50)); } return false; };
+    expect(await gone(), "grandchild survived the stop").toBe(true);
   }, SLOW);
 });

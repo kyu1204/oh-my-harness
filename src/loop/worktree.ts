@@ -168,16 +168,14 @@ export async function removeWorktreeIfClean(projectDir: string): Promise<void> {
   const p = loopPaths(projectDir);
   if (!fs.existsSync(p.worktree)) return;
   try {
-    const status = await git(p.worktree, ["status", "--porcelain"]);
-    if (status !== "") {
-      console.warn(
-        `oh-my-harness: loop worktree at ${p.worktree} has uncommitted work — left in place; ` +
-          `commit or discard it, then run \`omh loop clean\``,
-      );
-      return;
-    }
-    await removeWorktree(projectDir);
+    // Non-force removal: git itself refuses a dirty worktree, so a write that
+    // lands between any status check and the removal cannot be destroyed.
+    await git(projectDir, ["worktree", "remove", p.worktree]);
+    await git(projectDir, ["worktree", "prune"]);
   } catch {
-    // an unreadable worktree is not something a routine sync should force away
+    console.warn(
+      `oh-my-harness: loop worktree at ${p.worktree} has uncommitted work — left in place; ` +
+        `commit or discard it, then run \`omh loop clean\``,
+    );
   }
 }

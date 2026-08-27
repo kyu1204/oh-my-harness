@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
-import { loopPaths, readRun, isRunLive } from "./state.js";
+import path from "node:path";
+import { loopPaths, readRun, isRunLive, reclaimStaleRun } from "./state.js";
 
 /**
  * Ask a live loop to stop and wait until it has.
@@ -66,13 +67,10 @@ export async function stopLoop(projectDir: string, opts: StopOptions = {}): Prom
       while (groupAlive(run.pid) && Date.now() < hardDeadline) await sleep(50);
     }
   }
-  // Remove only the record we acted on: a concurrent start may have
-  // legitimately reclaimed the stale record and linked a fresh run.json in
-  // the meantime, and deleting that would leave a live supervisor lockless.
-  const now = readRun(projectDir);
-  if (now && now.runId === run.runId && now.pid === run.pid) {
-    fs.rmSync(p.runJson, { force: true });
-  }
+  // Remove only the record we acted on — under the same exclusive reclaim
+  // protocol acquireRun uses (reclaim lock + re-read equality), so a
+  // concurrent start that just linked a fresh run.json can never lose it.
+  reclaimStaleRun(projectDir, run);
 }
 
 /**
@@ -80,10 +78,15 @@ export async function stopLoop(projectDir: string, opts: StopOptions = {}): Prom
  * from isRunLive: signal it only if ps says the pid is actually running the
  * configured agent runtime.
  */
-function isTurnProcess(pid: number, runtime: string): boolean {
+export function isTurnProcess(pid: number, runtime: string): boolean {
   try {
     const args = execFileSync("ps", ["-o", "args=", "-p", String(pid)], { encoding: "utf-8" });
-    return args.includes(runtime);
+    // Token-exact: "pi" must match the pi binary, never "pip". The runtime
+    // may appear as argv0 or as a script path token ("node .../codex exec").
+    return args
+      .trim()
+      .split(/\s+/)
+      .some((tok) => path.basename(tok) === runtime);
   } catch {
     return false;
   }

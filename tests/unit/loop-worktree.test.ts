@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import {
   WorktreeError,
+  removeWorktreeIfClean,
   git,
   headOf,
   currentBranch,
@@ -165,5 +166,18 @@ describe("seedLedger — reseed backup (L-29a)", () => {
     const backups = fs.readdirSync(wt).filter((n) => n.startsWith("WORKPLAN.md.pre-seed-"));
     expect(backups).toHaveLength(1);
     expect(fs.readFileSync(path.join(wt, backups[0]), "utf-8")).toBe("- [x] T-1\n");
+  }, SLOW);
+});
+
+describe("removeWorktreeIfClean uses non-force removal (round 10)", () => {
+  it("a clean worktree is removed; a dirty one is left with no force applied", async () => {
+    const { path: wt } = await ensureWorktree(dir);
+    await removeWorktreeIfClean(dir);
+    expect(fs.existsSync(wt)).toBe(false);
+
+    const { path: wt2 } = await ensureWorktree(dir);
+    fs.writeFileSync(path.join(wt2, "precious.ts"), "uncommitted");
+    await removeWorktreeIfClean(dir);
+    expect(fs.existsSync(path.join(wt2, "precious.ts"))).toBe(true);
   }, SLOW);
 });

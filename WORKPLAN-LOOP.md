@@ -181,3 +181,4 @@ PR #94의 자율 루프 엔진은 문자열 템플릿 bash 슈퍼바이저(`rend
 - 2026-08-27: L-29 완료 (재시드 전 worktree 원장 .pre-seed 백업, sync 비활성화 경로는 dirty worktree를 경고와 함께 보존).
 - 2026-08-27: L-30 완료 (critical: 셸 메타문자 금지 재도입 — 값이 loop-guard bash에 렌더됨; sentinel trim·개행 금지; apply_patch `Move to:` 목적지 검사).
 - 2026-08-27: L-31 완료. ultracode 감사 확정 17건 전부 수정(L-26~L-30), 기각 3건은 검증 근거 보존, 미검증 1건 §6 리스크 기록. 테스트 1219개.
+- 2026-08-27: 라운드10 4건 수용(relPath CR 금지·stop 최종 삭제를 reclaim 프로토콜로·childPid 정체 token-exact·IfClean 비강제 git 제거), 1건 기각(날짜 — 실제 오늘 08-27). 테스트 준비 폴링 2건 보강.

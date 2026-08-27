@@ -155,9 +155,14 @@ describe("omh loop start — orphaned turn (L-27f)", () => {
     harness();
     ledgerAndOrders();
     const { spawn } = await import("node:child_process");
-    const orphan = spawn("sleep", ["30"], { detached: true, stdio: "ignore" });
+    // the orphan must look like the runtime — a reused pid on an unrelated
+    // process is reclaimable, so a bare sleep would (correctly) not refuse
+    const orphan = spawn("bash", ["-c", "exec -a claude sleep 30"], { detached: true, stdio: "ignore" });
     orphan.unref();
-    await new Promise((r) => setTimeout(r, 150));
+    const { isTurnProcess } = await import("../../src/loop/stop.js");
+    for (let i = 0; i < 40 && !isTurnProcess(orphan.pid!, "claude"); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
     const p = loopPaths(dir);
     fs.mkdirSync(p.dir, { recursive: true });
     fs.writeFileSync(p.runJson, JSON.stringify({ runId: "DEAD", pid: 999999, startedAt: "", runtime: "claude", iteration: 1, childPid: orphan.pid, cwd: dir }));

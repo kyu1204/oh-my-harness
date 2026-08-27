@@ -68,6 +68,20 @@ describe("buildCodexHooks", () => {
     expect(codexHooks.hooks.PreToolUse[0].matcher).toBe("Edit|Write|apply_patch");
   });
 
+  // loop-guard uses Edit|Write|Bash; without the alias it never fired on Codex.
+  it("adds the apply_patch alias to any matcher that contains Edit or Write (L-10)", () => {
+    for (const [given, expected] of [
+      ["Edit|Write|Bash", "Edit|Write|Bash|apply_patch"],
+      ["Bash|Write", "Bash|Write|apply_patch"],
+      ["Edit|apply_patch", "Edit|apply_patch"],
+    ]) {
+      const out = makeHooksOutput({
+        PreToolUse: [{ matcher: given, hooks: [{ type: "command", command: "bash /p/g.sh" }] }],
+      });
+      expect(buildCodexHooks(out).codexHooks.hooks.PreToolUse[0].matcher).toBe(expected);
+    }
+  });
+
   it("leaves unrelated matchers alone", () => {
     const out = makeHooksOutput({
       PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "bash /p/g.sh" }] }],

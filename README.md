@@ -103,12 +103,16 @@ your-project/
 │   │   ├── catalog-command-guard.sh   # Blocks dangerous commands
 │   │   ├── catalog-lint-on-save.sh    # Auto-lint on save
 │   │   └── catalog-auto-pr.sh         # Auto-create PR after push
+│   ├── loop/
+│   │   └── worktree/                  # gitignored — the loop's isolated git worktree (see Loop Engine)
 │   ├── state/                         # gitignored — log/runtime data
 │   │   ├── events.jsonl               # Unified hook event log (powers omh stats)
+│   │   ├── loop/                      # run.json (lock + identity), stop flag, runs/<id>/events.jsonl
 │   │   └── tdd-edits.json             # TDD guard working state
 │   └── manifest.json                  # Generated-files manifest
 ├── .claude/
 │   ├── settings.json                  # Claude permissions + hooks → .omh/hooks/*.sh
+│   ├── skills/omh-loop/SKILL.md       # "run this as a loop" skill
 │   └── oh-my-harness.json             # Harness init/sync state
 └── .codex/
     ├── config.toml                    # [features] hooks = true, goals = true
@@ -215,6 +219,7 @@ All enforcement is powered by **catalog blocks** — reusable, parameterized hoo
 | 🗜️ `compact-context` | maintenance | Re-injects context on session start |
 | 📋 `config-audit` | audit | Audit trail for config changes |
 | 🔔 `desktop-notify` | ux | Cross-platform desktop notifications |
+| 🔁 `loop-guard` | quality | Blocks a loop session from writing its own work orders or touching architect-only paths |
 
 ### Usage in `harness.yaml`
 
@@ -258,6 +263,96 @@ Any blocking hook accepts an optional `mode` (default `block`):
 
 `mode: ask` only applies to blocks that can block (`canBlock: true`); setting it
 on a non-blocking block (e.g. `lint-on-save`) is reported and ignored.
+
+---
+
+## 🔁 Autonomous Loop Engine
+
+Once `omh init`/`omh sync` has run (with `loop.enabled: true`, the default),
+any agent session (Claude Code, Codex, Pi) can be told **"run this as a loop"** — the generated `omh-loop` skill turns that
+into a fully set-up autonomous loop, no manual wiring:
+
+```text
+you: "ship the remaining Phase B tasks as a loop"
+        │
+        ▼  omh-loop skill (the session becomes the ARCHITECT)
+  1. writes the `loop.ledger`     — default WORKPLAN.md; goal gates + task checkboxes
+  2. writes `loop.workOrders`/*.md — default docs/work-orders; one exact work order per task
+  3. runs `omh loop start`        — a detached supervisor; with `isolate: true` (default), in its own git worktree
+  4. attaches monitoring          — omh loop status, then tail -f .omh/state/loop/runs/<id>/events.jsonl
+        │
+        ▼  loop (fresh headless session per iteration, cheap model)
+  pick next unchecked task → implement its work order exactly → run its
+  acceptance commands → tick checkbox + commit → repeat until the sentinel
+```
+
+The design follows a battle-tested pattern from real autonomous runs: state
+lives in **files** (ledger + git log), never in a conversation. Each iteration
+is a fresh headless session (`claude -p` / `codex exec --dangerously-bypass-hook-trust` / `pi --print --no-session`)
+on an explicit cheap model, so token use stays flat.
+
+### Why it doesn't fall over
+
+Every guard below exists because the failure actually happened somewhere:
+
+| Guard | Failure it prevents |
+|-------|---------------------|
+| Sentinel = fixed string, whole line, clean exit only | a crashed turn (or a turn merely *mentioning* the sentinel) ending the loop as "complete" |
+| Three **separate** backoffs — usage limit / empty-output failed turn / consecutive `BLOCKED` | a loop once spun **266 iterations** doing nothing because waiting-on-a-human was treated like a failure |
+| `loop-guard` hook blocks the loop writing its own work orders (Edit/Write **and** Bash redirection/`cd`) | self-approval: the loop authoring the spec it then implements |
+| `loop-guard` blocks architect-only paths, listed **by name** | an abstract "don't improvise" is ignored; a named path is obeyed |
+| Worktree isolation (`isolate: true`, default) | the loop and the architect fighting over the same working tree |
+| Ledger seeded once, re-seeded only when the main-tree copy is newer | the loop's progress being rolled back — or a second goal reusing the first goal's ledger |
+
+### Configuration
+
+On by default. Everything is optional in `harness.yaml`:
+
+```yaml
+loop:
+  enabled: true                # false removes all loop assets on next sync
+  ledger: WORKPLAN.md          # single source of truth
+  workOrders: docs/work-orders # architect-written task specs
+  model: sonnet                # cheap implementation model (always explicit)
+  sentinel: OMH_GOAL_COMPLETE  # whole-line completion signal
+  interval: 120                # seconds between iterations
+  blockedBackoff: 1800         # backoff once stallStreak blocked/idle turns pile up
+  limitBackoff: 1800           # backoff after a provider usage limit
+  emptyBackoff: 300            # backoff after a crashed (empty-output / timed-out) turn
+  stallStreak: 3               # consecutive blocked/idle turns before blockedBackoff
+  turnTimeout: 7200            # hard per-turn timeout (seconds); the turn is killed past this
+  architectOnly: []            # paths the loop must never touch (name them!)
+  isolate: true                # run in .omh/loop/worktree on branch omh-loop
+  runtime: claude              # claude | codex | pi
+```
+
+### Operating it
+
+```bash
+omh loop start            # preflight, then a detached supervisor (the skill does this for you)
+omh loop status           # run id, pid, iteration, last event, events path
+tail -f .omh/state/loop/runs/<id>/events.jsonl   # progress / blocked / idle / limit / crash
+omh loop stop [--now]     # stop flag + SIGTERM to the whole process group (--now: 1s grace)
+omh loop clean [--branch] # remove the worktree and stale state (and optionally the omh-loop branch)
+```
+
+The supervisor is TypeScript (`src/loop/`), not a generated script: the runtime
+is spawned from an argv array (no shell), each turn is judged by the **ledger
+diff and git HEAD** rather than by grepping output, and the run lock is a single
+`run.json` created atomically with `link(2)`. POSIX only — it relies on process
+groups and `ps` for identity checks.
+
+Known limit: the ledger is seeded into the worktree once per goal (by content
+hash). Editing the main-tree ledger mid-run does nothing until the next start,
+which then re-seeds it — add mid-run tasks as new work orders instead, and edit
+the worktree's ledger if you must.
+
+A task the loop cannot finish (needs a human, or 3 failed attempts) is marked
+`BLOCKED: <reason>` in the ledger and skipped — the loop never idles waiting
+for a person. When you unblock it (e.g. fix an architect-only file), the loop
+picks it back up after its backoff. When the goal completes in isolation, merge
+the `omh-loop` branch and **re-verify** — a clean textual merge is not a
+semantic one.
 
 ---
 
@@ -403,13 +498,13 @@ oh-my-harness/
 ├── bin/                    # CLI entry point
 ├── src/
 │   ├── catalog/
-│   │   ├── blocks/         # 17 building block definitions
+│   │   ├── blocks/         # 18 building block definitions
 │   │   ├── types.ts        # BuildingBlock, HookEntry schemas
 │   │   ├── registry.ts     # Block discovery & search
 │   │   ├── template-engine.ts # Handlebars rendering + applyDefaults
 │   │   └── converter.ts    # HookEntry[] → rendered scripts
 │   ├── cli/
-│   │   ├── commands/       # init, doctor, catalog, hook, sync, test
+│   │   ├── commands/       # init, doctor, catalog, hook, sync, test, loop (start/run/stop/status/clean)
 │   │   ├── stats/          # TUI dashboard (ink/React)
 │   │   │   ├── App.tsx     # App shell (tab bar, keyboard nav)
 │   │   │   ├── data.ts     # Data aggregation layer
@@ -420,6 +515,14 @@ oh-my-harness/
 │   │   ├── tui/               # Interactive provider & model selection
 │   │   ├── provider-setup.ts  # Provider configuration UI
 │   │   └── tool-checker.ts    # Command executable checks
+│   ├── loop/               # autonomous loop supervisor (TypeScript, no generated shell)
+│   │   ├── supervisor.ts   # one run: lock → worktree/seed → turns → release
+│   │   ├── state.ts        # run.json link-lock, events, atomic writes
+│   │   ├── classify.ts     # turn verdict from ledger diff + HEAD; wait policy
+│   │   ├── runtime.ts      # argv per runtime, turn execution in its own process group
+│   │   ├── worktree.ts     # git worktree lifecycle, asset sync, ledger seeding
+│   │   ├── protocol.ts     # the rules, rendered into prompt / CLAUDE.md / skill
+│   │   └── stop.ts         # identity-checked group stop, group sweep
 │   ├── core/
 │   │   ├── harness-schema.ts      # harness.yaml Zod schema
 │   │   ├── merged-config.ts       # MergedConfig + HooksConfig interfaces
@@ -466,7 +569,7 @@ oh-my-harness/
 
 - [x] `npx oh-my-harness` — zero-install usage
 - [x] `omh sync` — regenerate from harness.yaml
-- [x] Building block catalog — 17 verified hook templates
+- [x] Building block catalog — 18 verified hook templates
 - [x] Project detector — 14 language auto-detection
 - [x] `omh test` — dry-run hook verification
 - [x] `omh stats` — TUI analytics dashboard (ink)
@@ -481,6 +584,7 @@ oh-my-harness/
 - [x] `ask` mode — request approval before executing risky tools (Claude native prompt / Pi `ctx.ui.select`; Codex falls back to block)
 - [x] `omh uninstall` — remove generated artifacts while preserving user content
 - [x] `omh config` — view, reconfigure, or reset the saved AI provider (rotate expired keys, switch provider/model)
+- [x] Autonomous loop engine — `omh-loop` skill, worktree-isolated runner, loop-guard, JSONL monitoring
 - [ ] Community harness.yaml registry — share and reuse configs
 - [ ] `omh modify "change X"` — NL config editing
 

@@ -13,6 +13,8 @@ CLAUDE.md
 .claude/
 
 # oh-my-harness
+.omh/loop/worktree/
+.omh/state/
 .claude/hooks/
 .claude/hooks/.state/
 .omx/

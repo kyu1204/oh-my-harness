@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import type { MergedConfig } from "./merged-config.js";
 import type { GenerationPlan, PlannedFile } from "./plan.js";
@@ -9,6 +10,10 @@ import { generateCodexConfig, computeCodexConfig } from "../generators/codex-con
 import { generatePiExtension, computePiExtension } from "../generators/pi-extension.js";
 import { updateGitignore, computeGitignore } from "../generators/gitignore.js";
 import { computeManagedMarkdown } from "../generators/managed-md.js";
+import { computeLoopAssets, loopAssetPaths } from "../generators/loop-assets.js";
+import { atomicWrite } from "../loop/state.js";
+import { stopLoop } from "../loop/stop.js";
+import { removeWorktreeIfClean } from "../loop/worktree.js";
 import { migrateLegacyState } from "../utils/state-migration.js";
 import { OMH_DIR } from "../utils/paths.js";
 
@@ -49,8 +54,41 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   ]);
   files.push(`${projectDir}/.claude/settings.json`, ...codexFiles, ...piFiles);
 
+  // Loop-engine assets (runner, and later the skill/monitor/templates). Emitted
+  // through the same compute function as the plan path so drift detection sees
+  // them; skipped entirely when the loop engine is not configured.
+  // Migration: versions before the TypeScript supervisor generated a shell
+  // runner here. It is no longer a managed asset, so remove it explicitly.
+  await fs.rm(path.join(projectDir, OMH_DIR, "loop", "run.sh"), { force: true });
+
+  const loopAssets = await computeLoopAssets({ projectDir, config });
+  for (const asset of loopAssets) {
+    atomicWrite(asset.path, asset.content, asset.chmod);
+    files.push(asset.path);
+  }
+  if (!config.loop) {
+    // The loop was disabled after a previous sync: stop a live run, tear the
+    // worktree down, then remove the now-stale assets.
+    await stopLoop(projectDir);
+    // The stop flag has served its purpose once the loop is down; a leftover
+    // would otherwise just be cleared by the next start.
+    await fs.rm(path.join(projectDir, OMH_DIR, "state", "loop", "stop"), { force: true });
+    // A routine sync must never destroy uncommitted loop work. A dirty
+    // worktree stays in place with a warning; explicit destruction remains
+    // the job of `omh loop clean` and uninstall.
+    await removeWorktreeIfClean(projectDir);
+    for (const stale of loopAssetPaths(projectDir)) {
+      await fs.rm(stale, { recursive: true, force: true });
+    }
+  }
+
   // .omh/state/ holds volatile log data; hooks/manifest are reproducible.
-  await updateGitignore(projectDir, [`${OMH_DIR}/state/`]);
+  await updateGitignore(projectDir, [
+    `${OMH_DIR}/state/`,
+    // The loop's isolated worktree lives inside the repo; without this it (and
+    // everything the loop builds there) shows up as untracked in the main tree.
+    ...(config.loop?.isolate ? [`${OMH_DIR}/loop/worktree/`] : []),
+  ]);
   files.push(`${projectDir}/.gitignore`);
 
   return { files };
@@ -79,7 +117,10 @@ export async function planGenerate(options: GenerateOptions): Promise<Generation
     computeSettings({ projectDir, config, hooksOutput }),
     computeCodexConfig({ projectDir, hooksOutput }),
     Promise.resolve(computePiExtension({ projectDir, hooksOutput })),
-    computeGitignore(projectDir, [`${OMH_DIR}/state/`]),
+    computeGitignore(projectDir, [
+      `${OMH_DIR}/state/`,
+      ...(config.loop?.isolate ? [`${OMH_DIR}/loop/worktree/`] : []),
+    ]),
   ]);
 
   files.push({ path: path.join(projectDir, "CLAUDE.md"), content: claudeMd });
@@ -88,7 +129,27 @@ export async function planGenerate(options: GenerateOptions): Promise<Generation
   files.push(settings);
   files.push(...codexFiles);
   files.push(...piFiles);
+  files.push(...(await computeLoopAssets({ projectDir, config })));
   if (gitignore) files.push(gitignore);
 
-  return { files, wouldDelete: hooksPlan.wouldDelete };
+  const wouldDelete = [...hooksPlan.wouldDelete];
+  // Mirror generate(): the legacy shell runner is removed on sync.
+  const legacyRunner = path.join(projectDir, OMH_DIR, "loop", "run.sh");
+  try {
+    await fs.access(legacyRunner);
+    wouldDelete.push(legacyRunner);
+  } catch {
+    // not present
+  }
+  if (!config.loop) {
+    for (const stale of loopAssetPaths(projectDir)) {
+      try {
+        await fs.access(stale);
+        wouldDelete.push(stale);
+      } catch {
+        // not present — nothing stale
+      }
+    }
+  }
+  return { files, wouldDelete };
 }

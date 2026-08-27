@@ -4,6 +4,7 @@ import type { CatalogRegistry } from "../catalog/registry.js";
 import type { HookEntry } from "../catalog/types.js";
 import { createDefaultRegistry } from "../catalog/registry.js";
 import { convertHookEntries } from "../catalog/converter.js";
+import { renderProtocolSection } from "../loop/protocol.js";
 
 function harnessToMergedConfig(harness: HarnessConfig): MergedConfig {
   const variables: Variables = {};
@@ -20,12 +21,22 @@ function harnessToMergedConfig(harness: HarnessConfig): MergedConfig {
     .map((rule) => ({ id: rule.id, title: rule.title, content: rule.content, priority: rule.priority }))
     .sort((a, b) => (a.priority ?? 50) - (b.priority ?? 50));
 
+  if (harness.loop?.enabled) {
+    claudeMdSections.push({
+      id: "omh-loop-protocol",
+      title: "Autonomous Loop Protocol",
+      content: renderProtocolSection(harness.loop),
+      priority: 90,
+    });
+  }
+
   return {
     presets: ["harness"],
     variables,
     claudeMdSections,
     hooks: { preToolUse: [], postToolUse: [], sessionStart: [], notification: [], configChange: [], worktreeCreate: [] },
     settings: { permissions: { allow: harness.permissions.allow, deny: harness.permissions.deny } },
+    ...(harness.loop?.enabled ? { loop: harness.loop } : {}),
   };
 }
 
@@ -77,6 +88,20 @@ export async function harnessToMergedConfigV2(
 
   // Merge enforcement-derived hooks with explicit hooks (dedup by block id)
   const allHookEntries = mergeEnforcementAndHooks(harness);
+
+  // The loop engine brings its guard along. An explicit loop-guard entry may
+  // choose its mode, but the paths it protects always come from the loop
+  // config — otherwise an empty explicit entry would silently unguard the
+  // real work-order directory.
+  if (harness.loop?.enabled) {
+    const loopParams = { workOrders: harness.loop.workOrders, architectOnly: harness.loop.architectOnly };
+    const explicit = allHookEntries.find((h) => h.block === "loop-guard");
+    if (explicit) {
+      explicit.params = { ...explicit.params, ...loopParams };
+    } else {
+      allHookEntries.push({ block: "loop-guard", params: loopParams, mode: "block" });
+    }
+  }
 
   // If no hook entries at all, return base config unchanged
   if (allHookEntries.length === 0) {

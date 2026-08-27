@@ -4,6 +4,8 @@ import path from "node:path";
 import { parse, stringify } from "smol-toml";
 import { extractManagedSections, removeManagedSection } from "../utils/markdown.js";
 import { isOmhHookCommand } from "./managed-hooks.js";
+import { stopLoop } from "../loop/stop.js";
+import { removeWorktree } from "../loop/worktree.js";
 
 export interface ComputeUninstallOptions {
   projectDir: string;
@@ -215,6 +217,7 @@ export async function computeUninstall(options: ComputeUninstallOptions): Promis
     path.join(projectDir, ".omh"),
     path.join(projectDir, ".claude", "oh-my-harness.json"),
     path.join(projectDir, ".pi", "extensions", "omh-harness.ts"),
+    path.join(projectDir, ".claude", "skills", "omh-loop"),
   ]) {
     if (await exists(target)) plan.delete.push(target);
   }
@@ -277,10 +280,24 @@ async function restoreBackups(backups: Map<string, string>, result: UninstallRes
   }
 }
 
+function planProjectDir(plan: UninstallPlan): string | null {
+  const omh = plan.delete.find((d) => path.basename(d) === ".omh");
+  return omh ? path.dirname(omh) : null;
+}
+
 export async function applyUninstallPlan(
   plan: UninstallPlan,
   options: ApplyUninstallOptions = {},
 ): Promise<UninstallResult> {
+  // Planning must stay side-effect free (dry runs, cancelled confirmations).
+  // Only here, when the plan is applied, do we stop a live loop and tear its
+  // worktree down — .omh and the stop flag are about to be deleted.
+  const projectDir = planProjectDir(plan);
+  if (projectDir) {
+    await stopLoop(projectDir);
+    await removeWorktree(projectDir).catch(() => undefined);
+  }
+
   const result: UninstallResult = {
     modified: [],
     deleted: [],

@@ -7,13 +7,19 @@ import {
 import { listModels, type ListModelsOptions } from "../../nl/list-models.js";
 import { ensureCodexOauthApiAuth } from "../../nl/providers/codex-oauth-api.js";
 import { createPkce, buildOpenrouterAuthUrl, exchangeOpenrouterCode } from "../../nl/providers/openrouter-oauth.js";
-import { openInBrowser } from "./open-browser.js";
+import { openInBrowser, hyperlink } from "./open-browser.js";
 
-/** Show a sign-in URL on its own line (easy to copy) and try to open it. */
+/**
+ * Show a sign-in URL and try to open it. The URL is printed as a bare line
+ * outside any box: clack's note hard-wraps and adds borders, which breaks
+ * terminal link detection on narrow screens.
+ */
 async function showAuthLink(title: string, url: string, extra?: string): Promise<void> {
   const opened = await openInBrowser(url);
-  const lead = opened ? "Opened in your browser. If it did not open, visit:" : "Open this URL in your browser:";
-  p.note([lead, "", url, ...(extra ? ["", extra] : [])].join("\n"), title);
+  p.log.step(title);
+  p.log.message(opened ? "Opened in your browser. If it did not open, visit:" : "Open this URL in your browser:");
+  process.stdout.write(`\n${hyperlink(url)}\n\n`);
+  if (extra) p.log.message(extra);
 }
 import {
   saveProviderConfig,

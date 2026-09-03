@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import type { LLMProvider } from "../provider-registry.js";
 
 const DEFAULT_COMMAND = "codex";
-const DEFAULT_MODEL = "gpt-5.5";
+const DEFAULT_MODEL = "gpt-5.6-sol";
 const DEFAULT_TIMEOUT_MS = 120_000;
 
 export interface CodexOauthProviderOptions {

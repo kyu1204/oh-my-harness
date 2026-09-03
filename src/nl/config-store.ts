@@ -3,11 +3,13 @@ import path from "node:path";
 import os from "node:os";
 
 export interface ProviderConfig {
-  provider: "claude" | "openai" | "gemini" | "codex" | "codex-oauth-api";
+  provider: "claude" | "openai" | "gemini" | "codex" | "openrouter" | "openai-compatible";
   method: "cli" | "api" | "oauth" | "oauth-api";
   apiKey?: string;
   model?: string;
   cliCommand?: string;
+  /** OpenAI-compatible endpoint root, e.g. http://localhost:11434/v1 (openai-compatible only). */
+  baseUrl?: string;
 }
 
 export function getConfigDir(): string {
@@ -31,7 +33,12 @@ export async function hasProviderConfig(): Promise<boolean> {
 export async function loadProviderConfig(): Promise<ProviderConfig | undefined> {
   try {
     const raw = await fs.readFile(getConfigPath(), "utf-8");
-    return JSON.parse(raw) as ProviderConfig;
+    const parsed = JSON.parse(raw) as Omit<ProviderConfig, "provider"> & { provider: string };
+    // Legacy: "codex-oauth-api" used to be its own provider; it is now codex + oauth-api.
+    if (parsed.provider === "codex-oauth-api") {
+      return { ...parsed, provider: "codex", method: "oauth-api" };
+    }
+    return parsed as ProviderConfig;
   } catch {
     return undefined;
   }

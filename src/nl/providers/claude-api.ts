@@ -1,6 +1,6 @@
 import type { LLMProvider } from "../provider-registry.js";
 
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+const DEFAULT_MODEL = "claude-sonnet-5";
 const API_URL = "https://api.anthropic.com/v1/messages";
 const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_ATTEMPTS = 3;

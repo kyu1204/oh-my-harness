@@ -35,7 +35,8 @@ function printSummary(config: ProviderConfig): void {
   console.log(`  method:   ${chalk.cyan(config.method)}`);
   if (config.method === "api") {
     console.log(`  model:    ${chalk.cyan(config.model ?? "(default)")}`);
-    console.log(`  api key:  ${chalk.dim(maskApiKey(config.apiKey))}`);
+    if (config.baseUrl) console.log(`  base url: ${chalk.cyan(config.baseUrl)}`);
+    console.log(`  api key:  ${chalk.dim(config.apiKey ? maskApiKey(config.apiKey) : "(none)")}`);
   } else if (config.method === "oauth") {
     console.log(`  model:    ${chalk.cyan(config.model ?? "(default)")}`);
     console.log(`  command:  ${chalk.cyan(config.cliCommand ?? config.provider)}`);
@@ -103,10 +104,16 @@ export async function configCommand(options: ConfigOptions = {}): Promise<Config
     return { exitCode: 0 };
   }
 
-  // Default: show current config (if any), then reconfigure.
+  // Default: show current config, then ask before launching setup so a plain
+  // `omh config` is a safe read; `--yes` skips the prompt.
   if (existing) {
     printSummary(existing);
     console.log("");
+    if (!options.yes) {
+      const confirm = options.confirm ?? defaultConfirm;
+      const ok = await confirm("Reconfigure the AI provider?");
+      if (!ok) return { exitCode: 0 };
+    }
   } else {
     console.log("No AI provider configured yet. Let's set one up.\n");
   }

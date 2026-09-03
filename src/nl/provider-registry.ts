@@ -1,10 +1,11 @@
 import type { ProviderConfig } from "./config-store.js";
 import { createClaudeCliProvider } from "./providers/claude-cli.js";
 import { createClaudeApiProvider } from "./providers/claude-api.js";
-import { createOpenaiApiProvider } from "./providers/openai-api.js";
+import { createOpenaiApiProvider, OPENAI_BASE_URL } from "./providers/openai-api.js";
 import { createGeminiApiProvider } from "./providers/gemini-api.js";
 import { createCodexOauthProvider } from "./providers/codex-oauth.js";
 import { createCodexOauthApiProvider } from "./providers/codex-oauth-api.js";
+import { OPENROUTER_BASE_URL } from "./providers/openrouter-oauth.js";
 
 export interface LLMProvider {
   name: string;
@@ -23,9 +24,15 @@ export interface ProviderDefinition {
   supportsApi: boolean;
   supportsOAuth: boolean;
   supportsOAuthApi: boolean;
+  /** Static fallback list; the TUI fetches the live list first when the provider has one. */
   defaultModel: string;
   availableModels: ModelEntry[];
   cliCommand?: string;
+  /** User must supply an OpenAI-compatible base URL (local servers, routers). */
+  requiresBaseUrl?: boolean;
+  defaultBaseUrl?: string;
+  /** Setup can obtain the API key through a browser sign-in instead of pasting one. */
+  supportsBrowserKeyLogin?: boolean;
 }
 
 const providers: ProviderDefinition[] = [
@@ -36,25 +43,28 @@ const providers: ProviderDefinition[] = [
     supportsApi: true,
     supportsOAuth: false,
     supportsOAuthApi: false,
-    defaultModel: "claude-sonnet-4-6",
+    defaultModel: "claude-sonnet-5",
     availableModels: [
-      { id: "claude-opus-4-6", label: "Claude Opus 4.6 — most capable, 1M context" },
-      { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 — balanced, 1M context" },
+      { id: "claude-opus-5", label: "Claude Opus 5 — most capable, 1M context" },
+      { id: "claude-sonnet-5", label: "Claude Sonnet 5 — balanced, 1M context" },
       { id: "claude-haiku-4-5", label: "Claude Haiku 4.5 — fastest, 200k context" },
     ],
     cliCommand: "claude",
   },
   {
     name: "openai",
-    displayName: "OpenAI (GPT-5.5)",
+    displayName: "OpenAI",
     supportsCli: false,
     supportsApi: true,
     supportsOAuth: false,
     supportsOAuthApi: false,
-    defaultModel: "gpt-5.5",
+    defaultModel: "gpt-5.6-sol",
     availableModels: [
-      { id: "gpt-5.5", label: "GPT-5.5 — newest frontier, complex reasoning & coding" },
-      { id: "gpt-5.4", label: "GPT-5.4 — previous flagship, agentic & coding" },
+      { id: "gpt-5.6-sol", label: "GPT-5.6 Sol — flagship reasoning & coding" },
+      { id: "gpt-5.6-terra", label: "GPT-5.6 Terra — balanced intelligence/cost" },
+      { id: "gpt-5.6-luna", label: "GPT-5.6 Luna — cost-sensitive, high volume" },
+      { id: "gpt-5.5", label: "GPT-5.5 — previous frontier" },
+      { id: "gpt-5.4", label: "GPT-5.4 — agentic & coding" },
       { id: "gpt-5.4-mini", label: "GPT-5.4 Mini — strongest mini model" },
       { id: "gpt-5.4-nano", label: "GPT-5.4 Nano — cheapest GPT-5.4 class" },
       { id: "gpt-4.1", label: "GPT-4.1 — best non-reasoning, coding" },
@@ -81,32 +91,46 @@ const providers: ProviderDefinition[] = [
   },
   {
     name: "codex",
-    displayName: "Codex OAuth (OpenAI ChatGPT login)",
+    displayName: "Codex (ChatGPT subscription login)",
     supportsCli: false,
     supportsApi: false,
     supportsOAuth: true,
-    supportsOAuthApi: false,
-    defaultModel: "gpt-5.5",
+    supportsOAuthApi: true,
+    defaultModel: "gpt-5.6-sol",
     availableModels: [
-      { id: "gpt-5.5", label: "GPT-5.5 — frontier Codex reasoning when available" },
-      { id: "gpt-5.4", label: "GPT-5.4 — previous Codex default-capable flagship" },
-      { id: "gpt-5.4-mini", label: "GPT-5.4 Mini — faster Codex runs" },
+      { id: "gpt-5.6-sol", label: "GPT-5.6 Sol — flagship reasoning & coding" },
+      { id: "gpt-5.6-terra", label: "GPT-5.6 Terra — balanced intelligence/cost" },
+      { id: "gpt-5.6-luna", label: "GPT-5.6 Luna — cost-sensitive, high volume" },
+      { id: "gpt-5.5", label: "GPT-5.5 — previous frontier" },
+      { id: "gpt-5.4", label: "GPT-5.4 — agentic & coding" },
     ],
     cliCommand: "codex",
   },
   {
-    name: "codex-oauth-api",
-    displayName: "Codex OAuth API (ChatGPT token direct)",
+    name: "openrouter",
+    displayName: "OpenRouter (300+ models, one key, free tier available)",
     supportsCli: false,
-    supportsApi: false,
+    supportsApi: true,
     supportsOAuth: false,
-    supportsOAuthApi: true,
-    defaultModel: "gpt-5.5",
+    supportsOAuthApi: false,
+    supportsBrowserKeyLogin: true,
+    defaultModel: "openrouter/auto",
     availableModels: [
-      { id: "gpt-5.5", label: "GPT-5.5 — direct Codex OAuth Responses endpoint" },
-      { id: "gpt-5.4", label: "GPT-5.4 — previous direct Codex OAuth model" },
-      { id: "gpt-5.4-mini", label: "GPT-5.4 Mini — faster direct Codex OAuth runs" },
+      { id: "openrouter/auto", label: "Auto — OpenRouter picks a model per request" },
+      { id: "openrouter/free", label: "Free router — rotates across free models" },
     ],
+  },
+  {
+    name: "openai-compatible",
+    displayName: "OpenAI-compatible endpoint (Ollama, llama.cpp, MLX, LM Studio, routers)",
+    supportsCli: false,
+    supportsApi: true,
+    supportsOAuth: false,
+    supportsOAuthApi: false,
+    defaultModel: "",
+    availableModels: [],
+    requiresBaseUrl: true,
+    defaultBaseUrl: "http://localhost:11434/v1",
   },
 ];
 
@@ -165,26 +189,36 @@ export function createProvider(config: ProviderConfig): LLMProvider {
   }
 
   if (config.method === "oauth-api") {
-    if (config.provider === "codex-oauth-api") {
-      const model = config.model?.trim() || def.defaultModel;
-      return createCodexOauthApiProvider({ model });
-    }
-    throw new Error(`Provider "${config.provider}" does not support OAuth API mode`);
+    const model = config.model?.trim() || def.defaultModel;
+    return createCodexOauthApiProvider({ model });
   }
 
   // API mode
-  const apiKey = config.apiKey?.trim();
+  const apiKey = config.apiKey?.trim() ?? "";
+  const model = config.model?.trim() || def.defaultModel;
+
+  if (config.provider === "openai-compatible") {
+    const baseUrl = config.baseUrl?.trim();
+    if (!baseUrl) throw new Error(`baseUrl is required for "openai-compatible" provider`);
+    if (!model) throw new Error(`model is required for "openai-compatible" provider`);
+    return createOpenaiApiProvider(apiKey, model, { baseUrl, name: "openai-compatible" });
+  }
+
   if (!apiKey) {
     throw new Error(`API key is required for "${config.provider}" API mode`);
   }
-
-  const model = config.model?.trim() || def.defaultModel;
 
   switch (config.provider) {
     case "claude":
       return createClaudeApiProvider(apiKey, model);
     case "openai":
-      return createOpenaiApiProvider(apiKey, model);
+      return createOpenaiApiProvider(apiKey, model, { baseUrl: OPENAI_BASE_URL });
+    case "openrouter":
+      return createOpenaiApiProvider(apiKey, model, {
+        baseUrl: OPENROUTER_BASE_URL,
+        name: "openrouter",
+        headers: { "HTTP-Referer": "https://github.com/kyu1204/oh-my-harness", "X-Title": "oh-my-harness" },
+      });
     case "gemini":
       return createGeminiApiProvider(apiKey, model);
     default:

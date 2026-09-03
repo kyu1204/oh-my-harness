@@ -126,13 +126,13 @@ your-project/
 ```text
   ~/.omh/config.json   ┌─────────────────────┐
   ┌────────────────┐   │                     │
-  │ • Claude CLI   │──▶│   NL Processing     │◀── "React + FastAPI
-  │ • Claude API   │   │   (describe your    │     TDD enforced"
-  │ • OpenAI API   │   │                     │
-  │ • Gemini API   │   │                     │
-  │ • Codex OAuth  │   │                     │
-  │ • Codex OAuth  │   │                     │
-  │   API          │   └────────┬────────────┘
+  │ • Claude       │──▶│   NL Processing     │◀── "React + FastAPI
+  │ • OpenAI       │   │   (describe your    │     TDD enforced"
+  │ • Gemini       │   │                     │
+  │ • Codex        │   │                     │
+  │ • OpenRouter   │   │                     │
+  │ • OpenAI-compat│   │                     │
+  │   (local LLMs) │   └────────┬────────────┘
   └────────────────┘            │
    (global AI config)   ┌────────▼────────────┐
                         │  Project Detector   │  ← Auto-detects language,
@@ -177,21 +177,34 @@ oh-my-harness automatically detects your project type and injects accurate facts
 
 ### 🤖 AI Provider Setup
 
-oh-my-harness supports multiple AI providers for natural language mode:
+Natural language mode (`omh init "description"`) needs one LLM call. Pick a provider once with `omh config`; it is saved globally in `~/.omh/config.json`.
 
-| Provider | Setup | Available Models | Default |
-|----------|-------|------------------|---------|
-| **Claude CLI** | `claude` command installed | Opus 4.6, Sonnet 4.6, Haiku 4.5 | ✓ |
-| **Claude API** | Set `ANTHROPIC_API_KEY` | Opus 4.6, Sonnet 4.6, Haiku 4.5 | Sonnet 4.6 |
-| **OpenAI API** | Set `OPENAI_API_KEY` | GPT-5.5, GPT-5.4, GPT-5.4-mini, GPT-5.4-nano, GPT-4.1, GPT-4.1-mini, o3, o4-mini | GPT-5.5 |
-| **Gemini API** | Set `GOOGLE_API_KEY` | Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.5 Flash Lite, Gemini 3.1 Pro Preview | Gemini 2.5 Pro |
-| **Codex OAuth** | `codex` command installed + `codex login`; runs `codex exec` | GPT-5.5, GPT-5.4, GPT-5.4-mini | GPT-5.5 |
-| **Codex OAuth API** | `omh config` device-code login; imports `~/.codex/auth.json` once if present, then uses `~/.omh` | GPT-5.5, GPT-5.4, GPT-5.4-mini | GPT-5.5 |
+| Provider | How to connect | Models |
+|----------|----------------|--------|
+| **Claude** | `claude` CLI (no key), or Anthropic API key | Live list from `/v1/models` (Sonnet 5 default) |
+| **OpenAI** | API key | Live list from `/v1/models` (GPT-5.6 Sol default) |
+| **Gemini** | API key | Live list from the Gemini API (2.5 Pro default) |
+| **Codex** (ChatGPT subscription) | via the `codex` CLI (`codex login`), or direct API with device-code sign-in stored in `~/.omh` | Live list from your Codex account (GPT-5.6 Sol default) |
+| **OpenRouter** | Sign in with browser (PKCE, creates a key on your account) or paste an API key | 300+ models incl. `:free` ones; `openrouter/auto` default |
+| **OpenAI-compatible endpoint** | Base URL + optional key. Works with Ollama, llama.cpp server, MLX (`mlx_lm.server`), LM Studio, vLLM, and hosted OpenAI-compatible APIs (Groq, DeepSeek, xAI, Mistral, OrcaRouter, ...) | Whatever the server lists |
 
-Configuration is saved to `~/.omh/config.json` and selected via interactive UI on first use:
+The model picker fetches the live model list from the provider when it can, falls back to a small built-in list otherwise, and always offers "Other (enter model id)", so new model releases never require an update of this tool. Long lists (OpenRouter) get a type-to-filter picker.
+
+Browser sign-ins (Codex direct API, OpenRouter) open your default browser automatically and also print the URL as a bare clickable line, so it works over SSH or from a phone terminal. API keys and one-time codes are entered masked and stored with mode 0600.
 
 ```bash
-omh init  # will prompt for AI provider selection and model choice
+omh config          # show current provider, then optionally reconfigure
+omh config --show   # read-only
+omh config --reset  # forget the saved provider
+```
+
+No saved config? `omh` falls back to `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`/`GOOGLE_API_KEY`, or `OPENROUTER_API_KEY` from the environment (handy in CI), and finally to the `claude` CLI.
+
+Local example (Ollama):
+
+```bash
+ollama pull qwen2.5-coder:7b
+omh config   # OpenAI-compatible endpoint -> http://localhost:11434/v1 -> empty key -> pick qwen2.5-coder:7b
 ```
 
 ---
@@ -558,10 +571,7 @@ oh-my-harness/
 ## 📦 Requirements
 
 - **Node.js** >= 20
-- **Claude CLI** (optional, for default NL mode) — [Install guide](https://docs.anthropic.com/en/docs/claude-code)
-- **API Keys** (optional, for Claude/OpenAI/Gemini API modes) — set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY`
-- **Codex CLI OAuth** (optional, for `codex` CLI-wrapper mode) — install `codex` and run `codex login`
-- **Codex OAuth API** (optional, experimental direct mode) — run `omh config` and choose Codex OAuth API to complete device-code sign-in; credentials are stored under `~/.omh`
+- **An AI provider** (optional, only for natural-language `omh init`) — any one of: the `claude` CLI, an API key for Claude/OpenAI/Gemini/OpenRouter, a ChatGPT subscription via Codex, or a local OpenAI-compatible server (Ollama etc.). See [AI Provider Setup](#-ai-provider-setup).
 
 ---
 
@@ -575,7 +585,8 @@ oh-my-harness/
 - [x] `omh stats` — TUI analytics dashboard (ink)
 - [x] Stateful hook logging — events.jsonl
 - [x] TDD Guard — enforce test-first workflow
-- [x] Multi-provider AI support — Claude API, OpenAI, Gemini, Codex OAuth
+- [x] Multi-provider AI support — Claude, OpenAI, Gemini, Codex, OpenRouter, OpenAI-compatible local endpoints
+- [x] Live model lists from each provider (no hardcoded catalogue)
 - [x] Interactive model selection per provider
 - [x] GitHub star prompt — first-time only
 - [x] Codex emitter — `AGENTS.md` + `.codex/hooks.json` + `.codex/config.toml`

@@ -4,7 +4,7 @@ import path from "node:path";
 import { getConfigDir } from "../config-store.js";
 import type { LLMProvider } from "../provider-registry.js";
 
-const DEFAULT_MODEL = "gpt-5.5";
+const DEFAULT_MODEL = "gpt-5.6-sol";
 const ISSUER = "https://auth.openai.com";
 const RESPONSES_URL = "https://chatgpt.com/backend-api/codex/responses";
 const TOKEN_URL = `${ISSUER}/oauth/token`;
@@ -45,7 +45,7 @@ interface CodexAuthFile {
   auth_mode?: string;
 }
 
-interface AuthState {
+export interface AuthState {
   accessToken: string;
   refreshToken?: string;
   idToken?: string;
@@ -245,7 +245,7 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
-function buildHeaders(state: AuthState): Record<string, string> {
+export function buildCodexHeaders(state: Pick<AuthState, "accessToken" | "accountId">): Record<string, string> {
   const headers: Record<string, string> = {
     "Authorization": `Bearer ${state.accessToken}`,
     "Content-Type": "application/json",
@@ -481,7 +481,7 @@ export function createCodexOauthApiProvider(options: CodexOauthApiProviderOption
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         const response = await fetchWithTimeout(responsesUrl, {
           method: "POST",
-          headers: buildHeaders(authState),
+          headers: buildCodexHeaders(authState),
           body: buildBody(prompt, model),
         }, timeoutMs);
 

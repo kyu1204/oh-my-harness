@@ -7,6 +7,14 @@ import {
 import { listModels, type ListModelsOptions } from "../../nl/list-models.js";
 import { ensureCodexOauthApiAuth } from "../../nl/providers/codex-oauth-api.js";
 import { createPkce, buildOpenrouterAuthUrl, exchangeOpenrouterCode } from "../../nl/providers/openrouter-oauth.js";
+import { openInBrowser } from "./open-browser.js";
+
+/** Show a sign-in URL on its own line (easy to copy) and try to open it. */
+async function showAuthLink(title: string, url: string, extra?: string): Promise<void> {
+  const opened = await openInBrowser(url);
+  const lead = opened ? "Opened in your browser. If it did not open, visit:" : "Open this URL in your browser:";
+  p.note([lead, "", url, ...(extra ? ["", extra] : [])].join("\n"), title);
+}
 import {
   saveProviderConfig,
   type ProviderConfig,
@@ -131,8 +139,8 @@ export async function runProviderSetup(): Promise<ProviderConfig | undefined> {
 
     if (keySource === "browser") {
       const { verifier, challenge } = createPkce();
-      p.note(`Open this URL, approve, then paste the code shown:\n${buildOpenrouterAuthUrl(challenge)}`, `${def.displayName} sign-in`);
-      const code = await p.text({
+      await showAuthLink(`${def.displayName} sign-in`, buildOpenrouterAuthUrl(challenge), "Approve, then paste the code shown on that page below.");
+      const code = await p.password({
         message: "Authorization code:",
         validate: (v) => (v?.trim() ? undefined : "Code is required"),
       });
@@ -166,7 +174,7 @@ export async function runProviderSetup(): Promise<ProviderConfig | undefined> {
       // Sign in first so the model list can come from the live Codex registry.
       codexAuth = await ensureCodexOauthApiAuth({
         onDeviceCode: ({ url, code }) => {
-          p.note(`Open ${url} and enter code: ${code}`, "Codex sign-in");
+          void showAuthLink("Codex sign-in", url, `Enter this code:  ${code}`);
         },
       });
       p.log.success("Codex session saved under ~/.omh.");

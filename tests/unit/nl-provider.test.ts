@@ -26,6 +26,7 @@ describe("provider-registry", () => {
     expect(names).toContain("gemini");
     expect(names).toContain("codex");
     expect(names).toContain("openai-compatible");
+    expect(names).toContain("openrouter");
     expect(names).not.toContain("codex-oauth-api");
   });
 
@@ -99,6 +100,29 @@ describe("provider-registry", () => {
     };
     const provider = createProvider(config);
     expect(provider.name).toBe("openai-compatible");
+  });
+
+  it("createProvider routes openrouter through the OpenAI-compatible client at openrouter.ai", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }), { status: 200 })),
+    );
+    const provider = createProvider({ provider: "openrouter", method: "api", apiKey: "sk-or", model: "openai/gpt-oss-120b:free" });
+    expect(provider.name).toBe("openrouter");
+    await provider.run("hi");
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
+    const headers = init?.headers as Record<string, string>;
+    expect(headers.Authorization).toBe("Bearer sk-or");
+    expect(headers["HTTP-Referer"]).toContain("oh-my-harness");
+    vi.unstubAllGlobals();
+  });
+
+  it("openrouter offers browser key login on top of a plain API key", () => {
+    const def = getAvailableProviders().find((p) => p.name === "openrouter");
+    expect(def!.supportsApi).toBe(true);
+    expect(def!.supportsBrowserKeyLogin).toBe(true);
+    expect(def!.supportsOAuth).toBe(false);
   });
 
   it("createProvider rejects openai-compatible config without a baseUrl", () => {

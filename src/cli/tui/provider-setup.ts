@@ -6,6 +6,7 @@ import {
 } from "../../nl/provider-registry.js";
 import { listModels } from "../../nl/list-models.js";
 import { ensureCodexOauthApiAuth } from "../../nl/providers/codex-oauth-api.js";
+import { createPkce, buildOpenrouterAuthUrl, exchangeOpenrouterCode } from "../../nl/providers/openrouter-oauth.js";
 import {
   saveProviderConfig,
   type ProviderConfig,
@@ -50,11 +51,11 @@ async function pickModel(def: ProviderDefinition, creds: { apiKey?: string; base
 
   let model: string | symbol = CUSTOM_MODEL;
   if (options.length > 1) {
-    model = await p.select({
-      message: "Select model:",
-      options,
-      initialValue: merged.includes(def.defaultModel) ? def.defaultModel : merged[0],
-    });
+    const initialValue = merged.includes(def.defaultModel) ? def.defaultModel : merged[0];
+    // Long lists (OpenRouter has hundreds) are unusable as a plain select.
+    model = options.length > 20
+      ? await p.autocomplete({ message: "Select model (type to filter):", options, initialValue })
+      : await p.select({ message: "Select model:", options, initialValue });
     if (p.isCancel(model)) return cancelled();
   }
 
@@ -118,12 +119,44 @@ export async function runProviderSetup(): Promise<ProviderConfig | undefined> {
       config.baseUrl = ((baseUrl as string) || def.defaultBaseUrl || "").trim().replace(/\/+$/, "");
     }
 
-    const apiKey = await p.password({
-      message: def.requiresBaseUrl ? "API key (leave empty if the server needs none):" : `Enter your ${def.displayName} API key:`,
-      validate: (v) => (!def.requiresBaseUrl && !v?.trim() ? "API key is required" : undefined),
-    });
-    if (p.isCancel(apiKey)) return cancelled();
-    if ((apiKey as string)?.trim()) config.apiKey = (apiKey as string).trim();
+    let keySource: "paste" | "browser" = "paste";
+    if (def.supportsBrowserKeyLogin) {
+      const picked = await p.select({
+        message: "How do you want to provide the API key?",
+        options: [
+          { value: "browser", label: "Sign in with browser", hint: "creates a key on your account" },
+          { value: "paste", label: "Paste an existing API key" },
+        ],
+      });
+      if (p.isCancel(picked)) return cancelled();
+      keySource = picked as "paste" | "browser";
+    }
+
+    if (keySource === "browser") {
+      const { verifier, challenge } = createPkce();
+      p.note(`Open this URL, approve, then paste the code shown:\n${buildOpenrouterAuthUrl(challenge)}`, `${def.displayName} sign-in`);
+      const code = await p.text({
+        message: "Authorization code:",
+        validate: (v) => (v?.trim() ? undefined : "Code is required"),
+      });
+      if (p.isCancel(code)) return cancelled();
+      const s = p.spinner();
+      s.start("Exchanging code for API key...");
+      try {
+        config.apiKey = await exchangeOpenrouterCode(code as string, verifier);
+        s.stop("API key created");
+      } catch (err) {
+        s.stop(`Sign-in failed: ${(err as Error).message}`);
+        return cancelled();
+      }
+    } else {
+      const apiKey = await p.password({
+        message: def.requiresBaseUrl ? "API key (leave empty if the server needs none):" : `Enter your ${def.displayName} API key:`,
+        validate: (v) => (!def.requiresBaseUrl && !v?.trim() ? "API key is required" : undefined),
+      });
+      if (p.isCancel(apiKey)) return cancelled();
+      if ((apiKey as string)?.trim()) config.apiKey = (apiKey as string).trim();
+    }
 
     const model = await pickModel(def, { apiKey: config.apiKey, baseUrl: config.baseUrl });
     if (!model) return undefined;

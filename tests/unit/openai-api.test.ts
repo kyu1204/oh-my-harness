@@ -44,6 +44,7 @@ describe("openai-api provider", () => {
     const provider = createOpenaiApiProvider("", "llama3.2", {
       baseUrl: "http://localhost:11434/v1/",
       name: "openai-compatible",
+      headers: { "X-Extra": "1" },
     });
     expect(provider.name).toBe("openai-compatible");
     await expect(provider.run("hello")).resolves.toBe("ok");
@@ -52,6 +53,7 @@ describe("openai-api provider", () => {
     expect(url).toBe("http://localhost:11434/v1/chat/completions");
     const headers = init?.headers as Record<string, string>;
     expect(headers.Authorization).toBeUndefined();
+    expect(headers["X-Extra"]).toBe("1");
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
     expect(body.max_tokens).toBe(4096);
     expect(body.max_completion_tokens).toBeUndefined();

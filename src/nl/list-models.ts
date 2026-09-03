@@ -1,4 +1,5 @@
 import { OPENAI_BASE_URL } from "./providers/openai-api.js";
+import { OPENROUTER_BASE_URL } from "./providers/openrouter-oauth.js";
 
 export interface ListModelsOptions {
   apiKey?: string;
@@ -31,6 +32,8 @@ export async function listModels(provider: string, options: ListModelsOptions): 
   switch (provider) {
     case "openai":
       return listOpenaiStyle(OPENAI_BASE_URL, options.apiKey);
+    case "openrouter":
+      return listOpenaiStyle(OPENROUTER_BASE_URL, options.apiKey);
     case "openai-compatible": {
       if (!options.baseUrl) throw new Error("baseUrl is required to list models");
       return listOpenaiStyle(options.baseUrl, options.apiKey);

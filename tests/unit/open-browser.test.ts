@@ -29,6 +29,12 @@ describe("openInBrowser", () => {
     await expect(result).resolves.toBe(false);
   });
 
+  it("wraps the URL in an OSC 8 hyperlink with the plain URL as visible text", async () => {
+    const { hyperlink } = await import("../../src/cli/tui/open-browser.js");
+    const ESC = String.fromCharCode(27);
+    expect(hyperlink("https://x/y?z=1")).toBe(`${ESC}]8;;https://x/y?z=1${ESC}\\https://x/y?z=1${ESC}]8;;${ESC}\\`);
+  });
+
   it("refuses non-http URLs", async () => {
     const spawn = vi.fn();
     await expect(openInBrowser("file:///etc/passwd", { spawn, platform: "darwin" })).resolves.toBe(false);

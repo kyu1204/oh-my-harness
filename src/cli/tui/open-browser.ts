@@ -31,3 +31,9 @@ export function openInBrowser(
     }
   });
 }
+
+/** OSC 8 terminal hyperlink: stays one clickable link even when soft-wrapped. */
+export function hyperlink(url: string): string {
+  const ESC = String.fromCharCode(27);
+  return `${ESC}]8;;${url}${ESC}\\${url}${ESC}]8;;${ESC}\\`;
+}

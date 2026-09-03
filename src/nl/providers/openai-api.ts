@@ -8,6 +8,8 @@ export interface OpenaiApiProviderOptions {
   baseUrl?: string;
   /** Provider name reported on the LLMProvider. */
   name?: string;
+  /** Extra request headers (e.g. OpenRouter attribution). */
+  headers?: Record<string, string>;
 }
 const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_ATTEMPTS = 3;
@@ -28,7 +30,7 @@ export function createOpenaiApiProvider(
   const baseUrl = (options.baseUrl ?? OPENAI_BASE_URL).replace(/\/+$/, "");
   const url = `${baseUrl}/chat/completions`;
   const isOpenai = baseUrl === OPENAI_BASE_URL;
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...options.headers };
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
   // OpenAI rejects max_tokens on reasoning models; most local servers still expect it.
   const tokenLimit = isOpenai ? { max_completion_tokens: 4096 } : { max_tokens: 4096 };

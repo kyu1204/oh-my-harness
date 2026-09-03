@@ -5,6 +5,7 @@ import { createOpenaiApiProvider, OPENAI_BASE_URL } from "./providers/openai-api
 import { createGeminiApiProvider } from "./providers/gemini-api.js";
 import { createCodexOauthProvider } from "./providers/codex-oauth.js";
 import { createCodexOauthApiProvider } from "./providers/codex-oauth-api.js";
+import { OPENROUTER_BASE_URL } from "./providers/openrouter-oauth.js";
 
 export interface LLMProvider {
   name: string;
@@ -30,6 +31,8 @@ export interface ProviderDefinition {
   /** User must supply an OpenAI-compatible base URL (local servers, routers). */
   requiresBaseUrl?: boolean;
   defaultBaseUrl?: string;
+  /** Setup can obtain the API key through a browser sign-in instead of pasting one. */
+  supportsBrowserKeyLogin?: boolean;
 }
 
 const providers: ProviderDefinition[] = [
@@ -97,6 +100,20 @@ const providers: ProviderDefinition[] = [
       { id: "gpt-5.4-mini", label: "GPT-5.4 Mini — faster runs" },
     ],
     cliCommand: "codex",
+  },
+  {
+    name: "openrouter",
+    displayName: "OpenRouter (300+ models, one key, free tier available)",
+    supportsCli: false,
+    supportsApi: true,
+    supportsOAuth: false,
+    supportsOAuthApi: false,
+    supportsBrowserKeyLogin: true,
+    defaultModel: "openrouter/auto",
+    availableModels: [
+      { id: "openrouter/auto", label: "Auto — OpenRouter picks a model per request" },
+      { id: "openrouter/free", label: "Free router — rotates across free models" },
+    ],
   },
   {
     name: "openai-compatible",
@@ -191,6 +208,12 @@ export function createProvider(config: ProviderConfig): LLMProvider {
       return createClaudeApiProvider(apiKey, model);
     case "openai":
       return createOpenaiApiProvider(apiKey, model, { baseUrl: OPENAI_BASE_URL });
+    case "openrouter":
+      return createOpenaiApiProvider(apiKey, model, {
+        baseUrl: OPENROUTER_BASE_URL,
+        name: "openrouter",
+        headers: { "HTTP-Referer": "https://github.com/kyu1204/oh-my-harness", "X-Title": "oh-my-harness" },
+      });
     case "gemini":
       return createGeminiApiProvider(apiKey, model);
     default:

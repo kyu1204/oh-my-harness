@@ -35,6 +35,15 @@ describe("listModels", () => {
     expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer sk-x");
   });
 
+  it("lists OpenRouter models from openrouter.ai", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ data: [{ id: "openai/gpt-oss-120b:free" }] })));
+
+    const ids = await listModels("openrouter", { apiKey: "sk-or" });
+
+    expect(ids).toEqual(["openai/gpt-oss-120b:free"]);
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe("https://openrouter.ai/api/v1/models");
+  });
+
   it("lists Claude models via x-api-key", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ data: [{ id: "claude-opus-5" }, { id: "claude-sonnet-5" }] })));
 

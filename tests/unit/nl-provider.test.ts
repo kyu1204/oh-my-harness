@@ -232,16 +232,17 @@ describe("provider-registry", () => {
     }
   });
 
-  it("openai default model is gpt-5.5", () => {
+  it("openai default model is gpt-5.6-sol and its display name does not bake in a model", () => {
     const providers = getAvailableProviders();
     const openai = providers.find((p) => p.name === "openai");
-    expect(openai!.defaultModel).toBe("gpt-5.5");
+    expect(openai!.defaultModel).toBe("gpt-5.6-sol");
+    expect(openai!.displayName).toBe("OpenAI");
   });
 
-  it("codex default model is gpt-5.5", () => {
+  it("codex default model is gpt-5.6-sol", () => {
     const providers = getAvailableProviders();
     const codex = providers.find((p) => p.name === "codex");
-    expect(codex!.defaultModel).toBe("gpt-5.5");
+    expect(codex!.defaultModel).toBe("gpt-5.6-sol");
   });
 
   it("claude default model is claude-sonnet-5", () => {

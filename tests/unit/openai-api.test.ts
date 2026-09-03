@@ -8,7 +8,7 @@ describe("openai-api provider", () => {
     expect(typeof provider.run).toBe("function");
   });
 
-  it("defaults requests to gpt-5.5 when no model is configured", async () => {
+  it("defaults requests to gpt-5.6-sol when no model is configured", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -27,7 +27,7 @@ describe("openai-api provider", () => {
     const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body)) as {
       model?: string;
     };
-    expect(body.model).toBe("gpt-5.5");
+    expect(body.model).toBe("gpt-5.6-sol");
   });
 
   it("targets a custom base URL, sends max_tokens and omits Authorization when no key is given", async () => {

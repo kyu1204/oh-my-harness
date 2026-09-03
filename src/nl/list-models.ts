@@ -1,9 +1,46 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { OPENAI_BASE_URL } from "./providers/openai-api.js";
 import { OPENROUTER_BASE_URL } from "./providers/openrouter-oauth.js";
+import { buildCodexHeaders, type AuthState } from "./providers/codex-oauth-api.js";
 
 export interface ListModelsOptions {
   apiKey?: string;
   baseUrl?: string;
+  /** Codex: live registry lookup with this ChatGPT session. */
+  codexAuth?: Pick<AuthState, "accessToken" | "accountId">;
+  /** Codex: fallback to the Codex CLI's local cache (default ~/.codex/models_cache.json). */
+  codexCachePath?: string;
+}
+
+interface CodexModel {
+  slug: string;
+  visibility?: string;
+  priority?: number;
+  supported_in_api?: boolean;
+}
+
+function codexSlugs(models: CodexModel[]): string[] {
+  return models
+    .filter((m) => m.visibility === "list" && m.supported_in_api !== false)
+    .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
+    .map((m) => m.slug);
+}
+
+async function listCodexModels(options: ListModelsOptions): Promise<string[]> {
+  if (options.codexAuth) {
+    const data = await getJson<{ models?: CodexModel[] }>(
+      "https://chatgpt.com/backend-api/codex/models",
+      buildCodexHeaders(options.codexAuth),
+    );
+    return codexSlugs(data.models ?? []);
+  }
+  const cachePath =
+    options.codexCachePath ??
+    path.join(process.env.CODEX_HOME?.trim() || path.join(process.env.HOME ?? os.homedir(), ".codex"), "models_cache.json");
+  const raw = await fs.readFile(cachePath, "utf-8");
+  return codexSlugs((JSON.parse(raw) as { models?: CodexModel[] }).models ?? []);
 }
 
 const TIMEOUT_MS = 10_000;
@@ -45,6 +82,8 @@ export async function listModels(provider: string, options: ListModelsOptions): 
       });
       return (data.data ?? []).map((m) => m.id);
     }
+    case "codex":
+      return listCodexModels(options);
     case "gemini": {
       const data = await getJson<{
         models?: Array<{ name: string; supportedGenerationMethods?: string[] }>;

@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { listModels } from "../../src/nl/list-models.js";
 
 function jsonResponse(payload: unknown, status = 200): Response {
@@ -84,7 +87,46 @@ describe("listModels", () => {
     await expect(listModels("openai", { apiKey: "bad" })).rejects.toThrow("401");
   });
 
+  it("lists Codex models live when an OAuth session is given, listed+api-supported only, by priority", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({
+          models: [
+            { slug: "gpt-5.5", visibility: "list", priority: 7, supported_in_api: true },
+            { slug: "gpt-reserve", visibility: "hide", priority: 3, supported_in_api: true },
+            { slug: "gpt-5.6-sol", visibility: "list", priority: 1, supported_in_api: true },
+          ],
+        }),
+      ),
+    );
+
+    const ids = await listModels("codex", { codexAuth: { accessToken: "tok", accountId: "acc" } });
+
+    expect(ids).toEqual(["gpt-5.6-sol", "gpt-5.5"]);
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(url).toBe("https://chatgpt.com/backend-api/codex/models");
+    const headers = init?.headers as Record<string, string>;
+    expect(headers.Authorization).toBe("Bearer tok");
+    expect(headers["ChatGPT-Account-ID"]).toBe("acc");
+  });
+
+  it("falls back to the Codex CLI models cache when no session is given", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omh-codex-"));
+    const cachePath = path.join(dir, "models_cache.json");
+    await fs.writeFile(
+      cachePath,
+      JSON.stringify({ models: [{ slug: "gpt-5.4", visibility: "list", priority: 16, supported_in_api: true }, { slug: "gpt-5.6-terra", visibility: "list", priority: 2, supported_in_api: true }] }),
+    );
+    vi.stubGlobal("fetch", vi.fn());
+
+    const ids = await listModels("codex", { codexCachePath: cachePath });
+
+    expect(ids).toEqual(["gpt-5.6-terra", "gpt-5.4"]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("throws for providers without a model listing endpoint", async () => {
-    await expect(listModels("codex", {})).rejects.toThrow();
+    await expect(listModels("unknown", {})).rejects.toThrow();
   });
 });

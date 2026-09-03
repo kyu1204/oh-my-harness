@@ -1,6 +1,6 @@
 import type { LLMProvider } from "../provider-registry.js";
 
-const DEFAULT_MODEL = "gpt-5.5";
+const DEFAULT_MODEL = "gpt-5.6-sol";
 export const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
 export interface OpenaiApiProviderOptions {

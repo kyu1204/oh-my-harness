@@ -4,7 +4,7 @@ import {
   getProviderDefinition,
   type ProviderDefinition,
 } from "../../nl/provider-registry.js";
-import { listModels } from "../../nl/list-models.js";
+import { listModels, type ListModelsOptions } from "../../nl/list-models.js";
 import { ensureCodexOauthApiAuth } from "../../nl/providers/codex-oauth-api.js";
 import { createPkce, buildOpenrouterAuthUrl, exchangeOpenrouterCode } from "../../nl/providers/openrouter-oauth.js";
 import {
@@ -24,18 +24,15 @@ function cancelled(): undefined {
  * otherwise, and always an "enter model id" escape hatch so a brand-new model
  * never needs a release of this tool.
  */
-async function pickModel(def: ProviderDefinition, creds: { apiKey?: string; baseUrl?: string }): Promise<string | undefined> {
+async function pickModel(def: ProviderDefinition, creds: ListModelsOptions): Promise<string | undefined> {
   let ids: string[] = [];
-  const canFetch = def.name !== "codex";
-  if (canFetch) {
-    const s = p.spinner();
-    s.start("Fetching available models...");
-    try {
-      ids = await listModels(def.name, creds);
-      s.stop(`Found ${ids.length} models`);
-    } catch (err) {
-      s.stop(`Could not fetch models (${(err as Error).message}); using built-in list`);
-    }
+  const s = p.spinner();
+  s.start("Fetching available models...");
+  try {
+    ids = await listModels(def.name, creds);
+    s.stop(`Found ${ids.length} models`);
+  } catch (err) {
+    s.stop(`Could not fetch models (${(err as Error).message}); using built-in list`);
   }
 
   const staticIds = def.availableModels.map((m) => m.id);
@@ -162,20 +159,22 @@ export async function runProviderSetup(): Promise<ProviderConfig | undefined> {
     if (!model) return undefined;
     config.model = model;
   } else if (method === "oauth" || method === "oauth-api") {
-    if (method === "oauth") config.cliCommand = def.cliCommand ?? def.name;
-
-    const model = await pickModel(def, {});
-    if (!model) return undefined;
-    config.model = model;
-
-    if (method === "oauth-api") {
-      await ensureCodexOauthApiAuth({
+    let codexAuth: ListModelsOptions["codexAuth"];
+    if (method === "oauth") {
+      config.cliCommand = def.cliCommand ?? def.name;
+    } else {
+      // Sign in first so the model list can come from the live Codex registry.
+      codexAuth = await ensureCodexOauthApiAuth({
         onDeviceCode: ({ url, code }) => {
           p.note(`Open ${url} and enter code: ${code}`, "Codex sign-in");
         },
       });
       p.log.success("Codex session saved under ~/.omh.");
     }
+
+    const model = await pickModel(def, { codexAuth });
+    if (!model) return undefined;
+    config.model = model;
   } else {
     config.cliCommand = def.cliCommand ?? def.name;
   }

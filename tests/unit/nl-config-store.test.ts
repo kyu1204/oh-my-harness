@@ -96,7 +96,7 @@ describe("config-store", () => {
 
   it("saves Codex OAuth API configs without requiring an API key", async () => {
     const config: ProviderConfig = {
-      provider: "codex-oauth-api",
+      provider: "codex",
       method: "oauth-api",
       model: "gpt-5.5",
     };
@@ -106,6 +106,30 @@ describe("config-store", () => {
     const loaded = await loadProviderConfig();
     expect(loaded).toEqual(config);
     expect(loaded!.apiKey).toBeUndefined();
+  });
+
+  it("normalizes legacy codex-oauth-api provider configs on load", async () => {
+    await fs.mkdir(getConfigDir(), { recursive: true });
+    await fs.writeFile(
+      path.join(getConfigDir(), "config.json"),
+      JSON.stringify({ provider: "codex-oauth-api", method: "oauth-api", model: "gpt-5.5" }),
+      "utf-8",
+    );
+
+    const loaded = await loadProviderConfig();
+    expect(loaded).toEqual({ provider: "codex", method: "oauth-api", model: "gpt-5.5" });
+  });
+
+  it("round-trips openai-compatible configs with a baseUrl and no API key", async () => {
+    const config: ProviderConfig = {
+      provider: "openai-compatible",
+      method: "api",
+      baseUrl: "http://localhost:11434/v1",
+      model: "llama3.2",
+    };
+
+    await saveProviderConfig(config);
+    expect(await loadProviderConfig()).toEqual(config);
   });
 
   it("loadProviderConfig returns undefined when no config exists", async () => {

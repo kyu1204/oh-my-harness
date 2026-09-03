@@ -1,7 +1,14 @@
 import type { LLMProvider } from "../provider-registry.js";
 
 const DEFAULT_MODEL = "gpt-5.5";
-const API_URL = "https://api.openai.com/v1/chat/completions";
+export const OPENAI_BASE_URL = "https://api.openai.com/v1";
+
+export interface OpenaiApiProviderOptions {
+  /** API root; anything OpenAI-compatible (Ollama, llama.cpp, MLX, LM Studio, routers). */
+  baseUrl?: string;
+  /** Provider name reported on the LLMProvider. */
+  name?: string;
+}
 const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_ATTEMPTS = 3;
 
@@ -16,9 +23,18 @@ function sleep(ms: number): Promise<void> {
 export function createOpenaiApiProvider(
   apiKey: string,
   model: string = DEFAULT_MODEL,
+  options: OpenaiApiProviderOptions = {},
 ): LLMProvider {
+  const baseUrl = (options.baseUrl ?? OPENAI_BASE_URL).replace(/\/+$/, "");
+  const url = `${baseUrl}/chat/completions`;
+  const isOpenai = baseUrl === OPENAI_BASE_URL;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+  // OpenAI rejects max_tokens on reasoning models; most local servers still expect it.
+  const tokenLimit = isOpenai ? { max_completion_tokens: 4096 } : { max_tokens: 4096 };
+
   return {
-    name: "openai",
+    name: options.name ?? "openai",
     run: async (prompt: string): Promise<string> => {
       let lastError: unknown;
 
@@ -27,16 +43,13 @@ export function createOpenaiApiProvider(
         const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
         let response: Response;
         try {
-          response = await fetch(API_URL, {
+          response = await fetch(url, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${apiKey}`,
-            },
+            headers,
             body: JSON.stringify({
               model,
               messages: [{ role: "user", content: prompt }],
-              max_completion_tokens: 4096,
+              ...tokenLimit,
             }),
             signal: controller.signal,
           });

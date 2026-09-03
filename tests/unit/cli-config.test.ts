@@ -56,6 +56,22 @@ describe("configCommand --show", () => {
     expect(loggedOutput().toLowerCase()).toContain("no ai provider");
   });
 
+  it("prints openai-compatible config with its base URL", async () => {
+    await saveProviderConfig({
+      provider: "openai-compatible",
+      method: "api",
+      baseUrl: "http://localhost:11434/v1",
+      model: "llama3.2",
+    });
+
+    const result = await configCommand({ show: true });
+
+    expect(result.exitCode).toBe(0);
+    const out = loggedOutput();
+    expect(out).toContain("http://localhost:11434/v1");
+    expect(out).toContain("llama3.2");
+  });
+
   it("prints Codex OAuth config without asking for or leaking an API key", async () => {
     await saveProviderConfig({
       provider: "codex",
@@ -77,7 +93,7 @@ describe("configCommand --show", () => {
 
   it("prints Codex OAuth API config without asking for or leaking an API key", async () => {
     await saveProviderConfig({
-      provider: "codex-oauth-api",
+      provider: "codex",
       method: "oauth-api",
       model: "gpt-5.5",
     });
@@ -86,7 +102,7 @@ describe("configCommand --show", () => {
 
     expect(result.exitCode).toBe(0);
     const out = loggedOutput();
-    expect(out).toContain("codex-oauth-api");
+    expect(out).toContain("codex");
     expect(out).toContain("oauth-api");
     expect(out).toContain("gpt-5.5");
     expect(out).toContain("~/.omh");
@@ -139,7 +155,7 @@ describe("configCommand (reconfigure)", () => {
       return newConfig;
     });
 
-    const result = await configCommand({ setupRunner });
+    const result = await configCommand({ setupRunner, confirm: async () => true });
 
     expect(result.exitCode).toBe(0);
     expect(setupRunner).toHaveBeenCalledOnce();
@@ -147,11 +163,44 @@ describe("configCommand (reconfigure)", () => {
     expect(await loadProviderConfig()).toEqual(newConfig);
   });
 
+  it("only shows the config when the user declines to reconfigure", async () => {
+    await saveProviderConfig({ provider: "claude", method: "cli", cliCommand: "claude" });
+
+    const setupRunner = vi.fn(async () => undefined);
+    const result = await configCommand({ setupRunner, confirm: async () => false });
+
+    expect(result.exitCode).toBe(0);
+    expect(setupRunner).not.toHaveBeenCalled();
+    expect(loggedOutput()).toContain("claude");
+  });
+
+  it("skips the reconfigure prompt with --yes", async () => {
+    await saveProviderConfig({ provider: "claude", method: "cli", cliCommand: "claude" });
+
+    const setupRunner = vi.fn(async () => undefined);
+    const confirm = vi.fn(async () => false);
+    const result = await configCommand({ setupRunner, confirm, yes: true });
+
+    expect(result.exitCode).toBe(0);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(setupRunner).toHaveBeenCalledOnce();
+  });
+
+  it("runs setup directly without a prompt when nothing is configured yet", async () => {
+    const setupRunner = vi.fn(async () => undefined);
+    const confirm = vi.fn(async () => false);
+    const result = await configCommand({ setupRunner, confirm });
+
+    expect(result.exitCode).toBe(0);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(setupRunner).toHaveBeenCalledOnce();
+  });
+
   it("exits cleanly when setup is cancelled", async () => {
     await saveProviderConfig({ provider: "claude", method: "cli", cliCommand: "claude" });
 
     const setupRunner = vi.fn(async () => undefined);
-    const result = await configCommand({ setupRunner });
+    const result = await configCommand({ setupRunner, confirm: async () => true });
 
     expect(result.exitCode).toBe(0);
     expect(setupRunner).toHaveBeenCalledOnce();

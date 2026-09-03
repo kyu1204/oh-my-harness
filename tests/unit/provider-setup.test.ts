@@ -23,15 +23,22 @@ describe("provider-setup TUI data", () => {
     expect(oauthProviders[0].name).toBe("codex");
   });
 
-  it("codex-oauth-api is the only provider with OAuth API support", () => {
+  it("codex is the only provider with OAuth API support", () => {
     const providers = getAvailableProviders();
     const oauthApiProviders = providers.filter((p) => p.supportsOAuthApi);
     expect(oauthApiProviders).toHaveLength(1);
-    expect(oauthApiProviders[0].name).toBe("codex-oauth-api");
+    expect(oauthApiProviders[0].name).toBe("codex");
   });
 
-  it("all providers have a default model", () => {
+  it("openai-compatible is the only provider that requires a base URL", () => {
     const providers = getAvailableProviders();
+    const withBase = providers.filter((p) => p.requiresBaseUrl);
+    expect(withBase).toHaveLength(1);
+    expect(withBase[0].name).toBe("openai-compatible");
+  });
+
+  it("all hosted providers have a default model", () => {
+    const providers = getAvailableProviders().filter((p) => !p.requiresBaseUrl);
     for (const p of providers) {
       expect(p.defaultModel.length).toBeGreaterThan(0);
     }

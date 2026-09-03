@@ -4,7 +4,7 @@ import type { PresetInfo, CatalogBlockInfo } from "./prompt-templates.js";
 import { HarnessConfigSchema } from "../core/harness-schema.js";
 import type { HarnessConfig } from "../core/harness-schema.js";
 import type { ProjectFacts } from "../detector/project-detector.js";
-import { loadProviderConfig } from "./config-store.js";
+import { loadProviderConfig, type ProviderConfig } from "./config-store.js";
 import { createProvider } from "./provider-registry.js";
 import { createClaudeCliProvider } from "./providers/claude-cli.js";
 
@@ -22,7 +22,7 @@ export type ClaudeRunner = LLMRunner;
 
 /** Creates a runner from the saved provider config (~/.omh/config.json) or falls back to claude CLI */
 export async function createDefaultRunner(): Promise<LLMRunner> {
-  const config = await loadProviderConfig();
+  const config = await loadProviderConfig() ?? providerConfigFromEnv();
   if (config) {
     const provider = createProvider(config);
     return (prompt: string) => provider.run(prompt);
@@ -30,6 +30,16 @@ export async function createDefaultRunner(): Promise<LLMRunner> {
   // Fallback: claude CLI
   const cliProvider = createClaudeCliProvider("claude");
   return (prompt: string) => cliProvider.run(prompt);
+}
+
+/** CI-friendly fallback: pick an API provider from the usual env vars when nothing is saved. */
+function providerConfigFromEnv(): ProviderConfig | undefined {
+  const env = process.env;
+  if (env.ANTHROPIC_API_KEY) return { provider: "claude", method: "api", apiKey: env.ANTHROPIC_API_KEY };
+  if (env.OPENAI_API_KEY) return { provider: "openai", method: "api", apiKey: env.OPENAI_API_KEY };
+  const gemini = env.GEMINI_API_KEY ?? env.GOOGLE_API_KEY;
+  if (gemini) return { provider: "gemini", method: "api", apiKey: gemini };
+  return undefined;
 }
 
 /** Legacy default runner using claude CLI directly */

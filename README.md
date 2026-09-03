@@ -177,10 +177,27 @@ oh-my-harness automatically detects your project type and injects accurate facts
 
 ### 🤖 AI Provider Setup
 
-oh-my-harness supports multiple AI providers for natural language mode:
+Natural language mode (`omh init "description"`) needs one LLM call. Pick a provider once with `omh config`; it is saved globally in `~/.omh/config.json`.
 
-| Provider | Setup | Available Models | Default |
-|----------|-------|------------------|---------|
+| Provider | How to connect | Models |
+|----------|----------------|--------|
+| **Claude** | `claude` CLI (no key), or Anthropic API key | Opus 5, Sonnet 5 (default), Haiku 4.5 |
+| **OpenAI** | API key | GPT-5.5 (default), GPT-5.4 family, GPT-4.1, o3, o4-mini |
+| **Gemini** | API key | Gemini 2.5 Pro (default), 2.5 Flash, 3.x previews |
+| **Codex** (ChatGPT subscription) | via the `codex` CLI (`codex login`), or direct API with device-code sign-in stored in `~/.omh` | GPT-5.5 (default), GPT-5.4, GPT-5.4 Mini |
+| **OpenAI-compatible endpoint** | Base URL + optional key. Works with Ollama, llama.cpp server, MLX (`mlx_lm.server`), LM Studio, vLLM, OpenRouter/OrcaRouter-style gateways | Whatever the server lists |
+
+The model picker fetches the live model list from the provider when it can, falls back to the built-in list otherwise, and always offers "Other (enter model id)", so new model releases never require an update of this tool.
+
+```bash
+omh config          # show current provider, then optionally reconfigure
+omh config --show   # read-only
+omh config --reset  # forget the saved provider
+```
+
+No saved config? `omh` falls back to `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`/`GOOGLE_API_KEY` from the environment (handy in CI), and finally to the `claude` CLI.
+
+----------|-------|------------------|---------|
 | **Claude CLI** | `claude` command installed | Opus 4.6, Sonnet 4.6, Haiku 4.5 | ✓ |
 | **Claude API** | Set `ANTHROPIC_API_KEY` | Opus 4.6, Sonnet 4.6, Haiku 4.5 | Sonnet 4.6 |
 | **OpenAI API** | Set `OPENAI_API_KEY` | GPT-5.5, GPT-5.4, GPT-5.4-mini, GPT-5.4-nano, GPT-4.1, GPT-4.1-mini, o3, o4-mini | GPT-5.5 |

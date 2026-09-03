@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { OPENAI_BASE_URL } from "./providers/openai-api.js";
+import { OPENAI_BASE_URL, validateBaseUrl } from "./providers/openai-api.js";
 import { OPENROUTER_BASE_URL } from "./providers/openrouter-oauth.js";
 import { buildCodexHeaders, type AuthState } from "./providers/codex-oauth-api.js";
 
@@ -54,6 +54,8 @@ async function getJson<T>(url: string, headers: Record<string, string>): Promise
 }
 
 async function listOpenaiStyle(baseUrl: string, apiKey?: string): Promise<string[]> {
+  const invalid = validateBaseUrl(baseUrl, apiKey);
+  if (invalid) throw new Error(`Invalid base URL "${baseUrl}": ${invalid}`);
   const headers: Record<string, string> = {};
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
   const data = await getJson<{ data?: Array<{ id: string }> }>(`${baseUrl.replace(/\/+$/, "")}/models`, headers);

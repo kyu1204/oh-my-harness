@@ -27,6 +27,12 @@ describe("listModels", () => {
     expect((init?.headers as Record<string, string>).Authorization).toBeUndefined();
   });
 
+  it("refuses to send an API key to a remote http endpoint", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    await expect(listModels("openai-compatible", { baseUrl: "http://10.0.0.5:8000/v1", apiKey: "sk-x" })).rejects.toThrow(/https/i);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("lists OpenAI models with the bearer key", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ data: [{ id: "gpt-5.5" }] })));
 

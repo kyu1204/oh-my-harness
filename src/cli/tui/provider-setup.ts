@@ -5,6 +5,7 @@ import {
   type ProviderDefinition,
 } from "../../nl/provider-registry.js";
 import { listModels, type ListModelsOptions } from "../../nl/list-models.js";
+import { validateBaseUrl } from "../../nl/providers/openai-api.js";
 import { ensureCodexOauthApiAuth } from "../../nl/providers/codex-oauth-api.js";
 import { createPkce, buildOpenrouterAuthUrl, exchangeOpenrouterCode } from "../../nl/providers/openrouter-oauth.js";
 import { openInBrowser, hyperlink } from "./open-browser.js";
@@ -124,7 +125,7 @@ export async function runProviderSetup(): Promise<ProviderConfig | undefined> {
         message: "Base URL of the OpenAI-compatible endpoint:",
         placeholder: def.defaultBaseUrl,
         defaultValue: def.defaultBaseUrl,
-        validate: (v) => (/^https?:\/\//.test((v ?? def.defaultBaseUrl ?? "").trim()) ? undefined : "Must start with http:// or https://"),
+        validate: (v) => validateBaseUrl((v ?? "").trim() || def.defaultBaseUrl || ""),
       });
       if (p.isCancel(baseUrl)) return cancelled();
       config.baseUrl = ((baseUrl as string) || def.defaultBaseUrl || "").trim().replace(/\/+$/, "");
@@ -167,6 +168,14 @@ export async function runProviderSetup(): Promise<ProviderConfig | undefined> {
       });
       if (p.isCancel(apiKey)) return cancelled();
       if ((apiKey as string)?.trim()) config.apiKey = (apiKey as string).trim();
+    }
+
+    if (config.baseUrl) {
+      const invalid = validateBaseUrl(config.baseUrl, config.apiKey);
+      if (invalid) {
+        p.log.error(invalid);
+        return cancelled();
+      }
     }
 
     const model = await pickModel(def, { apiKey: config.apiKey, baseUrl: config.baseUrl });

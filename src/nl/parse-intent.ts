@@ -34,13 +34,15 @@ export async function createDefaultRunner(): Promise<LLMRunner> {
 
 /** CI-friendly fallback: pick an API provider from the usual env vars when nothing is saved. */
 function providerConfigFromEnv(): ProviderConfig | undefined {
-  const env = process.env;
-  if (env.ANTHROPIC_API_KEY) return { provider: "claude", method: "api", apiKey: env.ANTHROPIC_API_KEY };
-  if (env.OPENAI_API_KEY) return { provider: "openai", method: "api", apiKey: env.OPENAI_API_KEY };
-  const gemini = env.GEMINI_API_KEY ?? env.GOOGLE_API_KEY;
-  if (gemini) return { provider: "gemini", method: "api", apiKey: gemini };
-  if (env.OPENROUTER_API_KEY) return { provider: "openrouter", method: "api", apiKey: env.OPENROUTER_API_KEY };
-  return undefined;
+  const key = (name: string): string | undefined => process.env[name]?.trim() || undefined;
+  const candidates: Array<[ProviderConfig["provider"], string | undefined]> = [
+    ["claude", key("ANTHROPIC_API_KEY")],
+    ["openai", key("OPENAI_API_KEY")],
+    ["gemini", key("GEMINI_API_KEY") ?? key("GOOGLE_API_KEY")],
+    ["openrouter", key("OPENROUTER_API_KEY")],
+  ];
+  const hit = candidates.find(([, apiKey]) => apiKey);
+  return hit ? { provider: hit[0], method: "api", apiKey: hit[1] } : undefined;
 }
 
 /** Legacy default runner using claude CLI directly */

@@ -74,6 +74,17 @@ describe("createDefaultRunner", () => {
     expect(createProvider).toHaveBeenLastCalledWith(expect.objectContaining({ provider: "openrouter", apiKey: "sk-or" }));
   });
 
+  it("ignores whitespace-only keys and falls through to the next env var", async () => {
+    loadProviderConfig.mockResolvedValue(undefined);
+    process.env.ANTHROPIC_API_KEY = "   ";
+    process.env.OPENAI_API_KEY = " sk-o ";
+    const { createDefaultRunner } = await import("../../src/nl/parse-intent.js");
+
+    await createDefaultRunner();
+
+    expect(createProvider).toHaveBeenLastCalledWith(expect.objectContaining({ provider: "openai", apiKey: "sk-o" }));
+  });
+
   it("falls back to the claude CLI when neither config nor env keys exist", async () => {
     loadProviderConfig.mockResolvedValue(undefined);
     const { createDefaultRunner } = await import("../../src/nl/parse-intent.js");

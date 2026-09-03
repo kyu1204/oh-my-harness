@@ -87,7 +87,7 @@ describe("codex-oauth provider", () => {
     await expect(resultPromise).rejects.toThrow("partial output");
   });
 
-  it("defaults Codex exec to gpt-5.5 when no model is configured", async () => {
+  it("defaults Codex exec to gpt-5.6-sol when no model is configured", async () => {
     const proc = makeProcess();
     spawnMock.mockReturnValue(proc);
     const { createCodexOauthProvider } = await import("../../src/nl/providers/codex-oauth.js");
@@ -97,7 +97,7 @@ describe("codex-oauth provider", () => {
 
     expect(spawnMock).toHaveBeenCalledWith(
       "codex",
-      expect.arrayContaining(["-m", "gpt-5.5"]),
+      expect.arrayContaining(["-m", "gpt-5.6-sol"]),
       expect.any(Object),
     );
 

@@ -39,6 +39,7 @@ function providerConfigFromEnv(): ProviderConfig | undefined {
   if (env.OPENAI_API_KEY) return { provider: "openai", method: "api", apiKey: env.OPENAI_API_KEY };
   const gemini = env.GEMINI_API_KEY ?? env.GOOGLE_API_KEY;
   if (gemini) return { provider: "gemini", method: "api", apiKey: gemini };
+  if (env.OPENROUTER_API_KEY) return { provider: "openrouter", method: "api", apiKey: env.OPENROUTER_API_KEY };
   return undefined;
 }
 

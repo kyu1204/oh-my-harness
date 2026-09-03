@@ -185,7 +185,8 @@ Natural language mode (`omh init "description"`) needs one LLM call. Pick a prov
 | **OpenAI** | API key | GPT-5.5 (default), GPT-5.4 family, GPT-4.1, o3, o4-mini |
 | **Gemini** | API key | Gemini 2.5 Pro (default), 2.5 Flash, 3.x previews |
 | **Codex** (ChatGPT subscription) | via the `codex` CLI (`codex login`), or direct API with device-code sign-in stored in `~/.omh` | GPT-5.5 (default), GPT-5.4, GPT-5.4 Mini |
-| **OpenAI-compatible endpoint** | Base URL + optional key. Works with Ollama, llama.cpp server, MLX (`mlx_lm.server`), LM Studio, vLLM, OpenRouter/OrcaRouter-style gateways | Whatever the server lists |
+| **OpenRouter** | Sign in with browser (PKCE, creates a key on your account) or paste an API key | 300+ models incl. `:free` ones; `openrouter/auto` default |
+| **OpenAI-compatible endpoint** | Base URL + optional key. Works with Ollama, llama.cpp server, MLX (`mlx_lm.server`), LM Studio, vLLM, and hosted OpenAI-compatible APIs (Groq, DeepSeek, xAI, Mistral, OrcaRouter, ...) | Whatever the server lists |
 
 The model picker fetches the live model list from the provider when it can, falls back to the built-in list otherwise, and always offers "Other (enter model id)", so new model releases never require an update of this tool.
 
@@ -195,7 +196,14 @@ omh config --show   # read-only
 omh config --reset  # forget the saved provider
 ```
 
-No saved config? `omh` falls back to `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`/`GOOGLE_API_KEY` from the environment (handy in CI), and finally to the `claude` CLI.
+No saved config? `omh` falls back to `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`/`GOOGLE_API_KEY`, or `OPENROUTER_API_KEY` from the environment (handy in CI), and finally to the `claude` CLI.
+
+Local example (Ollama):
+
+```bash
+ollama pull qwen2.5-coder:7b
+omh config   # OpenAI-compatible endpoint -> http://localhost:11434/v1 -> empty key -> pick qwen2.5-coder:7b
+```
 
 ----------|-------|------------------|---------|
 | **Claude CLI** | `claude` command installed | Opus 4.6, Sonnet 4.6, Haiku 4.5 | ✓ |

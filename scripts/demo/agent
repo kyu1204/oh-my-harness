@@ -1,0 +1,26 @@
+#!/bin/bash
+# Demo stand-in for an AI coding agent: sends the same PreToolUse payload
+# Claude Code / Codex would send, into the hooks omh generated.
+GREEN=$'\e[32m'; RED=$'\e[31m'; DIM=$'\e[2m'; BOLD=$'\e[1m'; RST=$'\e[0m'
+decide() { # $1 hook, $2 tool_input json
+  printf '{"tool_input":%s}' "$2" | ".omh/hooks/catalog-$1.sh" 2>"$TMP"
+}
+TMP=$(mktemp)
+case "$1" in
+  run)
+    echo "${DIM}agent → Bash: ${RST}$2"
+    OUT=$(decide command-guard "{\"command\":$(printf %s "$2" | jq -Rs .)}")
+    [ -z "$OUT" ] && OUT=$(decide commit-test-gate "{\"command\":$(printf %s "$2" | jq -Rs .)}")
+    grep -E "^\s+×|AssertionError|expected" "$TMP" | head -2 | sed "s/^/   ${RED}/;s/$/${RST}/"
+    ;;
+  edit)
+    echo "${DIM}agent → Edit: ${RST}$2"
+    OUT=$(decide tdd-guard "{\"file_path\":\"$PWD/$2\"}")
+    ;;
+esac
+if echo "$OUT" | jq -e '.decision=="block"' >/dev/null 2>&1; then
+  echo "   ${RED}${BOLD}⛔ BLOCKED${RST}  $(echo "$OUT" | jq -r .reason)"
+else
+  echo "   ${GREEN}✔ allowed${RST}"
+fi
+rm -f "$TMP"

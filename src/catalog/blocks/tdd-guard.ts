@@ -65,7 +65,7 @@ fi
 # 대응 테스트 파일 확인 — 확장자 제거
 BASENAME=$(basename "\$FILE_PATH" | sed -E 's/\\.[^.]+$//')
 
-REASON="oh-my-harness: TDD — \${BASENAME} 에 대응하는 테스트 파일을 먼저 수정하세요"
+REASON="oh-my-harness: TDD guard — edit the test for \${BASENAME} first, then the source"
 if [[ ! -f "\$HISTORY_FILE" ]]; then
   _log_event "block" "\$REASON"
   _emit_decision "block" "\$REASON"

@@ -2,46 +2,40 @@
 
 # 🐴 oh-my-harness
 
-**Tame your AI coding agents with natural language.**
+**CLAUDE.md is a request. oh-my-harness is enforcement.**
+
+One command turns "TDD enforced, block dangerous commands" into hooks that actually **block** your AI coding agent — for Claude Code, Codex and Pi at once.
 
 [![npm version](https://img.shields.io/npm/v/oh-my-harness.svg)](https://www.npmjs.com/package/oh-my-harness)
 [![npm downloads](https://img.shields.io/npm/dm/oh-my-harness.svg)](https://www.npmjs.com/package/oh-my-harness)
 [![CI](https://github.com/kyu1204/oh-my-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/kyu1204/oh-my-harness/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/github/license/kyu1204/oh-my-harness.svg)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-blue.svg)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
 
-> Stop hand-writing CLAUDE.md files. Describe your project, get enforced guardrails.
+<img src="docs/demo.gif" alt="omh init generates hooks; an AI agent's commit, rm -rf and untested edit are blocked" width="900">
 
 </div>
 
----
-
-## 😤 The Problem
-
-Every AI code agent needs configuration files. Claude Code needs `CLAUDE.md` + hooks. Cursor needs `.cursorrules`. Codex needs `AGENTS.md`. You end up:
-
-- 📋 Copy-pasting config files between projects
-- 🔓 Forgetting to set up TDD enforcement hooks
-- 💥 Agents committing code without running tests
-- 🎲 Inconsistent behavior across projects
-
-## ✨ The Solution
-
 ```bash
-oh-my-harness init "React + FastAPI fullstack, TDD enforced, lint on save"
+npx oh-my-harness init "React + FastAPI, TDD enforced, lint on save"
 ```
 
-That's it. oh-my-harness generates **enforced guardrails** — not just instructions, but hooks that actually **block** bad behavior:
+That is the whole setup. Your agent now hits a wall when it tries to:
 
-- ❌ Commit without tests passing? **Blocked.**
-- ❌ Edit source without updating tests first? **Blocked.** _(TDD Guard)_
-- ❌ Write to `node_modules/` or `.next/`? **Blocked.**
-- ❌ Run `rm -rf /`? **Blocked.**
-- ❌ Commit on a merged branch? **Blocked.**
-- ✅ Auto-lint on every file save? **Done.**
-- ✅ Auto-create PR after push? **Done.**
-- 📊 Track all hook events for analytics? **Done.**
+| Agent tries to... | Result |
+|---|---|
+| `git commit` while tests fail | ⛔ **Blocked** |
+| edit `src/foo.ts` before touching `foo.test.ts` | ⛔ **Blocked** (TDD guard) |
+| run `rm -rf /`, `chmod -R 777`, or any pattern you list | ⛔ **Blocked** |
+| write into `node_modules/`, `.next/`, `dist/` | ⛔ **Blocked** |
+| commit on a branch already merged to main | ⛔ **Blocked** |
+| save a file | ✅ auto-lint |
+| push a branch | ✅ auto-PR |
+
+Every decision is logged to `.omh/state/events.jsonl` — `omh stats` shows what your agent tried and what got stopped.
+
+## Why not just write CLAUDE.md?
+
+Because agents read instructions and then forget them halfway through a long session. A rule in a markdown file is a suggestion; a `PreToolUse` hook that returns `{"decision":"block"}` is a fact. oh-my-harness writes the markdown **and** the hooks, from one `harness.yaml`, and keeps them in sync (`omh sync --check` fails CI when they drift).
 
 ---
 

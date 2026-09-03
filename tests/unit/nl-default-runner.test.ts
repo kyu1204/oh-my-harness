@@ -15,7 +15,7 @@ vi.mock("../../src/nl/provider-registry.js", async (importOriginal) => {
   return { ...actual, createProvider: (c: ProviderConfig) => createProvider(c) };
 });
 
-const ENV_KEYS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"];
+const ENV_KEYS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY"];
 let saved: Record<string, string | undefined>;
 
 beforeEach(() => {
@@ -67,6 +67,11 @@ describe("createDefaultRunner", () => {
     process.env.GOOGLE_API_KEY = "g-key";
     await createDefaultRunner();
     expect(createProvider).toHaveBeenLastCalledWith(expect.objectContaining({ provider: "gemini", apiKey: "g-key" }));
+
+    delete process.env.GOOGLE_API_KEY;
+    process.env.OPENROUTER_API_KEY = "sk-or";
+    await createDefaultRunner();
+    expect(createProvider).toHaveBeenLastCalledWith(expect.objectContaining({ provider: "openrouter", apiKey: "sk-or" }));
   });
 
   it("falls back to the claude CLI when neither config nor env keys exist", async () => {

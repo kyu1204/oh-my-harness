@@ -19,7 +19,7 @@ export const pathGuard: BuildingBlock = {
       name: "protectHarness",
       type: "boolean",
       description:
-        "Also block edits to the harness's own hook scripts and runtime wiring (.omh/hooks/, .claude/settings.json, .codex/, .pi/extensions/) so the agent cannot disable its guardrails",
+        "Also block edits to the harness's own hook scripts and runtime wiring (.omh/hooks/, .claude/settings.json, .codex/hooks.json, .codex/config.toml, .pi/extensions/omh-harness.ts) so the agent cannot disable its guardrails",
       default: true,
       required: false,
     },

@@ -15,6 +15,14 @@ export const pathGuard: BuildingBlock = {
       description: "Paths or directory prefixes to block (e.g. dist/, node_modules/)",
       required: true,
     },
+    {
+      name: "protectHarness",
+      type: "boolean",
+      description:
+        "Also block edits to the harness's own hook scripts and runtime wiring (.omh/hooks/, .claude/settings.json, .codex/, .pi/extensions/) so the agent cannot disable its guardrails",
+      default: true,
+      required: false,
+    },
   ],
   tags: ["security", "file", "path", "guard"],
   template: `#!/bin/bash
@@ -41,6 +49,10 @@ fi
 [[ \${#FILE_PATHS[@]} -eq 0 ]] && exit 0
 
 BLOCKED_PATHS=({{#each blockedPaths}}"{{{this}}}" {{/each}})
+{{#if protectHarness}}
+# Guardrails guard themselves: the agent must not edit the hooks or the runtime config that wires them in.
+BLOCKED_PATHS+=(".omh/hooks/" ".claude/settings.json" ".codex/hooks.json" ".codex/config.toml" ".pi/extensions/omh-harness.ts")
+{{/if}}
 for FILE_PATH in "\${FILE_PATHS[@]}"; do
   # Normalize each path to prevent directory traversal attacks (e.g., ./foo/../dist/secret.js -> dist/secret.js)
   if command -v python3 >/dev/null 2>&1; then

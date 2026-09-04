@@ -28,6 +28,7 @@ That is the whole setup. Your agent now hits a wall when it tries to:
 | run `rm -rf /`, `chmod -R 777`, or any pattern you list | ⛔ **Blocked** |
 | write into `node_modules/`, `.next/`, `dist/` | ⛔ **Blocked** |
 | commit on a branch already merged to main | ⛔ **Blocked** |
+| edit its own hooks or `.claude/settings.json` to switch the guardrails off | ⛔ **Blocked** |
 | save a file | ✅ auto-lint |
 | push a branch | ✅ auto-PR |
 

@@ -168,6 +168,57 @@ describe("catalog block execution", () => {
     expect(result.reason).toContain("dist/");
   });
 
+  it("path-guard: blocks edits to the harness's own hook files and runtime wiring by default", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+
+    const rendered = renderTemplate(pathGuard.template, {
+      blockedPaths: ["dist/"],
+      protectHarness: true,
+    });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "path-guard-harness.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    for (const file_path of [
+      ".omh/hooks/catalog-tdd-guard.sh",
+      ".claude/settings.json",
+      ".codex/hooks.json",
+      ".pi/extensions/omh-harness.ts",
+      "sub/project/.omh/hooks/x.sh",
+    ]) {
+      const stdout = runScript(
+        scriptPath,
+        JSON.stringify({ tool_name: "Write", tool_input: { file_path } }),
+      );
+      const result = JSON.parse(stdout.trim());
+      expect(result.decision, file_path).toBe("block");
+    }
+  });
+
+  it("path-guard: protectHarness=false leaves harness files editable", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+
+    const rendered = renderTemplate(pathGuard.template, {
+      blockedPaths: ["dist/"],
+      protectHarness: false,
+    });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "path-guard-harness-off.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    const stdout = runScript(
+      scriptPath,
+      JSON.stringify({ tool_name: "Write", tool_input: { file_path: ".claude/settings.json" } }),
+    );
+    expect(stdout.trim()).toBe("");
+  });
+
   it("path-guard: allows a write to a non-blocked path", async () => {
     if (!hasJq()) {
       console.log("jq not found, skipping");

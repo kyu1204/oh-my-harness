@@ -66,6 +66,7 @@ describe("tdd-guard execution", () => {
       const result = JSON.parse(trimmed);
       expect(result.decision).toBe("block");
       expect(result.reason).toContain("event-logger");
+      expect(result.reason).toMatch(/edit the test for event-logger first/);
     },
   );
 

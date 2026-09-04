@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question / idea
+    url: https://github.com/kyu1204/oh-my-harness/discussions
+    about: Ask how to configure something or float an idea before filing an issue.

@@ -1,0 +1,17 @@
+name: Feature request
+description: Something omh should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What goes wrong today without it
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: CLI flag, harness.yaml key, or generated output you expect.
+    validations:
+      required: true

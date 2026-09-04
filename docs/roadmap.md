@@ -1,0 +1,23 @@
+# Roadmap
+
+- [x] `npx oh-my-harness` — zero-install usage
+- [x] `omh sync` — regenerate from harness.yaml
+- [x] Building block catalog — 18 verified hook templates
+- [x] Project detector — 14 language auto-detection
+- [x] `omh test` — dry-run hook verification
+- [x] `omh stats` — TUI analytics dashboard (ink)
+- [x] Stateful hook logging — events.jsonl
+- [x] TDD Guard — enforce test-first workflow
+- [x] Multi-provider AI support — Claude, OpenAI, Gemini, Codex, OpenRouter, OpenAI-compatible local endpoints
+- [x] Live model lists from each provider (no hardcoded catalogue)
+- [x] Interactive model selection per provider
+- [x] GitHub star prompt — first-time only
+- [x] Codex emitter — `AGENTS.md` + `.codex/hooks.json` + `.codex/config.toml`
+- [x] Unified `.omh/` layout — single source of truth for hooks & state across runtimes
+- [x] Pi ([pi.dev](https://pi.dev)) emitter — bridge extension (`.pi/extensions/omh-harness.ts`) reusing the same `.omh/hooks/*.sh`
+- [x] `ask` mode — request approval before executing risky tools (Claude native prompt / Pi `ctx.ui.select`; Codex falls back to block)
+- [x] `omh uninstall` — remove generated artifacts while preserving user content
+- [x] `omh config` — view, reconfigure, or reset the saved AI provider (rotate expired keys, switch provider/model)
+- [x] Autonomous loop engine — `omh-loop` skill, worktree-isolated runner, loop-guard, JSONL monitoring
+- [ ] Community harness.yaml registry — share and reuse configs
+- [ ] `omh modify "change X"` — NL config editing

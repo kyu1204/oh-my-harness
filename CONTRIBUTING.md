@@ -53,6 +53,24 @@ npm run test:watch
 npm run lint
 ```
 
+## Your first PR in 30 minutes: add a building block
+
+Building blocks are the easiest entry point. Each one is a single file that
+becomes a hook script in every project that enables it.
+
+1. `git clone` and `npm install`, then `npx vitest run` to see green.
+2. Copy `src/catalog/blocks/lockfile-guard.ts` to `src/catalog/blocks/<your-block>.ts`.
+   Change `id`, `name`, `description`, `params` and the bash `template`.
+   Call `_emit_decision "block" "$REASON"` to block, `_log_event` to record.
+3. Register it in `src/catalog/blocks/index.ts`.
+4. Add a test in `tests/unit/catalog-blocks.test.ts` (an existing block's test
+   is a good copy source). Run `npx vitest run tests/unit/catalog-blocks.test.ts`.
+5. Try it for real: `npm run build && npm link`, then in any project
+   `omh hook add <your-block>` and trigger it.
+6. Open the PR. Issues labelled
+   [`block-request`](https://github.com/kyu1204/oh-my-harness/labels/block-request)
+   are ready-made ideas.
+
 ## What to Contribute
 
 ### harness.yaml Schema

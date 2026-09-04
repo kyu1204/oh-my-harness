@@ -23,7 +23,7 @@ Type `omh init -y "TypeScript API, TDD enforced, block dangerous commands"`
 Sleep 800ms
 Enter
 Hide
-Sleep 30s
+Wait+Screen@60s /initialized successfully/
 Show
 Sleep 3s
 

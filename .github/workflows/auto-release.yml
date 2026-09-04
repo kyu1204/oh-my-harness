@@ -4,10 +4,15 @@ on:
   pull_request:
     types: [closed]
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)publish, e.g. v0.20.0"
+        required: true
 
 jobs:
   release:
-    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/v')
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -41,6 +46,7 @@ jobs:
 
   publish-npm:
     needs: release
+    if: always() && (needs.release.result == 'success' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -48,23 +54,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release.outputs.tag }}
+          ref: ${{ inputs.tag || needs.release.outputs.tag }}
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
           cache: npm
+      - run: npm install -g npm@latest   # trusted publishing needs npm >= 11.5.1
       - run: npm ci
       - run: npm test
       - run: npm run build
       - name: Verify CLI works
         run: node dist/bin/oh-my-harness.js --help
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: npm publish --provenance --access public   # auth via npm Trusted Publishing (OIDC)
 
   publish-github:
-    needs: publish-npm
+    needs: [release, publish-npm]
+    if: always() && needs.publish-npm.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -72,7 +78,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release.outputs.tag }}
+          ref: ${{ inputs.tag || needs.release.outputs.tag }}
       - uses: actions/setup-node@v4
         with:
           node-version: 20

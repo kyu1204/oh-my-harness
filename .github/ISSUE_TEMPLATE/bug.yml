@@ -1,0 +1,33 @@
+name: Bug report
+description: Something omh generated or blocked is wrong
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: omh version / OS / agent runtime
+      placeholder: "0.19.0 / macOS 15 / Claude Code 2.x"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include the hook name and the exact block reason if a hook fired.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. omh init "..."
+        2. agent runs ...
+        3. hook says ...
+    validations:
+      required: true
+  - type: textarea
+    id: harness
+    attributes:
+      label: harness.yaml (relevant part)
+      render: yaml

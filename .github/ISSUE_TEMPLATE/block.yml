@@ -1,0 +1,27 @@
+name: New building block
+description: Propose a catalog block (a hook that blocks, warns, or runs something)
+labels: [block-request, "good first issue"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Block name
+      placeholder: "no-force-push-guard"
+    validations:
+      required: true
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: What the agent does that this block should stop or automate
+    validations:
+      required: true
+  - type: input
+    id: event
+    attributes:
+      label: Hook event
+      placeholder: "PreToolUse on Bash / PostToolUse on Edit"
+  - type: textarea
+    id: params
+    attributes:
+      label: Parameters (if any)
+      placeholder: "patterns: [...] with sensible defaults"

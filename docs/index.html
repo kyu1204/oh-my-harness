@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>oh-my-harness — hooks that actually block your AI coding agent</title>
+<meta name="description" content="One command turns 'TDD enforced, block dangerous commands' into hooks that block Claude Code, Codex and Pi before they misbehave.">
+<meta property="og:title" content="oh-my-harness">
+<meta property="og:description" content="CLAUDE.md is a request. oh-my-harness is enforcement.">
+<meta property="og:image" content="https://kyu1204.github.io/oh-my-harness/demo.gif">
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#1e1e2e; color:#cdd6f4; font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 56px 20px 80px; text-align:center; }
+  h1 { font-size: 44px; margin: 0 0 8px; letter-spacing:-.02em; }
+  h1 span { color:#f38ba8; }
+  .tag { font-size: 22px; color:#a6adc8; margin: 0 0 28px; }
+  pre { display:inline-block; text-align:left; background:#11111b; border:1px solid #313244; border-radius:10px; padding:14px 20px; font:15px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a6e3a1; margin: 0 0 32px; max-width:100%; overflow-x:auto; }
+  img { width:100%; max-width:900px; border-radius:12px; border:1px solid #313244; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+  .row { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin: 28px 0 44px; }
+  a.btn { text-decoration:none; padding:11px 20px; border-radius:8px; font-weight:600; }
+  .primary { background:#cba6f7; color:#11111b; }
+  .ghost { border:1px solid #45475a; color:#cdd6f4; }
+  table { margin: 0 auto 40px; border-collapse:collapse; text-align:left; }
+  td { padding:8px 16px; border-bottom:1px solid #313244; }
+  td:last-child { white-space:nowrap; }
+  .block { color:#f38ba8; font-weight:700; } .ok { color:#a6e3a1; font-weight:700; }
+  p.why { max-width:680px; margin:0 auto 40px; color:#a6adc8; }
+  footer { color:#6c7086; font-size:14px; }
+  footer a { color:#89b4fa; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🐴 oh-my-harness</h1>
+  <p class="tag">CLAUDE.md is a request. <span style="color:#f38ba8">oh-my-harness is enforcement.</span></p>
+  <pre>npx oh-my-harness init "React + FastAPI, TDD enforced, lint on save"</pre>
+  <div>
+    <img src="demo.gif" alt="omh init generates hooks; an AI agent's failing-test commit, dangerous rm and untested edit are blocked">
+  </div>
+  <div class="row">
+    <a class="btn primary" href="https://github.com/kyu1204/oh-my-harness">★ Star on GitHub</a>
+    <a class="btn ghost" href="https://www.npmjs.com/package/oh-my-harness">npm</a>
+    <a class="btn ghost" href="https://github.com/kyu1204/oh-my-harness/blob/main/docs/comparison.md">vs. other tools</a>
+  </div>
+
+  <table>
+    <tr><td>Agent commits while tests fail</td><td class="block">⛔ Blocked</td></tr>
+    <tr><td>Agent edits <code>foo.ts</code> before <code>foo.test.ts</code></td><td class="block">⛔ Blocked (TDD guard)</td></tr>
+    <tr><td>Agent runs <code>rm -rf /</code> or any pattern you list</td><td class="block">⛔ Blocked</td></tr>
+    <tr><td>Agent writes into <code>node_modules/</code>, <code>dist/</code>, a lockfile</td><td class="block">⛔ Blocked</td></tr>
+    <tr><td>Agent commits on a branch already merged</td><td class="block">⛔ Blocked</td></tr>
+    <tr><td>Agent saves a file</td><td class="ok">✔ auto-lint</td></tr>
+    <tr><td>Agent pushes a branch</td><td class="ok">✔ auto-PR</td></tr>
+  </table>
+
+  <p class="why">Agents read instructions and forget them halfway through a long session. A rule in markdown is a suggestion; a <code>PreToolUse</code> hook that returns <code>{"decision":"block"}</code> is a fact. oh-my-harness writes both, from one <code>harness.yaml</code>, for Claude Code, Codex and Pi at once, and fails CI when they drift.</p>
+
+  <footer>MIT · <a href="https://github.com/kyu1204/oh-my-harness/blob/main/README.md">README</a> · <a href="https://github.com/kyu1204/oh-my-harness/discussions">Discussions</a> · <a href="https://github.com/kyu1204/oh-my-harness/labels/good%20first%20issue">good first issues</a></footer>
+</main>
+</body>
+</html>

@@ -186,6 +186,7 @@ describe("catalog block execution", () => {
       ".omh/hooks/catalog-tdd-guard.sh",
       ".claude/settings.json",
       ".codex/hooks.json",
+      ".codex/config.toml",
       ".pi/extensions/omh-harness.ts",
       "sub/project/.omh/hooks/x.sh",
     ]) {

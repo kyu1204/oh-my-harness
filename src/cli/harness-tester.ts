@@ -235,6 +235,24 @@ export function generateBlockTestCases(
         break;
       }
 
+      case "harness-guard": {
+        cases.push({
+          name: '"rm -rf .omh" → BLOCKED',
+          category: "harness-guard",
+          hookScript,
+          input: { tool_name: "Bash", tool_input: { command: "rm -rf .omh" } },
+          expectation: "block",
+        });
+        cases.push({
+          name: '"cat .omh/hooks/catalog-tdd-guard.sh" → ALLOWED',
+          category: "harness-guard",
+          hookScript,
+          input: { tool_name: "Bash", tool_input: { command: "cat .omh/hooks/catalog-tdd-guard.sh" } },
+          expectation: "allow",
+        });
+        break;
+      }
+
       case "branch-guard": {
         const isProtected = currentBranch === "main" || currentBranch === "master";
         cases.push({

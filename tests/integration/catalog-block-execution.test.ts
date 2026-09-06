@@ -12,6 +12,7 @@ import { commitTestGate } from "../../src/catalog/blocks/commit-test-gate.js";
 import { pathGuard } from "../../src/catalog/blocks/path-guard.js";
 import { lockfileGuard } from "../../src/catalog/blocks/lockfile-guard.js";
 import { secretFileGuard } from "../../src/catalog/blocks/secret-file-guard.js";
+import { harnessGuard } from "../../src/catalog/blocks/harness-guard.js";
 
 let tmpDir: string;
 
@@ -215,6 +216,86 @@ EOF
     } else {
       expect(trimmed).toBe("");
     }
+  });
+
+  it("harness-guard: blocks shell writes to the harness's own files (#113)", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+    const rendered = renderTemplate(harnessGuard.template, { extraPaths: ["ops/protected.yml"] });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "harness-guard.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    for (const command of [
+      "sed -i 's/block/allow/' .omh/hooks/catalog-tdd-guard.sh",
+      "rm -rf .omh",
+      "rm .omh/state/tdd-edits.json",
+      "chmod -x ./.omh/hooks/catalog-command-guard.sh",
+      "echo '{}' > .claude/settings.json",
+      "cat /dev/null >> .codex/hooks.json",
+      "git checkout -- .claude/settings.json",
+      "git -C . restore .pi/extensions/omh-harness.ts",
+      "mv .codex/config.toml /tmp/x",
+      "cp /tmp/evil.sh /abs/path/project/.omh/hooks/catalog-tdd-guard.sh",
+      "cd src && rm -rf ../.omh/hooks",
+      "sudo rm -rf .omh",
+      "bash -c 'rm -rf .omh'",
+      "find .omh -name '*.sh' -delete",
+      "tee ops/protected.yml < /dev/null",
+    ]) {
+      const stdout = runScript(scriptPath, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
+      const result = JSON.parse(stdout.trim());
+      expect(result.decision, command).toBe("block");
+      expect(result.reason, command).toContain("omh sync");
+    }
+  });
+
+  it("harness-guard: allows reads, unrelated writes, omh itself and mentions in strings", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+    const rendered = renderTemplate(harnessGuard.template, { extraPaths: [] });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "harness-guard-allow.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    for (const command of [
+      "cat .omh/hooks/catalog-tdd-guard.sh",
+      "grep -n block .claude/settings.json",
+      "ls -la .omh/hooks",
+      "diff .codex/hooks.json /tmp/other.json",
+      "omh sync",
+      "npx oh-my-harness hook add tdd-guard",
+      "rm -rf dist node_modules",
+      "echo x > .omh-notes.md",
+      "sed -i 's/a/b/' src/omh/index.ts",
+      "git checkout -b feat/x",
+      "git commit -m 'touch .omh/hooks in the message'",
+      "echo 'rm -rf .omh'",
+      "find src -name '*.ts' -delete",
+    ]) {
+      const stdout = runScript(scriptPath, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
+      expect(stdout.trim(), command).toBe("");
+    }
+  });
+
+  it("harness-guard: leaves Codex apply_patch to path-guard", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+    const rendered = renderTemplate(harnessGuard.template, { extraPaths: [] });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "harness-guard-patch.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+    const stdout = runScript(
+      scriptPath,
+      JSON.stringify({ tool_name: "apply_patch", tool_input: { command: "*** Update File: .omh/hooks/x.sh\nrm -rf .omh" } }),
+    );
+    expect(stdout.trim()).toBe("");
   });
 
   it("branch-guard: rendered script contains git commit detection logic", async () => {

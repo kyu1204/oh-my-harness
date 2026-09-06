@@ -111,6 +111,14 @@ export async function harnessToMergedConfigV2(
   // Resolve registry — use provided one or create the default
   const resolvedRegistry = registry ?? (await createDefaultRegistry());
 
+  // A harness that enforces anything also guards itself: without this an
+  // agent could delete or rewrite the hooks through Bash (#113). An explicit
+  // entry may change its mode or add paths. Skipped for custom registries
+  // that do not ship the block.
+  if (resolvedRegistry.has("harness-guard") && !allHookEntries.some((h) => h.block === "harness-guard")) {
+    allHookEntries.push({ block: "harness-guard", params: {}, mode: "block" });
+  }
+
   const catalogResult = await convertHookEntries(allHookEntries, resolvedRegistry, projectDir ?? ".");
 
   // Convert hooksConfig entries from catalog into HookDefinition format.

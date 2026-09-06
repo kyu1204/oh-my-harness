@@ -99,11 +99,24 @@ EOF
   });
 
   it("drops redirections so they cannot split or disguise a command", () => {
-    expect(simple("git 2>/dev/null commit -m x")).toEqual([["git", "commit", "-m", "x"]]);
-    expect(simple("rm 2> /dev/null -rf /")).toEqual([["rm", "-rf", "/"]]);
-    expect(simple("make >build.log 2>&1 && echo ok")).toEqual([["make"], ["echo", "ok"]]);
-    expect(simple("cat < in.txt >> out.txt")).toEqual([["cat"]]);
+    const R = "__omh_redirect__";
+    expect(simple("git 2>/dev/null commit -m x")).toEqual([[R, "/dev/null"], ["git", "commit", "-m", "x"]]);
+    expect(simple("rm 2> /dev/null -rf /")).toEqual([[R, "/dev/null"], ["rm", "-rf", "/"]]);
+    expect(simple("make >build.log 2>&1 && echo ok")).toEqual([[R, "build.log"], ["make"], ["echo", "ok"]]);
+    expect(simple("cat < in.txt >> out.txt")).toEqual([[R, "out.txt"], ["cat"]]);
     expect(simple(`cat <<< "not a heredoc"`)).toEqual([["cat"]]);
+  });
+
+  it("reports output-redirection targets as __omh_redirect__ lines", () => {
+    expect(simple("echo x > .claude/settings.json")).toEqual([
+      ["__omh_redirect__", ".claude/settings.json"],
+      ["echo", "x"],
+    ]);
+    expect(simple("cat a >>out.log 2>&1")).toEqual([["__omh_redirect__", "out.log"], ["cat", "a"]]);
+    expect(simple("make &> build.log")).toEqual([["__omh_redirect__", "build.log"], ["make"]]);
+    // reads and fd dups are not writes
+    expect(simple("wc -l < in.txt")).toEqual([["wc", "-l"]]);
+    expect(simple("echo hi >&2")).toEqual([["echo", "hi"]]);
   });
 
   it("drops comments", () => {

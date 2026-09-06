@@ -85,12 +85,23 @@ END {
 }
 # Append the pending token to the current simple command, unless it is a
 # redirection (2>/dev/null, >file, <in, 2>&1, &>log) or the word a bare
-# redirection operator (2>, >, <, >>) applies to.
-function flush(d) {
+# redirection operator (2>, >, <, >>) applies to. Output-redirection targets
+# are emitted as their own "__omh_redirect__<TAB>target" line so guards that
+# care about writes (harness-guard) can see them; argv0 matchers never match
+# that pseudo-command.
+function flush(d,   t) {
   if (tok[d] == "") return
-  if (skipnext[d]) { skipnext[d] = 0; tok[d] = ""; return }
+  if (skipnext[d]) {
+    # the word an output redirection applies to: report it as a write target
+    if (skipnext[d] == 2) print "__omh_redirect__\t" tok[d]
+    skipnext[d] = 0; tok[d] = ""; return
+  }
   if (tok[d] ~ /^[0-9]*(>>?|<|&>>?|>&)/) {
-    if (tok[d] ~ /^[0-9]*(>>?|<|&>>?)$/) skipnext[d] = 1
+    if (tok[d] ~ /^[0-9]*(>>?|&>>?)$/) skipnext[d] = 2        # bare "> " / "2> " / "&> ": next word is written
+    else if (tok[d] ~ /^<$/) skipnext[d] = 1                   # bare "< ": next word is read
+    else if (tok[d] ~ /^[0-9]*(>>?|&>>?)[^&]/) {              # attached ">file" (not the ">&2" dup form)
+      t = tok[d]; sub(/^[0-9]*(>>?|&>>?)/, "", t); print "__omh_redirect__\t" t
+    }
     tok[d] = ""; return
   }
   cmd[d] = cmd[d] (cmd[d] == "" ? "" : "\t") tok[d]; tok[d] = ""

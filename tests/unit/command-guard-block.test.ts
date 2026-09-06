@@ -9,12 +9,11 @@ describe("commandGuard block", () => {
     expect(commandGuard.canBlock).toBe(true);
   });
 
-  it("template uses grep -- to support patterns starting with dashes", () => {
-    // Without --, patterns like --no-verify are interpreted as grep options
-    expect(commandGuard.template).toContain('grep -qF -- ');
-  });
-
-  it("generated script normalizes all whitespace before pattern matching", () => {
-    expect(commandGuard.template).toContain("tr '[:space:]' ' ' | tr -s ' '");
+  it("template matches patterns through the shared shell-token helper, not raw grep (#109)", () => {
+    // Token matching handles dash-leading patterns (--no-verify) and any
+    // whitespace shape; quoted text never matches. Behaviour is covered in
+    // tests/integration/command-parser.test.ts and catalog-block-execution.test.ts.
+    expect(commandGuard.template).toContain('_omh_cmd_has_pattern "$COMMAND" "$PATTERN"');
+    expect(commandGuard.template).not.toContain("grep");
   });
 });

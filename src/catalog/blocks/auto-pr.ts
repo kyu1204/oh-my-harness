@@ -30,7 +30,7 @@ set -euo pipefail
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 [[ -z "$COMMAND" ]] && exit 0
-if ! echo "$COMMAND" | grep -q "git push"; then
+if ! _omh_cmd_matches "$COMMAND" git push; then
   exit 0
 fi
 if ! command -v gh >/dev/null 2>&1; then

@@ -23,7 +23,7 @@ set -euo pipefail
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 [[ -z "$COMMAND" ]] && exit 0
-COMMAND_LOWER=$(echo "$COMMAND" | tr '[:upper:]' '[:lower:]')
+COMMAND_LOWER=$(_omh_simple_commands "$COMMAND" | tr '[:upper:]' '[:lower:]')
 PATTERNS=({{#each patterns}}"{{{this}}}" {{/each}})
 for PATTERN in "\${PATTERNS[@]}"; do
   PATTERN_LOWER=$(echo "$PATTERN" | tr '[:upper:]' '[:lower:]')

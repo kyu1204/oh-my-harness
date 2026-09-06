@@ -16,7 +16,7 @@ export const commitTypecheckGate: BuildingBlock = {
 set -euo pipefail
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
-if echo "$COMMAND" | grep -qE "git commit"; then
+if _omh_cmd_matches "$COMMAND" git commit; then
   echo "oh-my-harness: Running {{{typecheckCommand}}} before commit..." >&2
   if ! {{{typecheckCommand}}} >&2 2>&1; then
     REASON="oh-my-harness: pre-commit check failed"

@@ -84,6 +84,28 @@ EOF
     expect(lines).toContainEqual(["echo", "ok"]);
   });
 
+  it("strips leading tabs from the terminator only for <<- heredocs", () => {
+    // Plain <<EOF: a tab-indented EOF line is body, not the terminator, so
+    // the real terminator comes later and nothing in between is a command.
+    expect(simple("cat <<EOF\n\tEOF\ngit commit -m x\nEOF\necho after")).toEqual([
+      ["cat"],
+      ["echo", "after"],
+    ]);
+    // <<-EOF: the tab-indented EOF terminates.
+    expect(simple("cat <<-EOF\n\tEOF\ngit commit -m x")).toEqual([
+      ["cat"],
+      ["git", "commit", "-m", "x"],
+    ]);
+  });
+
+  it("drops redirections so they cannot split or disguise a command", () => {
+    expect(simple("git 2>/dev/null commit -m x")).toEqual([["git", "commit", "-m", "x"]]);
+    expect(simple("rm 2> /dev/null -rf /")).toEqual([["rm", "-rf", "/"]]);
+    expect(simple("make >build.log 2>&1 && echo ok")).toEqual([["make"], ["echo", "ok"]]);
+    expect(simple("cat < in.txt >> out.txt")).toEqual([["cat"]]);
+    expect(simple(`cat <<< "not a heredoc"`)).toEqual([["cat"]]);
+  });
+
   it("drops comments", () => {
     expect(simple("ls # git commit here")).toEqual([["ls"]]);
   });
@@ -99,6 +121,11 @@ describe("_omh_cmd_matches", () => {
   it("sees through leading git options like -c and -C", () => {
     expect(matches("git -c user.name=x -c user.email=y commit -qm init", "git", "commit")).toBe(true);
     expect(matches("git -C sub commit -m x", "git", "commit")).toBe(true);
+  });
+
+  it("skips leading environment assignments", () => {
+    expect(matches("CI=1 GIT_AUTHOR_NAME=x git commit -m x", "git", "commit")).toBe(true);
+    expect(matches("FOO=bar rm -rf build", "rm")).toBe(true);
   });
 
   it("finds the command anywhere in a pipeline or list", () => {

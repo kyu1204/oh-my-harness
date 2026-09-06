@@ -43,28 +43,31 @@ END {
     if (c == "\\") { if (substr(buf, i+1, 1) != "\n") tok[d] = tok[d] substr(buf, i+1, 1); i += 2; continue }
     if (c == "#" && tok[d] == "") { while (i <= n && substr(buf, i, 1) != "\n") i++; continue }
     if (c2 == "$(") { d++; q[d] = 0; tok[d] = ""; cmd[d] = ""; nhd[d] = 0; i += 2; continue }
+    if (substr(buf, i, 3) == "<<<") { i += 3; skipnext[d] = 1; continue }   # here-string: drop operator and word
     if (c2 == "<<") {                      # heredoc: remember the delimiter, drop the operator
-      i += 2; if (substr(buf, i, 1) == "-") i++
+      i += 2; strip[d, nhd[d] + 1] = 0; if (substr(buf, i, 1) == "-") { i++; strip[d, nhd[d] + 1] = 1 }
       while (substr(buf, i, 1) == " ") i++
       delim = ""
       while (i <= n) { h = substr(buf, i, 1); if (h ~ /[ \t\n;|&)]/) break; if (h != "\047" && h != "\"") delim = delim h; i++ }
       nhd[d]++; hd[d, nhd[d]] = delim; continue
     }
     if (c == ")" && d > 0) {               # end of $( ... )
-      if (tok[d] != "") cmd[d] = cmd[d] (cmd[d] == "" ? "" : "\t") tok[d]
+      flush(d)
       if (cmd[d] != "") print cmd[d]
       d--; tok[d] = tok[d] "$(...)"; i++; continue
     }
-    if (c ~ /[ \t]/) { if (tok[d] != "") { cmd[d] = cmd[d] (cmd[d] == "" ? "" : "\t") tok[d]; tok[d] = "" }; i++; continue }
+    if (c ~ /[ \t]/) { flush(d); i++; continue }
+    if (c == "&" && tok[d] ~ />$/) { tok[d] = tok[d] "&"; i++; continue }   # 2>&1, >&2
+    if (c2 == "&>") { flush(d); tok[d] = "&"; i++; continue }               # &>log, &>>log
     if (c ~ /[;|&()\n]/) {                 # command separator
-      if (tok[d] != "") { cmd[d] = cmd[d] (cmd[d] == "" ? "" : "\t") tok[d]; tok[d] = "" }
-      if (cmd[d] != "") print cmd[d]; cmd[d] = ""
+      flush(d)
+      if (cmd[d] != "") print cmd[d]; cmd[d] = ""; skipnext[d] = 0
       i++
       if (c == "\n" && nhd[d] > 0) {       # skip heredoc bodies that start on the next line
         for (k = 1; k <= nhd[d]; k++) {
           while (i <= n) {
             j = index(substr(buf, i), "\n"); line = (j ? substr(buf, i, j-1) : substr(buf, i))
-            i = (j ? i + j : n + 1); sub(/^\t+/, "", line)
+            i = (j ? i + j : n + 1); if (strip[d, k]) sub(/^\t+/, "", line)
             if (line == hd[d, k]) break
           }
         }
@@ -75,10 +78,22 @@ END {
     tok[d] = tok[d] c; i++
   }
   while (d >= 0) {
-    if (tok[d] != "") cmd[d] = cmd[d] (cmd[d] == "" ? "" : "\t") tok[d]
+    flush(d)
     if (cmd[d] != "") print cmd[d]
     d--
   }
+}
+# Append the pending token to the current simple command, unless it is a
+# redirection (2>/dev/null, >file, <in, 2>&1, &>log) or the word a bare
+# redirection operator (2>, >, <, >>) applies to.
+function flush(d) {
+  if (tok[d] == "") return
+  if (skipnext[d]) { skipnext[d] = 0; tok[d] = ""; return }
+  if (tok[d] ~ /^[0-9]*(>>?|<|&>>?|>&)/) {
+    if (tok[d] ~ /^[0-9]*(>>?|<|&>>?)$/) skipnext[d] = 1
+    tok[d] = ""; return
+  }
+  cmd[d] = cmd[d] (cmd[d] == "" ? "" : "\t") tok[d]; tok[d] = ""
 }`;
 
 const OMH_CMD_HELPERS = `_omh_simple_commands() {
@@ -87,9 +102,11 @@ const OMH_CMD_HELPERS = `_omh_simple_commands() {
 _omh_cmd_matches() {
   local a0="\${2:-}" sc="\${3:-}"
   _omh_simple_commands "\${1:-}" | awk -F '\t' -v a0="$a0" -v sc="$sc" '
-    { if ($1 != a0) next
+    { i = 1
+      while (i <= NF && $i ~ /^[A-Za-z_][A-Za-z0-9_]*=/) i++
+      if (i > NF || $i != a0) next
       if (sc == "") { found = 1; exit }
-      i = 2
+      i++
       while (i <= NF && $i ~ /^-/) { if ($i == "-c" || $i == "-C") i++; i++ }
       if (i <= NF && $i == sc) { found = 1; exit } }
     END { exit found ? 0 : 1 }'

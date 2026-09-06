@@ -20,6 +20,7 @@ export function formatCategoryName(category: string): string {
   const names: Record<string, string> = {
     "path-guard": "File guards",
     "command-guard": "Command guards",
+    "harness-guard": "Harness self-protection",
     "branch-guard": "Branch guard",
     "lockfile-guard": "Lockfile guard",
     "secret-file-guard": "Secret file guard",

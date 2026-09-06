@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { builtinBlocks } from "../../src/catalog/blocks/index.js";
 
 describe("blocks index", () => {
-  it("exports all 18 catalog blocks", () => {
+  it("exports all 19 catalog blocks", () => {
     const ids = builtinBlocks.map((b) => b.id);
     expect(ids).toContain("sql-guard");
     expect(ids).toContain("test-on-save");
@@ -11,6 +11,7 @@ describe("blocks index", () => {
     expect(ids).toContain("config-audit");
     expect(ids).toContain("compact-context");
     expect(ids).toContain("worktree-setup");
-    expect(builtinBlocks.length).toBe(18);
+    expect(ids).toContain("harness-guard");
+    expect(builtinBlocks.length).toBe(19);
   });
 });

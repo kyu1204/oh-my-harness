@@ -73,6 +73,7 @@ All enforcement is powered by **catalog blocks** — reusable, parameterized hoo
 | 🧪 `commit-test-gate` | quality | Runs tests before git commit |
 | 🔍 `commit-typecheck-gate` | quality | Runs typecheck before git commit |
 | 🔒 `command-guard` | security | Blocks dangerous shell commands |
+| 🪝 `harness-guard` | security | Blocks shell writes to the harness's own hooks and config (always on) |
 | 📁 `path-guard` | file-protection | Blocks writes to protected paths |
 | 🔐 `lockfile-guard` | file-protection | Prevents manual lockfile edits |
 | 🤫 `secret-file-guard` | security | Blocks edits to .env, credentials |

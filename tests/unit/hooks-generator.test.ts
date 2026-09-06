@@ -975,3 +975,13 @@ describe("generateHooks — cwd-independence", () => {
     await expect(access(wrongEventsPath)).rejects.toThrow();
   });
 });
+
+describe("wrapWithLogger replacement safety", () => {
+  it("keeps $' and $& in the injected preamble literally (String.replace special patterns)", () => {
+    // The preamble contains bash like IFS=$'\t'. A string replacement would
+    // expand $' to "text after the match" and silently corrupt the script.
+    const out = wrapWithLogger("#!/bin/bash\nset -euo pipefail\nINPUT=$(cat)\necho done\n", "PreToolUse", "/tmp/x");
+    expect(out).toContain("IFS=$'\\t'");
+    expect(out.split("INPUT=$(cat)").length).toBe(2);
+  });
+});

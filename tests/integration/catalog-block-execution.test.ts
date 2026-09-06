@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir, chmod } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
@@ -99,6 +100,94 @@ describe("catalog block execution", () => {
     const result = JSON.parse(stdout.trim());
     expect(result.decision).toBe("block");
     expect(result.reason).toContain("rm -rf /");
+  });
+
+  it("command-guard: ignores the pattern when it only appears inside quoted text (#109)", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+
+    const rendered = renderTemplate(commandGuard.template, {
+      patterns: ["rm -rf /", "sudo rm"],
+    });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "command-guard-quoted.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    for (const command of [
+      `gh issue create --body "never run rm -rf / in CI"`,
+      `echo 'sudo rm is bad'`,
+      "rm -rf /tmp/build-cache",
+      "rm -rf ./dist",
+    ]) {
+      const stdout = runScript(
+        scriptPath,
+        JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
+      );
+      expect(stdout.trim(), command).toBe("");
+    }
+  });
+
+  it("command-guard: still blocks the pattern when it is a real command in a list or substitution (#109)", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+
+    const rendered = renderTemplate(commandGuard.template, {
+      patterns: ["rm -rf /", "sudo rm"],
+    });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "command-guard-real.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    for (const command of [
+      "cd /tmp && rm -rf /",
+      'rm -rf "/"',
+      "echo $(sudo rm -rf /var/lib/x)",
+      "sudo rm -rf /var/lib/x",
+    ]) {
+      const stdout = runScript(
+        scriptPath,
+        JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
+      );
+      expect(JSON.parse(stdout.trim()).decision, command).toBe("block");
+    }
+  });
+
+  it("commit-test-gate: does not run the test command when 'git commit' only appears in a heredoc or string (#109)", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+
+    // testCommand leaves a marker file; the gate must not run it.
+    const marker = join(tmpDir, "ran-tests");
+    const rendered = renderTemplate(commitTestGate.template, {
+      testCommand: `touch '${marker}'`,
+    });
+    const wrapped = wrapWithLogger(rendered, "PreToolUse");
+    const scriptPath = join(tmpDir, "commit-test-gate-heredoc.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    const command = `gh pr create --body "$(cat <<'EOF'
+Run git commit after tests pass.
+EOF
+)"`;
+    const stdout = runScript(
+      scriptPath,
+      JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
+    );
+    expect(stdout.trim()).toBe("");
+    expect(existsSync(marker)).toBe(false);
+
+    // ...and it does run for a real commit, including git -c options.
+    runScript(
+      scriptPath,
+      JSON.stringify({ tool_name: "Bash", tool_input: { command: "git -c user.name=x commit -m wip" } }),
+    );
+    expect(existsSync(marker)).toBe(true);
   });
 
   it("command-guard: allows a safe command (exit 0, no block output)", async () => {

@@ -16,7 +16,7 @@ export const branchGuard: BuildingBlock = {
 set -euo pipefail
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
-if echo "$COMMAND" | grep -qE "git commit|git push"; then
+if _omh_cmd_matches "$COMMAND" git commit || _omh_cmd_matches "$COMMAND" git push; then
   BRANCH=$(git branch --show-current 2>/dev/null)
   [[ -z "$BRANCH" ]] && exit 0
   MAIN='{{mainBranch}}'

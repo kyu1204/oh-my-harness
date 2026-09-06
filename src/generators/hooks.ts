@@ -12,6 +12,98 @@ function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
+// Shell-token helpers shared by every generated hook (#109). Guards must not
+// grep the raw command string: text inside quotes or heredocs is data, not a
+// command, and a pattern like "rm -rf /" must not match "rm -rf /tmp". The
+// tokenizer is a single-pass awk state machine so it runs anywhere bash does.
+//   _omh_simple_commands "<cmd>"          one simple command per line, TAB-separated tokens, quotes resolved
+//   _omh_cmd_matches "<cmd>" argv0 [sub]  0 when some simple command is `argv0 [opts] sub`
+//   _omh_cmd_has_pattern "<cmd>" "<pat>"  0 when pat's tokens appear contiguously in some simple command
+// ponytail: backticks and process substitution <(...) are treated as plain text;
+// $(...) is parsed as a nested command stream. Wrapper unwrapping (sh -c, eval) is #110.
+const OMH_CMD_TOKENIZER_AWK = String.raw`
+{ buf = buf $0 "\n" }
+END {
+  n = length(buf); d = 0; q[0] = 0; tok[0] = ""; cmd[0] = ""; nhd[0] = 0
+  i = 1
+  while (i <= n) {
+    c = substr(buf, i, 1); c2 = substr(buf, i, 2)
+    if (q[d] == 1) {                       # inside single quotes
+      if (c == "\047") q[d] = 0; else tok[d] = tok[d] c
+      i++; continue
+    }
+    if (q[d] == 2) {                       # inside double quotes
+      if (c == "\"") { q[d] = 0; i++; continue }
+      if (c == "\\" && i < n) { tok[d] = tok[d] substr(buf, i+1, 1); i += 2; continue }
+      if (c2 == "$(") { d++; q[d] = 0; tok[d] = ""; cmd[d] = ""; nhd[d] = 0; i += 2; continue }
+      tok[d] = tok[d] c; i++; continue
+    }
+    if (c == "\047") { q[d] = 1; i++; continue }
+    if (c == "\"")   { q[d] = 2; i++; continue }
+    if (c == "\\") { if (substr(buf, i+1, 1) != "\n") tok[d] = tok[d] substr(buf, i+1, 1); i += 2; continue }
+    if (c == "#" && tok[d] == "") { while (i <= n && substr(buf, i, 1) != "\n") i++; continue }
+    if (c2 == "$(") { d++; q[d] = 0; tok[d] = ""; cmd[d] = ""; nhd[d] = 0; i += 2; continue }
+    if (c2 == "<<") {                      # heredoc: remember the delimiter, drop the operator
+      i += 2; if (substr(buf, i, 1) == "-") i++
+      while (substr(buf, i, 1) == " ") i++
+      delim = ""
+      while (i <= n) { h = substr(buf, i, 1); if (h ~ /[ \t\n;|&)]/) break; if (h != "\047" && h != "\"") delim = delim h; i++ }
+      nhd[d]++; hd[d, nhd[d]] = delim; continue
+    }
+    if (c == ")" && d > 0) {               # end of $( ... )
+      if (tok[d] != "") cmd[d] = cmd[d] (cmd[d] == "" ? "" : "\t") tok[d]
+      if (cmd[d] != "") print cmd[d]
+      d--; tok[d] = tok[d] "$(...)"; i++; continue
+    }
+    if (c ~ /[ \t]/) { if (tok[d] != "") { cmd[d] = cmd[d] (cmd[d] == "" ? "" : "\t") tok[d]; tok[d] = "" }; i++; continue }
+    if (c ~ /[;|&()\n]/) {                 # command separator
+      if (tok[d] != "") { cmd[d] = cmd[d] (cmd[d] == "" ? "" : "\t") tok[d]; tok[d] = "" }
+      if (cmd[d] != "") print cmd[d]; cmd[d] = ""
+      i++
+      if (c == "\n" && nhd[d] > 0) {       # skip heredoc bodies that start on the next line
+        for (k = 1; k <= nhd[d]; k++) {
+          while (i <= n) {
+            j = index(substr(buf, i), "\n"); line = (j ? substr(buf, i, j-1) : substr(buf, i))
+            i = (j ? i + j : n + 1); sub(/^\t+/, "", line)
+            if (line == hd[d, k]) break
+          }
+        }
+        nhd[d] = 0
+      }
+      continue
+    }
+    tok[d] = tok[d] c; i++
+  }
+  while (d >= 0) {
+    if (tok[d] != "") cmd[d] = cmd[d] (cmd[d] == "" ? "" : "\t") tok[d]
+    if (cmd[d] != "") print cmd[d]
+    d--
+  }
+}`;
+
+const OMH_CMD_HELPERS = `_omh_simple_commands() {
+  printf '%s\\n' "\${1:-}" | awk '${OMH_CMD_TOKENIZER_AWK}'
+}
+_omh_cmd_matches() {
+  local a0="\${2:-}" sc="\${3:-}"
+  _omh_simple_commands "\${1:-}" | awk -F '\t' -v a0="$a0" -v sc="$sc" '
+    { if ($1 != a0) next
+      if (sc == "") { found = 1; exit }
+      i = 2
+      while (i <= NF && $i ~ /^-/) { if ($i == "-c" || $i == "-C") i++; i++ }
+      if (i <= NF && $i == sc) { found = 1; exit } }
+    END { exit found ? 0 : 1 }'
+}
+_omh_cmd_has_pattern() {
+  _omh_simple_commands "\${1:-}" | awk -F '\t' -v pat="\${2:-}" '
+    BEGIN { n = split(pat, p, " ") }
+    { for (s = 1; s + n - 1 <= NF; s++) {
+        ok = 1
+        for (k = 1; k <= n; k++) if ($(s + k - 1) != p[k]) { ok = 0; break }
+        if (ok) { found = 1; exit } } }
+    END { exit found ? 0 : 1 }'
+}`;
+
 function buildLoggerSnippet(event: string, projectDir?: string, mode: "block" | "ask" = "block"): string {
   const stateDir = projectDir
     ? `${projectDir}/${OMH_STATE_DIR}`
@@ -79,6 +171,7 @@ _emit_decision() {
   jq -cn --arg decision "$decision" --arg reason "$reason" \\
     '{decision:$decision,reason:$reason}'
 }
+${OMH_CMD_HELPERS}
 trap '_OMH_EXIT_CODE=$?; if [ "$_OMH_LOGGED" -eq 0 ]; then if [ "$_OMH_EXIT_CODE" -ne 0 ]; then _log_event "error" "hook exited with code $_OMH_EXIT_CODE"; else _log_event "allow"; fi; fi' EXIT
 # --- end logger ---`;
 }

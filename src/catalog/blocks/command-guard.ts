@@ -23,10 +23,9 @@ set -euo pipefail
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 [[ -z "$COMMAND" ]] && exit 0
-NORMALIZED_CMD=$(printf '%s' "$COMMAND" | tr '[:space:]' ' ' | tr -s ' ')
 PATTERNS=({{#each patterns}}"{{{this}}}" {{/each}})
 for PATTERN in "\${PATTERNS[@]}"; do
-  if echo "$NORMALIZED_CMD" | grep -qF -- "$PATTERN"; then
+  if _omh_cmd_has_pattern "$COMMAND" "$PATTERN"; then
     REASON="oh-my-harness: command matches blocked pattern: $PATTERN"
     _log_event "block" "$REASON"
     _emit_decision "block" "$REASON"

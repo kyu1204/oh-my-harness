@@ -169,3 +169,58 @@ describe("_omh_cmd_has_pattern", () => {
     expect(hasPattern(`gh issue create --body 'never run rm -rf /'`, "rm -rf /")).toBe(false);
   });
 });
+
+describe("wrapper unwrapping (#110)", () => {
+  it("strips leading privilege / environment / scheduling wrappers", () => {
+    // sudo/doas stay visible so user patterns like "sudo rm" keep working;
+    // _omh_cmd_matches skips them (see "guards see through wrappers").
+    expect(simple("sudo rm -rf /")).toEqual([["sudo", "rm", "-rf", "/"]]);
+    expect(simple("env FOO=1 git commit -m x")).toEqual([["git", "commit", "-m", "x"]]);
+    expect(simple("env -i -u HOME git commit -m x")).toEqual([["git", "commit", "-m", "x"]]);
+    expect(simple("timeout 30 git commit -m x")).toEqual([["git", "commit", "-m", "x"]]);
+    expect(simple("timeout -s KILL 5s rm -rf /")).toEqual([["rm", "-rf", "/"]]);
+    expect(simple("nohup nice -n 10 command exec git push origin main")).toEqual([
+      ["git", "push", "origin", "main"],
+    ]);
+    expect(simple("xargs -0 -I{} rm -rf /")).toEqual([["rm", "-rf", "/"]]);
+  });
+
+  it("re-parses the string given to sh -c / bash -c / eval", () => {
+    expect(simple(`sh -c "git commit -m wip"`)).toEqual([["git", "commit", "-m", "wip"]]);
+    expect(simple(`bash -lc 'cd app && git commit -m x'`)).toEqual([
+      ["cd", "app"],
+      ["git", "commit", "-m", "x"],
+    ]);
+    expect(simple(`eval "rm -rf /"`)).toEqual([["rm", "-rf", "/"]]);
+    expect(simple("eval git commit -m x")).toEqual([["git", "commit", "-m", "x"]]);
+    // nested wrappers
+    expect(simple(`sh -c 'timeout 5 rm -rf /'`)).toEqual([["rm", "-rf", "/"]]);
+  });
+
+  it("does not treat a shell running a script file as a wrapper", () => {
+    expect(simple("bash ./deploy.sh")).toEqual([["bash", "./deploy.sh"]]);
+    expect(simple("sh -x run.sh")).toEqual([["sh", "-x", "run.sh"]]);
+  });
+
+  it("stops unwrapping at a bounded depth instead of recursing forever", () => {
+    let cmd = "rm -rf /";
+    // 6 levels is past the depth cap; quote escaping grows ~3x per level so keep it small
+    for (let i = 0; i < 6; i++) cmd = `sh -c '${cmd.replace(/'/g, `'\\''`)}'`;
+    const lines = simple(cmd);
+    // terminates quickly and leaves the innermost wrapper unparsed
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines[0][0]).toBe("sh");
+  });
+
+  it("guards see through wrappers", () => {
+    expect(matches(`bash -c "git commit -m wip"`, "git", "commit")).toBe(true);
+    expect(matches("sudo git push --force origin main", "git", "push")).toBe(true);
+    expect(matches("sudo -u deploy -n git push origin main", "git", "push")).toBe(true);
+    expect(hasPattern("sudo rm -rf /var/x", "sudo rm")).toBe(true);
+    expect(hasPattern("env FOO=1 rm -rf /", "rm -rf /")).toBe(true);
+    expect(hasPattern("timeout 5 rm -rf /", "rm -rf /")).toBe(true);
+    expect(hasPattern(`sh -c 'rm -rf /'`, "rm -rf /")).toBe(true);
+    // still not fooled by strings that are not executed
+    expect(hasPattern(`echo 'sh -c "rm -rf /"'`, "rm -rf /")).toBe(false);
+  });
+});

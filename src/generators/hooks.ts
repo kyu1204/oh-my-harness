@@ -96,19 +96,87 @@ function flush(d) {
   cmd[d] = cmd[d] (cmd[d] == "" ? "" : "\t") tok[d]; tok[d] = ""
 }`;
 
-const OMH_CMD_HELPERS = `_omh_simple_commands() {
+// Wrapper unwrapping (#110). Runs on each TAB-separated simple command the
+// tokenizer emits. Leading wrappers that only change *how* a command runs
+// (env, timeout, nohup, nice, xargs, command, exec, builtin, time) are
+// stripped so the real argv0 is matched (sudo/doas are kept as tokens so user
+// patterns like "sudo rm" still work; _omh_cmd_matches skips them). `sh -c <string>` and `eval <words>`
+// carry the real command as data, so those are printed as "S<TAB><string>"
+// for the bash side to re-tokenize; everything else is "R<TAB><tokens>".
+// ponytail: bounded to 4 levels; deeper nesting is left unparsed rather than
+// blocked, so a pathological command cannot make every guard fire at once.
+const OMH_CMD_UNWRAP_AWK = String.raw`
+BEGIN { FS = "\t" }
+{
+  i = 1
+  while (i <= NF) {
+    while (i <= NF && $i ~ /^[A-Za-z_][A-Za-z0-9_]*=/) i++
+    if (i > NF) break
+    f = $i
+    if (f == "env") {
+      i++; while (i <= NF && $i ~ /^-/) { if ($i ~ /^-(u|C|S)$/) i++; i++ }; continue
+    }
+    if (f == "nohup" || f == "command" || f == "exec" || f == "builtin" || f == "time") {
+      i++; while (i <= NF && $i ~ /^-/) i++; continue
+    }
+    if (f == "nice") {
+      i++; while (i <= NF && $i ~ /^-/) { if ($i == "-n") i++; i++ }; continue
+    }
+    if (f == "timeout") {
+      i++; while (i <= NF && $i ~ /^-/) { if ($i ~ /^-(s|k)$/) i++; i++ }; i++; continue
+    }
+    if (f == "xargs") {
+      i++; while (i <= NF && $i ~ /^-/) { if ($i ~ /^-(I|n|L|P|s|d|E|a)$/) i++; i++ }; continue
+    }
+    if (f == "sh" || f == "bash" || f == "zsh" || f == "dash" || f == "ksh") {
+      j = i + 1
+      while (j <= NF && $j ~ /^-/) {
+        if ($j ~ /^-[A-Za-z]*c$/) { if (j + 1 <= NF) { print "S\t" $(j + 1); next }; break }
+        j++
+      }
+      break
+    }
+    if (f == "eval") {
+      out = ""; for (k = i + 1; k <= NF; k++) out = out (k > i + 1 ? " " : "") $k
+      print "S\t" out; next
+    }
+    break
+  }
+  if (i > NF) next
+  out = ""; for (k = i; k <= NF; k++) out = out (k > i ? "\t" : "") $k
+  print "R\t" out
+}`;
+
+const OMH_CMD_HELPERS = `_omh_tokenize() {
   printf '%s\\n' "\${1:-}" | awk '${OMH_CMD_TOKENIZER_AWK}'
+}
+_omh_simple_commands() {
+  local depth="\${2:-0}" kind rest
+  _omh_tokenize "\${1:-}" | while IFS= read -r line; do
+    printf '%s\\n' "$line" | awk '${OMH_CMD_UNWRAP_AWK}' | while IFS=$'\\t' read -r kind rest; do
+      if [ "$kind" = "S" ] && [ "$depth" -lt 4 ]; then
+        _omh_simple_commands "$rest" $((depth + 1))
+      elif [ "$kind" = "S" ]; then
+        printf '%s\\n' "$line"
+      else
+        printf '%s\\n' "$rest"
+      fi
+    done
+  done
 }
 _omh_cmd_matches() {
   local a0="\${2:-}" sc="\${3:-}"
   _omh_simple_commands "\${1:-}" | awk -F '\t' -v a0="$a0" -v sc="$sc" '
     { i = 1
       while (i <= NF && $i ~ /^[A-Za-z_][A-Za-z0-9_]*=/) i++
+      if (i <= NF && ($i == "sudo" || $i == "doas")) {
+        i++; while (i <= NF && $i ~ /^-/) { if ($i ~ /^-(u|g|C|D|h|p|r|t|T|U)$/) i++; i++ }
+      }
       if (i > NF || $i != a0) next
-      if (sc == "") { found = 1; exit }
+      if (sc == "") { found = 1; next }
       i++
       while (i <= NF && $i ~ /^-/) { if ($i == "-c" || $i == "-C") i++; i++ }
-      if (i <= NF && $i == sc) { found = 1; exit } }
+      if (i <= NF && $i == sc) { found = 1; next } }
     END { exit found ? 0 : 1 }'
 }
 _omh_cmd_has_pattern() {
@@ -117,7 +185,7 @@ _omh_cmd_has_pattern() {
     { for (s = 1; s + n - 1 <= NF; s++) {
         ok = 1
         for (k = 1; k <= n; k++) if ($(s + k - 1) != p[k]) { ok = 0; break }
-        if (ok) { found = 1; exit } } }
+        if (ok) { found = 1; next } } }
     END { exit found ? 0 : 1 }'
 }`;
 
@@ -201,15 +269,15 @@ export function wrapWithLogger(
 ): string {
   const snippet = buildLoggerSnippet(event, projectDir, mode);
   if (script.includes("INPUT=$(cat)")) {
-    return script.replace("INPUT=$(cat)", `INPUT=$(cat)\n\n${snippet}`);
+    return script.replace("INPUT=$(cat)", () => `INPUT=$(cat)\n\n${snippet}`);
   }
   if (script.includes("set -euo pipefail")) {
-    return script.replace("set -euo pipefail", `set -euo pipefail\n\n${snippet}`);
+    return script.replace("set -euo pipefail", () => `set -euo pipefail\n\n${snippet}`);
   }
   // shebang 패턴: #!/bin/bash, #!/usr/bin/env bash, #!/bin/sh 등
   const shebangMatch = script.match(/^#!.+$/m);
   if (shebangMatch) {
-    return script.replace(shebangMatch[0], `${shebangMatch[0]}\n\n${snippet}`);
+    return script.replace(shebangMatch[0], () => `${shebangMatch[0]}\n\n${snippet}`);
   }
   return `${snippet}\n${script}`;
 }

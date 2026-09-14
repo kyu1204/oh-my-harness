@@ -158,7 +158,54 @@ BEGIN { FS = "\t" }
   print "R\t" out
 }`;
 
-const OMH_CMD_HELPERS = `_omh_tokenize() {
+// Working-tree fingerprint for gates that want to skip a re-run when nothing
+// changed since the last pass (#112): HEAD plus the tree hash of a temporary
+// index with everything (tracked + untracked, .gitignore respected) added.
+// Prints "none" outside a git repo so callers can refuse to cache.
+const OMH_TREE_FINGERPRINT = `_omh_tree_fingerprint() {
+  local root head idx tree
+  root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo none; return 0; }
+  head=$(git -C "$root" rev-parse HEAD 2>/dev/null || echo empty)
+  # Start from an EMPTY temporary index, never a copy of the real one: git
+  # trusts cached stat data, so a file rewritten within the same second at the
+  # same size would be reported unchanged (seen on Linux CI). An empty index
+  # forces every file to be hashed. The real index is never touched.
+  idx=$(mktemp) || { echo none; return 0; }
+  rm -f "$idx"
+  # Always from the repository root, whatever directory the hook runs in.
+  # .omh/state is hook-owned scratch (events.jsonl grows on every hook run) and
+  # must never count as a change, whether or not the user gitignored it.
+  tree=$(GIT_INDEX_FILE="$idx" git -C "$root" add -A -- . ':(exclude).omh/state' >/dev/null 2>&1 && GIT_INDEX_FILE="$idx" git -C "$root" write-tree 2>/dev/null) || tree=none
+  rm -f "$idx"
+  [ "$tree" = "none" ] && { echo none; return 0; }
+  printf '%s:%s\\n' "$head" "$tree"
+}
+# Gate cache. Capture the fingerprint BEFORE running the gate command and pass
+# it to both helpers, so what gets recorded is the tree the command actually
+# checked, not whatever it left behind (snapshot updates, formatters).
+#   _omh_gate_cached <name> <ttl-seconds> <fp>  -> 0 when the last recorded pass
+#                                                  for <name> is <fp> and younger than ttl.
+#   _omh_gate_record <name> <fp>                -> remember <fp> as passed.
+_omh_gate_cached() {
+  local name="$1" ttl="\${2:-0}" fp="\${3:-none}" file now cached_fp cached_ts
+  [ "$ttl" -gt 0 ] 2>/dev/null || return 1
+  [ "$fp" = "none" ] && return 1
+  file="\${_OMH_STATE_DIR:-.omh/state}/gate-$name.fp"
+  [ -f "$file" ] || return 1
+  read -r cached_fp cached_ts < "$file" || return 1
+  now=$(date +%s)
+  [ "$cached_fp" = "$fp" ] && [ $((now - cached_ts)) -le "$ttl" ]
+}
+_omh_gate_record() {
+  local name="$1" fp="\${2:-none}" file
+  [ "$fp" = "none" ] && return 0
+  file="\${_OMH_STATE_DIR:-.omh/state}/gate-$name.fp"
+  mkdir -p "$(dirname "$file")" 2>/dev/null || true
+  printf '%s %s\\n' "$fp" "$(date +%s)" > "$file"
+}`;
+
+const OMH_CMD_HELPERS = `${OMH_TREE_FINGERPRINT}
+_omh_tokenize() {
   printf '%s\\n' "\${1:-}" | awk '${OMH_CMD_TOKENIZER_AWK}'
 }
 _omh_simple_commands() {

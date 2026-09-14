@@ -31,10 +31,10 @@ async function gate(block: typeof commitTestGate, params: Record<string, unknown
   return p;
 }
 
-function commitAttempt(script: string): string {
+function commitAttempt(script: string, cwd = dir): string {
   try {
     return execSync(`/bin/bash "${script}"`, {
-      cwd: dir, encoding: "utf-8", timeout: 10_000,
+      cwd, encoding: "utf-8", timeout: 10_000,
       input: JSON.stringify({ tool_name: "Bash", tool_input: { command: "git commit -m x" } }),
     });
   } catch (e) {
@@ -128,6 +128,25 @@ describe.skipIf(!hasJq())("commit gate cache (#112)", () => {
     commitAttempt(y);
     commitAttempt(t);
     commitAttempt(y);
+    expect(await runs()).toBe(2);
+  });
+
+  it("fingerprints the whole repository even when the hook runs in a subdirectory (review)", async () => {
+    sh("mkdir -p packages/a packages/b && echo a > packages/a/x.txt && echo b > packages/b/y.txt && git add -A && git -c user.name=t -c user.email=t@t commit -q -m pkgs");
+    const s = await gate(commitTestGate, { testCommand: record(), cacheTtlSeconds: 600 }, "gate.sh");
+    commitAttempt(s, join(dir, "packages/a"));
+    await writeFile(join(dir, "packages/b/y.txt"), "changed\n");
+    commitAttempt(s, join(dir, "packages/a"));
+    expect(await runs()).toBe(2);
+  });
+
+  it("records the tree the command checked, not the tree it left behind (review)", async () => {
+    // A test command that mutates a tracked file (snapshots, formatters):
+    // the next attempt sees a different tree from the one that passed.
+    const mutating = `bash -c 'echo run >> "${markerDir}/runs.log"; echo touched >> src.txt'`;
+    const s = await gate(commitTestGate, { testCommand: mutating, cacheTtlSeconds: 600 }, "gate.sh");
+    commitAttempt(s);
+    commitAttempt(s);
     expect(await runs()).toBe(2);
   });
 

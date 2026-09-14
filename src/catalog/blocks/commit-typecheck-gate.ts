@@ -24,7 +24,8 @@ set -euo pipefail
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 if _omh_cmd_matches "$COMMAND" git commit; then
-  if _omh_gate_cached commit-typecheck-gate {{cacheTtlSeconds}}; then
+  FP=$(_omh_tree_fingerprint)
+  if _omh_gate_cached commit-typecheck-gate {{cacheTtlSeconds}} "$FP"; then
     echo "oh-my-harness: typecheck already passed on this exact tree; skipping" >&2
     _log_event "allow" "cached: tree unchanged since last passing run"
     exit 0
@@ -36,7 +37,7 @@ if _omh_cmd_matches "$COMMAND" git commit; then
     _emit_decision "block" "$REASON"
     exit 0
   fi
-  _omh_gate_record commit-typecheck-gate
+  _omh_gate_record commit-typecheck-gate "$FP"
 fi
 exit 0`,
 };

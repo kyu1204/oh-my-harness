@@ -158,7 +158,46 @@ BEGIN { FS = "\t" }
   print "R\t" out
 }`;
 
-const OMH_CMD_HELPERS = `_omh_tokenize() {
+// Working-tree fingerprint for gates that want to skip a re-run when nothing
+// changed since the last pass (#112): HEAD plus the tree hash of a temporary
+// index with everything (tracked + untracked, .gitignore respected) added.
+// Prints "none" outside a git repo so callers can refuse to cache.
+const OMH_TREE_FINGERPRINT = `_omh_tree_fingerprint() {
+  local git_dir head idx tree
+  git_dir=$(git rev-parse --git-dir 2>/dev/null) || { echo none; return 0; }
+  head=$(git rev-parse HEAD 2>/dev/null || echo empty)
+  idx=$(mktemp) || { echo none; return 0; }
+  [ -f "$git_dir/index" ] && cp "$git_dir/index" "$idx" 2>/dev/null
+  # .omh/state is hook-owned scratch (events.jsonl grows on every hook run) and
+  # must never count as a change, whether or not the user gitignored it.
+  tree=$(GIT_INDEX_FILE="$idx" git add -A -- . ':(exclude).omh/state' >/dev/null 2>&1 && GIT_INDEX_FILE="$idx" git write-tree 2>/dev/null) || tree=none
+  rm -f "$idx"
+  [ "$tree" = "none" ] && { echo none; return 0; }
+  printf '%s:%s\n' "$head" "$tree"
+}
+# Gate cache: _omh_gate_cached <name> <ttl-seconds>  -> 0 when the last recorded
+# pass for <name> has the current fingerprint and is younger than ttl.
+#             _omh_gate_record <name>                -> remember the current fingerprint as passed.
+_omh_gate_cached() {
+  local name="$1" ttl="\${2:-0}" file fp ts now cached_fp cached_ts
+  [ "$ttl" -gt 0 ] 2>/dev/null || return 1
+  file="\${_OMH_STATE_DIR:-.omh/state}/gate-$name.fp"
+  [ -f "$file" ] || return 1
+  fp=$(_omh_tree_fingerprint); [ "$fp" = "none" ] && return 1
+  read -r cached_fp cached_ts < "$file" || return 1
+  now=$(date +%s)
+  [ "$cached_fp" = "$fp" ] && [ $((now - cached_ts)) -le "$ttl" ]
+}
+_omh_gate_record() {
+  local name="$1" file fp
+  fp=$(_omh_tree_fingerprint); [ "$fp" = "none" ] && return 0
+  file="\${_OMH_STATE_DIR:-.omh/state}/gate-$name.fp"
+  mkdir -p "$(dirname "$file")" 2>/dev/null || true
+  printf '%s %s\n' "$fp" "$(date +%s)" > "$file"
+}`;
+
+const OMH_CMD_HELPERS = `${OMH_TREE_FINGERPRINT}
+_omh_tokenize() {
   printf '%s\\n' "\${1:-}" | awk '${OMH_CMD_TOKENIZER_AWK}'
 }
 _omh_simple_commands() {

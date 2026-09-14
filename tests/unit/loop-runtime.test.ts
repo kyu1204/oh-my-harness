@@ -105,14 +105,21 @@ describe("runTurn — review round 9", () => {
   }, SLOW);
 
   it("timeout takes the turn's whole process tree down, not just the direct child", async () => {
+    // #111: this used a 700 ms timeout, which under full-suite load could fire
+    // before bash had even written the pid file, and a 2 s window for the
+    // grandchild to disappear. The timeout now leaves ample room for the stub
+    // to start (the stub itself is what we time out, not the machine), the
+    // pid file is awaited explicitly, and the "gone" window is 5 s.
     const pidFile = path.join(dir, "grandchild.pid");
     const r = await runTurn({
       argv: [stub(`sleep 30 & echo $! > '${pidFile}'; wait`)],
-      cwd: dir, env: process.env, logPath: path.join(dir, "tree.log"), timeoutMs: 700, shouldStop: () => false,
+      cwd: dir, env: process.env, logPath: path.join(dir, "tree.log"), timeoutMs: 2500, shouldStop: () => false,
     });
     expect(r.timedOut).toBe(true);
+    expect(fs.existsSync(pidFile), "stub never started; the machine is too slow for this test, not the runtime").toBe(true);
     const gc = Number(fs.readFileSync(pidFile, "utf-8").trim());
-    const gone = async () => { for (let i = 0; i < 40; i++) { try { process.kill(gc, 0); } catch { return true; } await new Promise((res) => setTimeout(res, 50)); } return false; };
+    expect(gc).toBeGreaterThan(0);
+    const gone = async () => { for (let i = 0; i < 100; i++) { try { process.kill(gc, 0); } catch { return true; } await new Promise((res) => setTimeout(res, 50)); } return false; };
     expect(await gone(), "grandchild survived the timeout").toBe(true);
   }, SLOW);
 
@@ -125,7 +132,8 @@ describe("runTurn — review round 9", () => {
     });
     expect(r.stoppedByRequest).toBe(true);
     const gc = Number(fs.readFileSync(pidFile, "utf-8").trim());
-    const gone = async () => { for (let i = 0; i < 40; i++) { try { process.kill(gc, 0); } catch { return true; } await new Promise((res) => setTimeout(res, 50)); } return false; };
+    expect(gc).toBeGreaterThan(0);
+    const gone = async () => { for (let i = 0; i < 100; i++) { try { process.kill(gc, 0); } catch { return true; } await new Promise((res) => setTimeout(res, 50)); } return false; };
     expect(await gone(), "grandchild survived the stop").toBe(true);
   }, SLOW);
 });

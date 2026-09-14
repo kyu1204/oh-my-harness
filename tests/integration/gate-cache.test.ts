@@ -81,6 +81,15 @@ describe.skipIf(!hasJq())("commit gate cache (#112)", () => {
     expect(await runs()).toBe(2);
   });
 
+  it("re-runs after a same-size rewrite in the same second (git stat cache must not be trusted)", async () => {
+    const s = await gate(commitTestGate, { testCommand: record(), cacheTtlSeconds: 600 }, "gate.sh");
+    for (let i = 0; i < 3; i++) {
+      await writeFile(join(dir, "src.txt"), `v${i}\n`);   // same byte length every time
+      commitAttempt(s);
+    }
+    expect(await runs()).toBe(3);
+  });
+
   it("re-runs after an untracked file appears or changes", async () => {
     const s = await gate(commitTestGate, { testCommand: record(), cacheTtlSeconds: 600 }, "gate.sh");
     commitAttempt(s);

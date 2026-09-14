@@ -163,13 +163,15 @@ BEGIN { FS = "\t" }
 // index with everything (tracked + untracked, .gitignore respected) added.
 // Prints "none" outside a git repo so callers can refuse to cache.
 const OMH_TREE_FINGERPRINT = `_omh_tree_fingerprint() {
-  local root git_dir head idx tree
+  local root head idx tree
   root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo none; return 0; }
-  git_dir=$(git -C "$root" rev-parse --git-dir 2>/dev/null) || { echo none; return 0; }
-  case "$git_dir" in /*) ;; *) git_dir="$root/$git_dir" ;; esac
   head=$(git -C "$root" rev-parse HEAD 2>/dev/null || echo empty)
+  # Start from an EMPTY temporary index, never a copy of the real one: git
+  # trusts cached stat data, so a file rewritten within the same second at the
+  # same size would be reported unchanged (seen on Linux CI). An empty index
+  # forces every file to be hashed. The real index is never touched.
   idx=$(mktemp) || { echo none; return 0; }
-  [ -f "$git_dir/index" ] && cp "$git_dir/index" "$idx" 2>/dev/null
+  rm -f "$idx"
   # Always from the repository root, whatever directory the hook runs in.
   # .omh/state is hook-owned scratch (events.jsonl grows on every hook run) and
   # must never count as a change, whether or not the user gitignored it.

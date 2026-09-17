@@ -119,10 +119,13 @@ function flush(d,   t) {
 const OMH_CMD_UNWRAP_AWK = String.raw`
 BEGIN { FS = "\t" }
 {
-  i = 1
+  i = 1; envp = ""
   while (i <= NF) {
-    while (i <= NF && $i ~ /^[A-Za-z_][A-Za-z0-9_]*=/) i++
+    # NAME=value words are kept in the output (guards such as no-verify-guard
+    # inspect GIT_CONFIG_*); every argv0 matcher skips them.
+    while (i <= NF && $i ~ /^[A-Za-z_][A-Za-z0-9_]*=/) { envp = envp $i "\t"; i++ }
     if (i > NF) break
+    sub(/.*\//, "", $i)          # /usr/bin/git -> git: argv0 matchers compare basenames
     f = $i
     if (f == "env") {
       i++; while (i <= NF && $i ~ /^-/) { if ($i ~ /^-(u|C|S)$/) i++; i++ }; continue
@@ -142,20 +145,20 @@ BEGIN { FS = "\t" }
     if (f == "sh" || f == "bash" || f == "zsh" || f == "dash" || f == "ksh") {
       j = i + 1
       while (j <= NF && $j ~ /^-/) {
-        if ($j ~ /^-[A-Za-z]*c$/) { if (j + 1 <= NF) { print "S\t" $(j + 1); next }; break }
+        if ($j ~ /^-[A-Za-z]*c$/) { if (j + 1 <= NF) { gsub(/\t/, " ", envp); print "S\t" envp $(j + 1); next }; break }
         j++
       }
       break
     }
     if (f == "eval") {
       out = ""; for (k = i + 1; k <= NF; k++) out = out (k > i + 1 ? " " : "") $k
-      print "S\t" out; next
+      gsub(/\t/, " ", envp); print "S\t" envp out; next
     }
     break
   }
   if (i > NF) next
   out = ""; for (k = i; k <= NF; k++) out = out (k > i ? "\t" : "") $k
-  print "R\t" out
+  print "R\t" envp out
 }`;
 
 // Working-tree fingerprint for gates that want to skip a re-run when nothing

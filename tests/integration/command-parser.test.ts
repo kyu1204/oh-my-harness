@@ -188,7 +188,8 @@ describe("wrapper unwrapping (#110)", () => {
     // sudo/doas stay visible so user patterns like "sudo rm" keep working;
     // _omh_cmd_matches skips them (see "guards see through wrappers").
     expect(simple("sudo rm -rf /")).toEqual([["sudo", "rm", "-rf", "/"]]);
-    expect(simple("env FOO=1 git commit -m x")).toEqual([["git", "commit", "-m", "x"]]);
+    // env assignments survive (guards inspect GIT_CONFIG_*); the env wrapper itself does not
+    expect(simple("env FOO=1 git commit -m x")).toEqual([["FOO=1", "git", "commit", "-m", "x"]]);
     expect(simple("env -i -u HOME git commit -m x")).toEqual([["git", "commit", "-m", "x"]]);
     expect(simple("timeout 30 git commit -m x")).toEqual([["git", "commit", "-m", "x"]]);
     expect(simple("timeout -s KILL 5s rm -rf /")).toEqual([["rm", "-rf", "/"]]);
@@ -208,6 +209,14 @@ describe("wrapper unwrapping (#110)", () => {
     expect(simple("eval git commit -m x")).toEqual([["git", "commit", "-m", "x"]]);
     // nested wrappers
     expect(simple(`sh -c 'timeout 5 rm -rf /'`)).toEqual([["rm", "-rf", "/"]]);
+  });
+
+  it("normalises the command token to its basename so absolute paths cannot dodge argv0 matching", () => {
+    expect(simple("/usr/bin/git commit -m x")).toEqual([["git", "commit", "-m", "x"]]);
+    expect(simple("/opt/homebrew/bin/rm -rf /")).toEqual([["rm", "-rf", "/"]]);
+    expect(matches("/usr/local/bin/git push origin main", "git", "push")).toBe(true);
+    // arguments keep their paths
+    expect(simple("cp ./a/b /tmp/c")).toEqual([["cp", "./a/b", "/tmp/c"]]);
   });
 
   it("does not treat a shell running a script file as a wrapper", () => {

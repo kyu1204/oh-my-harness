@@ -479,3 +479,19 @@ describe("generateBlockTestCases", () => {
     expect(cases.length).toBeGreaterThan(0);
   });
 });
+
+describe("generateBlockTestCases force-push-guard", () => {
+  it("uses the configured protected branch instead of hardcoding main", () => {
+    const entries = [{ block: "force-push-guard", params: { protected: ["release"] } }];
+    const cases = generateBlockTestCases(entries, builtinBlocks);
+    const block = cases.find((c) => c.category === "force-push-guard" && c.expectation === "block");
+    expect(block).toBeDefined();
+    expect(String((block!.input.tool_input as { command: string }).command)).toContain("release");
+  });
+
+  it("generates no block case when nothing is protected", () => {
+    const entries = [{ block: "force-push-guard", params: { protected: [] } }];
+    const cases = generateBlockTestCases(entries, builtinBlocks);
+    expect(cases.filter((c) => c.category === "force-push-guard" && c.expectation === "block")).toHaveLength(0);
+  });
+});

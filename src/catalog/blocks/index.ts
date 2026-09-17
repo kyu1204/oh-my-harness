@@ -19,6 +19,8 @@ import { compactContext } from "./compact-context.js";
 import { worktreeSetup } from "./worktree-setup.js";
 import { loopGuard } from "./loop-guard.js";
 import { harnessGuard } from "./harness-guard.js";
+import { noVerifyGuard } from "./no-verify-guard.js";
+import { forcePushGuard } from "./force-push-guard.js";
 
 export const builtinBlocks: BuildingBlock[] = [
   branchGuard,
@@ -40,4 +42,6 @@ export const builtinBlocks: BuildingBlock[] = [
   worktreeSetup,
   loopGuard,
   harnessGuard,
+  noVerifyGuard,
+  forcePushGuard,
 ];

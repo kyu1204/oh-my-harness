@@ -253,6 +253,42 @@ export function generateBlockTestCases(
         break;
       }
 
+      case "no-verify-guard": {
+        cases.push({
+          name: '"git commit --no-verify" → BLOCKED',
+          category: "no-verify-guard",
+          hookScript,
+          input: { tool_name: "Bash", tool_input: { command: "git commit -m x --no-verify" } },
+          expectation: "block",
+        });
+        cases.push({
+          name: '"git commit -m x" → ALLOWED',
+          category: "no-verify-guard",
+          hookScript,
+          input: { tool_name: "Bash", tool_input: { command: "git commit -m x" } },
+          expectation: "allow",
+        });
+        break;
+      }
+
+      case "force-push-guard": {
+        cases.push({
+          name: '"git push --force origin main" → BLOCKED',
+          category: "force-push-guard",
+          hookScript,
+          input: { tool_name: "Bash", tool_input: { command: "git push --force origin main" } },
+          expectation: "block",
+        });
+        cases.push({
+          name: '"git push origin main" → ALLOWED',
+          category: "force-push-guard",
+          hookScript,
+          input: { tool_name: "Bash", tool_input: { command: "git push origin main" } },
+          expectation: "allow",
+        });
+        break;
+      }
+
       case "branch-guard": {
         const isProtected = currentBranch === "main" || currentBranch === "master";
         cases.push({

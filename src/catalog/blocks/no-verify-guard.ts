@@ -7,7 +7,8 @@ import type { BuildingBlock } from "../types.js";
 // or `git push` (through env/sudo/sh -c, see #109/#110):
 //   git commit --no-verify | -n | any short cluster containing n (-anm, -qn)
 //   git push --no-verify
-//   git -c core.hooksPath=... <anything>   (points hooks at an empty dir)
+//   git -c core.hooksPath=... <anything>   (points hooks at an empty dir; key match is case-insensitive)
+//   GIT_CONFIG_KEY_n=core.hooksPath ... git  and GIT_CONFIG_PARAMETERS='core.hooksPath=...' git
 // `git push -n` is dry-run, not no-verify, so it stays allowed.
 export const noVerifyGuard: BuildingBlock = {
   id: "no-verify-guard",
@@ -29,14 +30,21 @@ HIT=$(_omh_simple_commands "$COMMAND" | awk -F '\\t' '
   found != "" { next }
   {
     i = 1
-    while (i <= NF && $i ~ /^[A-Za-z_][A-Za-z0-9_]*=/) i++
+    env_bypass = 0
+    while (i <= NF && $i ~ /^[A-Za-z_][A-Za-z0-9_]*=/) {
+      # GIT_CONFIG_KEY_n=core.hooksPath / GIT_CONFIG_PARAMETERS='core.hooksPath=...' disable hooks too
+      lw = tolower($i)
+      if (lw ~ /^git_config_key_[0-9]+=core\\.hookspath$/ || lw ~ /^git_config_parameters=.*core\\.hookspath=/) env_bypass = 1
+      i++
+    }
     if (i <= NF && ($i == "sudo" || $i == "doas")) { i++; while (i <= NF && $i ~ /^-/) i++ }
     if (i > NF || $i != "git") next
-    # global options before the subcommand; -c core.hooksPath=... is itself a bypass
+    if (env_bypass) { found = "GIT_CONFIG core.hooksPath override"; next }
+    # global options before the subcommand; -c core.hooksPath=... is itself a bypass (config keys are case-insensitive)
     j = i + 1
     while (j <= NF && $j ~ /^-/) {
       if ($j == "-c" || $j == "-C") {
-        if ($j == "-c" && j + 1 <= NF && $(j + 1) ~ /^core\\.hooksPath=/) { found = "git -c core.hooksPath override"; next }
+        if ($j == "-c" && j + 1 <= NF && tolower($(j + 1)) ~ /^core\\.hookspath=/) { found = "git -c core.hooksPath override"; next }
         j++
       }
       j++

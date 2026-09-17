@@ -272,18 +272,22 @@ export function generateBlockTestCases(
       }
 
       case "force-push-guard": {
+        const protectedBranches = (params.protected as string[]) ?? [];
+        const target = protectedBranches[0];
+        if (target) {
+          cases.push({
+            name: `"git push --force origin ${target}" → BLOCKED`,
+            category: "force-push-guard",
+            hookScript,
+            input: { tool_name: "Bash", tool_input: { command: `git push --force origin ${target}` } },
+            expectation: "block",
+          });
+        }
         cases.push({
-          name: '"git push --force origin main" → BLOCKED',
+          name: `"git push origin ${target ?? "main"}" → ALLOWED`,
           category: "force-push-guard",
           hookScript,
-          input: { tool_name: "Bash", tool_input: { command: "git push --force origin main" } },
-          expectation: "block",
-        });
-        cases.push({
-          name: '"git push origin main" → ALLOWED',
-          category: "force-push-guard",
-          hookScript,
-          input: { tool_name: "Bash", tool_input: { command: "git push origin main" } },
+          input: { tool_name: "Bash", tool_input: { command: `git push origin ${target ?? "main"}` } },
           expectation: "allow",
         });
         break;

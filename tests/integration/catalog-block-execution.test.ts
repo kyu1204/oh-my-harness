@@ -320,6 +320,10 @@ EOF
       "sudo git commit --no-verify -m x",
       "cd sub && git commit -n -m y",
       "bash -c 'git commit --no-verify -m z'",
+      "git -c core.hookspath=/dev/null commit -m x",                                   // config keys are case-insensitive
+      "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null git commit -m x",
+      "GIT_CONFIG_PARAMETERS='core.hooksPath=/dev/null' git commit -m x",
+      "/usr/bin/git commit --no-verify -m x",                                          // executable path is normalised
     ]) {
       const stdout = runScript(scriptPath, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
       const result = JSON.parse(stdout.trim());
@@ -361,6 +365,10 @@ EOF
       "git push origin main --force",
       "sudo git push -f origin main",
       "cd sub && git push --force origin main",
+      "git push --force origin feature:feature main:main",   // every refspec is checked
+      "git push --force origin feature main",
+      "git push origin feature +main",
+      "/usr/bin/git push -f origin main",
       "git push --force",   // no refspec and not inside a git repo: fail closed
     ]) {
       const stdout = runScript(s, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
@@ -386,6 +394,40 @@ EOF
     expect(JSON.parse(runScript(strict, JSON.stringify({ tool_name: "Bash", tool_input: { command: "git push --force-with-lease origin main" } })).trim()).decision).toBe("block");
     expect(JSON.parse(runScript(strict, JSON.stringify({ tool_name: "Bash", tool_input: { command: "git push -f origin release" } })).trim()).decision).toBe("block");
     expect(runScript(strict, JSON.stringify({ tool_name: "Bash", tool_input: { command: "git push -f origin master" } })).trim()).toBe("");
+  });
+
+  it("force-push-guard: resolves the real push target when no refspec is given (push.default=upstream)", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+    // feature tracks origin/main with push.default=upstream: a bare
+    // `git push --force` rewrites remote main even though HEAD is "feature".
+    const bare = join(tmpDir, "remote.git");
+    execSync(`git init -q --bare "${bare}"`, { cwd: tmpDir });
+    execSync(
+      [
+        "git init -q",
+        "git -c user.name=t -c user.email=t@t commit -q --allow-empty -m init",
+        "git branch -M main",
+        `git remote add origin "${bare}"`,
+        "git push -q origin main",
+        "git checkout -q -b feature",
+        "git branch --set-upstream-to=origin/main feature",
+        "git config push.default upstream",
+      ].join(" && "),
+      { cwd: tmpDir },
+    );
+    const s = join(tmpDir, "force-push-guard-upstream.sh");
+    await writeFile(s, wrapWithLogger(renderTemplate(forcePushGuard.template, { protected: ["main"], allowLease: true }), "PreToolUse"), { mode: 0o755 });
+
+    const blocked = runScript(s, JSON.stringify({ tool_name: "Bash", tool_input: { command: "git push --force" } }));
+    expect(JSON.parse(blocked.trim()).decision).toBe("block");
+    expect(JSON.parse(blocked.trim()).reason).toContain("main");
+
+    // same repo, explicit non-protected refspec: allowed
+    const allowed = runScript(s, JSON.stringify({ tool_name: "Bash", tool_input: { command: "git push --force origin feature" } }));
+    expect(allowed.trim()).toBe("");
   });
 
   it("branch-guard: rendered script contains git commit detection logic", async () => {

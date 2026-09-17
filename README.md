@@ -28,6 +28,7 @@ That is the whole setup. Your agent now hits a wall when it tries to:
 | run `rm -rf /`, `chmod -R 777`, or any pattern you list | ⛔ **Blocked** |
 | write into `node_modules/`, `.next/`, `dist/` | ⛔ **Blocked** |
 | commit on a branch already merged to main | ⛔ **Blocked** |
+| `git commit --no-verify`, `git push --force origin main` | ⛔ **Blocked** |
 | edit its own hooks or `.claude/settings.json` to switch the guardrails off | ⛔ **Blocked** |
 | save a file | ✅ auto-lint |
 | push a branch | ✅ auto-PR |
@@ -74,6 +75,8 @@ All enforcement is powered by **catalog blocks** — reusable, parameterized hoo
 | 🔍 `commit-typecheck-gate` | quality | Runs typecheck before git commit |
 | 🔒 `command-guard` | security | Blocks dangerous shell commands |
 | 🪝 `harness-guard` | security | Blocks shell writes to the harness's own hooks and config (always on) |
+| 🚫 `no-verify-guard` | git | Blocks `--no-verify` / `-n` / hooksPath overrides on commit and push (always on) |
+| 💥 `force-push-guard` | git | Blocks force pushes to protected branches (always on) |
 | 📁 `path-guard` | file-protection | Blocks writes to protected paths |
 | 🔐 `lockfile-guard` | file-protection | Prevents manual lockfile edits |
 | 🤫 `secret-file-guard` | security | Blocks edits to .env, credentials |

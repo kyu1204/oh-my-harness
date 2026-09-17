@@ -115,8 +115,13 @@ export async function harnessToMergedConfigV2(
   // agent could delete or rewrite the hooks through Bash (#113). An explicit
   // entry may change its mode or add paths. Skipped for custom registries
   // that do not ship the block.
-  if (resolvedRegistry.has("harness-guard") && !allHookEntries.some((h) => h.block === "harness-guard")) {
-    allHookEntries.push({ block: "harness-guard", params: {}, mode: "block" });
+  // Same rule for the git-safety pair (#114): a harness that enforces anything
+  // gets no-verify-guard and force-push-guard on every runtime, instead of the
+  // Claude-only permissions.deny list the NL prompt sometimes emitted.
+  for (const id of ["harness-guard", "no-verify-guard", "force-push-guard"]) {
+    if (resolvedRegistry.has(id) && !allHookEntries.some((h) => h.block === id)) {
+      allHookEntries.push({ block: id, params: {}, mode: "block" });
+    }
   }
 
   const catalogResult = await convertHookEntries(allHookEntries, resolvedRegistry, projectDir ?? ".");

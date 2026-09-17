@@ -21,6 +21,8 @@ export function formatCategoryName(category: string): string {
     "path-guard": "File guards",
     "command-guard": "Command guards",
     "harness-guard": "Harness self-protection",
+    "no-verify-guard": "Git hook bypass guard",
+    "force-push-guard": "Force push guard",
     "branch-guard": "Branch guard",
     "lockfile-guard": "Lockfile guard",
     "secret-file-guard": "Secret file guard",

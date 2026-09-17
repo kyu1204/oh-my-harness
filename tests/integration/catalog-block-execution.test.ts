@@ -13,6 +13,8 @@ import { pathGuard } from "../../src/catalog/blocks/path-guard.js";
 import { lockfileGuard } from "../../src/catalog/blocks/lockfile-guard.js";
 import { secretFileGuard } from "../../src/catalog/blocks/secret-file-guard.js";
 import { harnessGuard } from "../../src/catalog/blocks/harness-guard.js";
+import { noVerifyGuard } from "../../src/catalog/blocks/no-verify-guard.js";
+import { forcePushGuard } from "../../src/catalog/blocks/force-push-guard.js";
 
 let tmpDir: string;
 
@@ -296,6 +298,94 @@ EOF
       JSON.stringify({ tool_name: "apply_patch", tool_input: { command: "*** Update File: .omh/hooks/x.sh\nrm -rf .omh" } }),
     );
     expect(stdout.trim()).toBe("");
+  });
+
+  it("no-verify-guard: blocks hook bypasses on commit and push (#98)", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+    const wrapped = wrapWithLogger(renderTemplate(noVerifyGuard.template, {}), "PreToolUse");
+    const scriptPath = join(tmpDir, "no-verify-guard.sh");
+    await writeFile(scriptPath, wrapped, { mode: 0o755 });
+
+    for (const command of [
+      "git commit -m x --no-verify",
+      "git commit --no-verify -m x",
+      "git commit -n -m x",
+      "git commit -anm x",
+      "git commit -qn",
+      "git push --no-verify origin feat/x",
+      "git -c core.hooksPath=/dev/null commit -m x",
+      "sudo git commit --no-verify -m x",
+      "cd sub && git commit -n -m y",
+      "bash -c 'git commit --no-verify -m z'",
+    ]) {
+      const stdout = runScript(scriptPath, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
+      const result = JSON.parse(stdout.trim());
+      expect(result.decision, command).toBe("block");
+    }
+    for (const command of [
+      "git commit -m x",
+      "git commit -am 'never use --no-verify'",
+      "git commit -m n",
+      "git commit --amend --no-edit",
+      "git push -n origin feat/x",
+      "git push origin feat/x",
+      "echo git commit --no-verify",
+      "npm test -- -n",
+    ]) {
+      const stdout = runScript(scriptPath, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
+      expect(stdout.trim(), command).toBe("");
+    }
+  });
+
+  it("force-push-guard: blocks force pushes to protected branches only (#99)", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+    const render = async (params: Record<string, unknown>, name: string) => {
+      const p = join(tmpDir, name);
+      await writeFile(p, wrapWithLogger(renderTemplate(forcePushGuard.template, params), "PreToolUse"), { mode: 0o755 });
+      return p;
+    };
+    const s = await render({ protected: ["main", "master"], allowLease: true }, "force-push-guard.sh");
+
+    for (const command of [
+      "git push --force origin main",
+      "git push -f origin master",
+      "git push origin +main",
+      "git push --force origin HEAD:main",
+      "git push --force origin feature:refs/heads/main",
+      "git push origin main --force",
+      "sudo git push -f origin main",
+      "cd sub && git push --force origin main",
+      "git push --force",   // no refspec and not inside a git repo: fail closed
+    ]) {
+      const stdout = runScript(s, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
+      const result = JSON.parse(stdout.trim());
+      expect(result.decision, command).toBe("block");
+    }
+    for (const command of [
+      "git push origin main",
+      "git push --force origin feat/x",
+      "git push -f origin HEAD:feat/x",
+      "git push --force-with-lease origin main",
+      "git push --force-with-lease=main:abc origin main",
+      "git push --force-if-includes --force-with-lease origin main",
+      "git push --force-if-includes origin main",   // no-op without --force-with-lease
+      "echo 'git push --force origin main'",
+      "git push --tags origin",
+    ]) {
+      const stdout = runScript(s, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
+      expect(stdout.trim(), command).toBe("");
+    }
+
+    const strict = await render({ protected: ["main", "release"], allowLease: false }, "force-push-guard-strict.sh");
+    expect(JSON.parse(runScript(strict, JSON.stringify({ tool_name: "Bash", tool_input: { command: "git push --force-with-lease origin main" } })).trim()).decision).toBe("block");
+    expect(JSON.parse(runScript(strict, JSON.stringify({ tool_name: "Bash", tool_input: { command: "git push -f origin release" } })).trim()).decision).toBe("block");
+    expect(runScript(strict, JSON.stringify({ tool_name: "Bash", tool_input: { command: "git push -f origin master" } })).trim()).toBe("");
   });
 
   it("branch-guard: rendered script contains git commit detection logic", async () => {

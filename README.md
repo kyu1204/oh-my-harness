@@ -66,7 +66,43 @@ omh diff          # Preview what `omh sync` would change
 omh sync --check  # Fail (exit 1) if generated files are out of date — CI gate
 ```
 
-📖 Deeper: [what gets generated & CI drift check](docs/generated-files.md) · [how it works, project detector, AI providers](docs/how-it-works.md)
+📖 Deeper: [what gets generated & CI drift check](docs/generated-files.md) · [how it works, project detector, presets & Jev, AI providers](docs/how-it-works.md)
+
+---
+
+## 🎛️ Presets and the Jev chooser
+
+You do not need a chat model to set up a harness.
+
+**Presets** are deterministic and offline. The project detector fills in test, lint and typecheck commands and build directories; rule text is templated; a block whose required parameter cannot be detected is left out rather than half-configured.
+
+| Preset | What it enables |
+|--------|-----------------|
+| `minimal` | dangerous-command guard, main-branch guard, build-output guard |
+| `safe` | minimal + tests and typecheck must pass before a commit, lockfile and secret-file guards, lint on save |
+| `strict` | safe + test-first (TDD) on every source edit |
+
+```bash
+omh init --preset safe        # confirm prompt; add -y to skip it
+```
+
+**Jev** picks the blocks for you from a description. [Jev](https://docs.typesafe.ai/introduction) is TypeSafe's System One model: it does not generate text, it answers typed questions with calibrated probabilities. `omh init "description"` sends the description plus the detector facts and asks, in one call, "should block X be enabled?" for every selectable block and "how strict?" once. Probabilities at or above 0.65 enable a block, at or below 0.35 disable it, anything in between keeps the preset default. Rule text and free-form params never come from the model.
+
+```bash
+export TYPESAFE_API_KEY=...   # or put it in the project's .env
+omh init "Next.js + FastAPI, TDD enforced, no auto PRs"
+# Jev (jev-latest) chose: strictness=strict, 1716 input tokens
+#   enabled:   ... tdd-guard, sql-guard ...
+#   disabled:  auto-pr
+```
+
+- Get a key from the [TypeSafe console](https://typesafe.ai) (early access at the time of writing). One init costs a fraction of a cent (input $0.042 per million tokens, output free) and takes about half a second.
+- `--preset` always wins and never calls Jev. No key and no LLM provider? `omh init "description"` falls back to `safe` and says so.
+- `omh doctor` and `omh config --show` tell you whether the chooser is active. Remove the key to go back to the LLM providers or presets.
+- Interactive `omh init` offers both: "Describe your project (Jev picks the blocks)" and "Use a preset (no AI)".
+- Descriptions in English work best; other languages are handled but with lower confidence, so include the specifics.
+
+The always-on guards (harness self-protection, `--no-verify`, force-push) are added to every preset and every Jev result.
 
 ---
 

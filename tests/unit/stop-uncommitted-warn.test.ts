@@ -61,6 +61,20 @@ describe.skipIf(!hasJq())("stop-uncommitted-warn execution", () => {
     expect(out.systemMessage).toMatch(/b\.txt/);
   });
 
+  it("reports a git status failure instead of treating it as a clean tree (review)", async () => {
+    const { chmodSync } = await import("node:fs");
+    await writeFile(join(dir, "a.txt"), "x\n");
+    sh("git add a.txt");
+    chmodSync(join(dir, ".git", "index"), 0o000);
+    try {
+      const out = JSON.parse(stop(await hook()).trim());
+      expect(out.decision).toBeUndefined();
+      expect(out.systemMessage).toMatch(/could not read git status/);
+    } finally {
+      chmodSync(join(dir, ".git", "index"), 0o644);
+    }
+  });
+
   it("stays quiet outside a git repository", async () => {
     await rm(join(dir, ".git"), { recursive: true, force: true });
     await writeFile(join(dir, "a.txt"), "x\n");

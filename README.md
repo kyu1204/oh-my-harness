@@ -33,7 +33,7 @@ That is the whole setup. Your agent now hits a wall when it tries to:
 | save a file | ✅ auto-lint |
 | push a branch | ✅ auto-PR |
 
-Every decision is logged to `.omh/state/events.jsonl` — `omh stats` shows what your agent tried and what got stopped.
+Every decision is logged to `.omh/state/events.jsonl` — `omh stats` shows what your agent tried and what got stopped, and `omh explain` tells you in plain language why the last few calls were blocked and how to allow once or change the rule.
 
 ## Why not just write CLAUDE.md?
 
@@ -191,6 +191,7 @@ Hand omh a `WORKPLAN.md` and it runs one work order per fresh agent session, in 
 # 🚀 Initialize
 omh init "your project description"      # Jev with TYPESAFE_API_KEY, else an LLM provider, else the "safe" preset
 omh init --preset strict                  # No provider: minimal | safe | strict
+omh explain                               # Why were the last tool calls blocked, and what to do about it
 omh init                                  # Interactive TUI (import existing harness.yaml)
 
 # 📋 Catalog

@@ -18,6 +18,10 @@ export const commandGuard: BuildingBlock = {
     },
   ],
   tags: ["security", "bash", "guard", "dangerous"],
+  explain: {
+    allowOnce: "rewrite the command without the blocked pattern (a narrower path, no sudo, no -R 777)",
+    change: "harness.yaml > hooks > command-guard > params.patterns: remove or edit the pattern, then omh sync",
+  },
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)

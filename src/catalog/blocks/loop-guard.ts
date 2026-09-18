@@ -32,6 +32,10 @@ export const loopGuard: BuildingBlock = {
       default: [],
     },
   ],
+  explain: {
+    allowOnce: "the loop must not write its own work orders or architect-only paths; do that from an architect session",
+    change: "harness.yaml > loop.architectOnly / loop.workOrders, or disable the loop, then omh sync",
+  },
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)

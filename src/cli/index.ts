@@ -41,6 +41,18 @@ export function createCli(): Command {
     });
 
   program
+    .command("explain")
+    .description("Show the last blocked tool calls in plain language, with how to allow once and how to change the rule")
+    .option("-d, --project-dir <dir>", "Project directory")
+    .option("-n, --last <count>", "How many blocks to show (default 5)", (v: string) => Number.parseInt(v, 10))
+    .option("--json", "Machine-readable output")
+    .action(async (options: { projectDir?: string; last?: number; json?: boolean }) => {
+      const { explainCommand } = await import("./commands/explain.js");
+      const result = await explainCommand(options);
+      if (result.exitCode !== 0) process.exitCode = result.exitCode;
+    });
+
+  program
     .command("doctor")
     .description("Validate harness configuration health")
     .option("-d, --project-dir <dir>", "Project directory")

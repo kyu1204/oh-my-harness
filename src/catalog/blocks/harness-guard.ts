@@ -41,6 +41,10 @@ export const harnessGuard: BuildingBlock = {
     },
   ],
   tags: ["security", "bash", "guard", "harness", "self-protection"],
+  explain: {
+    allowOnce: "edit harness.yaml and run omh sync; hook scripts and runtime config are generated, not hand-edited",
+    change: "harness.yaml > hooks > harness-guard: scope: any / project, extraPaths, mode: ask, or remove it, then omh sync",
+  },
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)

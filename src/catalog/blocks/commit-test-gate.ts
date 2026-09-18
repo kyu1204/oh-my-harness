@@ -19,6 +19,10 @@ export const commitTestGate: BuildingBlock = {
     },
   ],
   tags: ["git", "test", "quality", "guard"],
+  explain: {
+    allowOnce: "make the test command pass, or commit only after fixing the failing test",
+    change: "harness.yaml > hooks > commit-test-gate: change testCommand or cacheTtlSeconds, set mode: ask, or remove it, then omh sync",
+  },
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)

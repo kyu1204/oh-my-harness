@@ -20,6 +20,10 @@ export const noVerifyGuard: BuildingBlock = {
   canBlock: true,
   params: [],
   tags: ["git", "hooks", "guard", "bypass"],
+  explain: {
+    allowOnce: "fix what the git hook reports and commit or push again without --no-verify",
+    change: "harness.yaml > hooks > no-verify-guard: set mode: ask or remove it, then omh sync",
+  },
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)

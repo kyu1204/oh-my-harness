@@ -34,6 +34,10 @@ export const forcePushGuard: BuildingBlock = {
     },
   ],
   tags: ["git", "push", "guard", "force"],
+  explain: {
+    allowOnce: "push to a feature branch and open a pull request; use --force-with-lease if you really need to rewrite your own branch",
+    change: "harness.yaml > hooks > force-push-guard > params.protected / allowLease, or remove it, then omh sync",
+  },
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)

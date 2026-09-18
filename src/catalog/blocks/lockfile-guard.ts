@@ -18,6 +18,10 @@ export const lockfileGuard: BuildingBlock = {
     },
   ],
   tags: ["security", "file", "lockfile", "guard"],
+  explain: {
+    allowOnce: "change the dependency with the package manager (npm/pnpm/yarn/pip add or remove) so it rewrites the lockfile",
+    change: "harness.yaml > hooks > lockfile-guard > params.lockfiles: remove the file, or remove the hook, then omh sync",
+  },
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)

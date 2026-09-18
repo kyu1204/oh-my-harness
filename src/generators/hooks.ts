@@ -239,11 +239,23 @@ function omh_cd(cwd, arg, home,   a) {
   a = omh_abs(cwd, arg, home)
   return a == "" ? "?" : a
 }
+# cd / pushd / popd with option skipping (cd -P dir) and a directory stack.
+# Returns the new cwd; the caller keeps the stack (omh_stack, omh_sp) between calls.
+function omh_cd_cmd(cwd, i, home,   k, arg) {
+  if ($i == "popd") { return (omh_sp > 0) ? omh_stack[omh_sp--] : "?" }
+  arg = ""
+  for (k = i + 1; k <= NF; k++) { if ($k ~ /^-./ && $k != "-") continue; arg = $k; break }
+  if ($i == "pushd") omh_stack[++omh_sp] = cwd
+  return omh_cd(cwd, arg, home)
+}
 function omh_under(a, root) {
   return a == root || substr(a, 1, length(root) + 1) == root "/"
 }`;
 
 const OMH_CMD_HELPERS = `_OMH_AWK_PATHLIB='${OMH_AWK_PATHLIB}'
+# 1 when the command chains with ';' or newlines: a failed cd then leaves the next
+# command in the OLD directory, so relative paths must also be judged from there.
+_omh_seq_unsafe() { case "\${1:-}" in *";"*|*$'\\n'*) echo 1 ;; *) echo 0 ;; esac; }
 # The project this hook belongs to: the parent of .omh/state (absolute, symlinks resolved).
 _OMH_PROJECT_ROOT="$(cd "$(dirname "$(dirname "$_OMH_STATE_DIR")")" 2>/dev/null && pwd -P || pwd -P)"
 ${OMH_TREE_FINGERPRINT}

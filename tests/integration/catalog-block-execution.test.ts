@@ -248,6 +248,11 @@ EOF
       `cd ${realpathSync(tmpDir)} && rm -rf .omh`,
       `cd /tmp && rm -rf ${realpathSync(tmpDir)}/.omh/hooks`,
       "rm -rf $PWD/.omh",                                                      // unresolvable variable: name match, fail closed
+      "cd nonexistent; rm -rf .omh",                                           // a failed cd with ';' runs the next command in the old cwd (review)
+      "cd /tmp/other-project; rm -rf .omh",
+      "cd /tmp/other-project\nrm -rf .omh",
+      "pushd /tmp/other-project && popd && rm -rf .omh",                       // popd is tracked
+      `cd -P /tmp && rm -rf ${realpathSync(tmpDir)}/.omh`,                     // cd options are not paths
       "cd src && rm -rf ../.omh/hooks",
       "sudo rm -rf .omh",
       "bash -c 'rm -rf .omh'",
@@ -290,6 +295,9 @@ EOF
       "find src -name '*.ts' -delete",
       "rm -rf /tmp/other-project/.omh",                     // another project's harness (#133)
       "cd /tmp/other-project && rm -rf .omh",
+      "cd -P /tmp/other-project && rm -rf .omh",
+      "pushd /tmp/other-project && rm -rf .omh",
+      "cd /tmp/other-project && cd sub && rm -rf ../.omh",
       "sed -i 's/a/b/' /srv/elsewhere/.claude/settings.json",
       "cd /tmp/other-project && git checkout -- .claude/settings.json",
       "echo x > /tmp/other-project/.codex/hooks.json",
@@ -321,12 +329,13 @@ EOF
     const scriptPath = join(tmpDir, "branch-guard.sh");
     await writeFile(scriptPath, wrapWithLogger(rendered, "PreToolUse"), { mode: 0o755 });
     const root = realpathSync(tmpDir);
-    for (const command of ["git commit -m x", `cd ${root} && git commit -m x`, "cd sub && git commit -m x", "git -C . commit -m x"]) {
+    for (const command of ["git commit -m x", `cd ${root} && git commit -m x`, "cd sub && git commit -m x", "git -C . commit -m x",
+      "cd /tmp/other-project; git commit -m x", "pushd /tmp/other-project && popd && git commit -m x"]) {
       const out = runScript(scriptPath, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
       expect(JSON.parse(out.trim()).decision, command).toBe("block");
       expect(JSON.parse(out.trim()).reason, command).toMatch(/direct commits to main/);
     }
-    for (const command of ["cd /tmp/other-project && git commit -m x", "git -C /tmp/other-project commit -m x", "cd ~/llm-wiki && git add -A && git commit -m note"]) {
+    for (const command of ["cd /tmp/other-project && git commit -m x", "git -C /tmp/other-project commit -m x", "cd ~/llm-wiki && git add -A && git commit -m note", "pushd /tmp/other-project && git commit -m x"]) {
       const out = runScript(scriptPath, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
       expect(out.trim(), command).toBe("");
     }

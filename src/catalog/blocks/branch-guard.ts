@@ -27,13 +27,15 @@ if _omh_cmd_matches "$COMMAND" git commit || _omh_cmd_matches "$COMMAND" git pus
       while (i <= NF && $i ~ /^[A-Za-z_][A-Za-z0-9_]*=/) i++
       if (i <= NF && ($i == "sudo" || $i == "doas")) { i++; while (i <= NF && $i ~ /^-/) i++ }
       if (i > NF) next
-      if ($i == "cd" || $i == "pushd") { cwd = omh_cd(cwd, (i + 1 <= NF ? $(i + 1) : ""), home); next }
+      if ($i == "cd" || $i == "pushd" || $i == "popd") { cwd = omh_cd_cmd(cwd, i, home); next }
       if ($i != "git") next
       c = cwd; j = i + 1
       while (j <= NF && $j ~ /^-/) { if ($j == "-C") { c = omh_cd(c, $(j + 1), home); j++ } else if ($j == "-c") j++; j++ }
       if (j <= NF && ($j == "commit" || $j == "push")) found = c }
     END { print found }')
   [[ "$GIT_CWD" == "?" || -z "$GIT_CWD" ]] && GIT_CWD="$_OMH_PROJECT_ROOT"
+  # ';' / newline chaining: a failed cd would leave the commit in this project, so judge it here
+  [[ "$(_omh_seq_unsafe "$COMMAND")" == "1" ]] && GIT_CWD="$_OMH_PROJECT_ROOT"
   case "$GIT_CWD" in
     "$_OMH_PROJECT_ROOT"|"$_OMH_PROJECT_ROOT"/*) ;;
     *) exit 0 ;;

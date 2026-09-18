@@ -338,7 +338,8 @@ EOF
       expect(JSON.parse(out.trim()).reason, command).toMatch(/direct commits to main/);
     }
     for (const command of ["cd /tmp/other-project && git commit -m x", "git -C /tmp/other-project commit -m x", "cd ~/llm-wiki && git add -A && git commit -m note", "pushd /tmp/other-project && git commit -m x",
-      "git -C /tmp/other-project commit -m x; echo done"]) {   // explicit absolute -C survives ';' chaining (review)
+      "git -C /tmp/other-project commit -m x; echo done",     // explicit absolute -C survives ';' chaining (review)
+      "git -C ~/other-project commit -m x\necho done"]) {      // ~/ counts as explicit too
       const out = runScript(scriptPath, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
       expect(out.trim(), command).toBe("");
     }

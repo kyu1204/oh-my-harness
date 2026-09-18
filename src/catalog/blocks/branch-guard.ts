@@ -35,7 +35,7 @@ if _omh_cmd_matches "$COMMAND" git commit || _omh_cmd_matches "$COMMAND" git pus
       if ($i != "git") next
       c = cwd; ex = 0; j = i + 1
       while (j <= NF && $j ~ /^-/) {
-        if ($j == "-C") { if ($(j + 1) ~ /^\\//) ex = 1; c = omh_cd(c, $(j + 1), home); j++ }
+        if ($j == "-C") { if ($(j + 1) ~ /^(\\/|~\\/)/) ex = 1; c = omh_cd(c, $(j + 1), home); j++ }
         else if ($j == "-c") j++
         j++
       }

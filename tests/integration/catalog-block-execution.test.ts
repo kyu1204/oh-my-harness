@@ -252,6 +252,8 @@ EOF
       "cd /tmp/other-project; rm -rf .omh",
       "cd /tmp/other-project\nrm -rf .omh",
       "pushd /tmp/other-project && popd && rm -rf .omh",                       // popd is tracked
+      "pushd -n /tmp/other-project && rm -rf .omh",                            // -n does not change the cwd (review)
+      "pushd +1 && rm -rf .omh",                                               // stack rotation: unknown cwd, fail closed
       `cd -P /tmp && rm -rf ${realpathSync(tmpDir)}/.omh`,                     // cd options are not paths
       "cd src && rm -rf ../.omh/hooks",
       "sudo rm -rf .omh",
@@ -330,12 +332,13 @@ EOF
     await writeFile(scriptPath, wrapWithLogger(rendered, "PreToolUse"), { mode: 0o755 });
     const root = realpathSync(tmpDir);
     for (const command of ["git commit -m x", `cd ${root} && git commit -m x`, "cd sub && git commit -m x", "git -C . commit -m x",
-      "cd /tmp/other-project; git commit -m x", "pushd /tmp/other-project && popd && git commit -m x"]) {
+      "cd /tmp/other-project; git commit -m x", "pushd /tmp/other-project && popd && git commit -m x", "pushd -n /tmp/other-project && git commit -m x"]) {
       const out = runScript(scriptPath, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
       expect(JSON.parse(out.trim()).decision, command).toBe("block");
       expect(JSON.parse(out.trim()).reason, command).toMatch(/direct commits to main/);
     }
-    for (const command of ["cd /tmp/other-project && git commit -m x", "git -C /tmp/other-project commit -m x", "cd ~/llm-wiki && git add -A && git commit -m note", "pushd /tmp/other-project && git commit -m x"]) {
+    for (const command of ["cd /tmp/other-project && git commit -m x", "git -C /tmp/other-project commit -m x", "cd ~/llm-wiki && git add -A && git commit -m note", "pushd /tmp/other-project && git commit -m x",
+      "git -C /tmp/other-project commit -m x; echo done"]) {   // explicit absolute -C survives ';' chaining (review)
       const out = runScript(scriptPath, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
       expect(out.trim(), command).toBe("");
     }

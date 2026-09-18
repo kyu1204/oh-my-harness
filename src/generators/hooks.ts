@@ -242,6 +242,11 @@ function omh_cd(cwd, arg, home,   a) {
 # cd / pushd / popd with option skipping (cd -P dir) and a directory stack.
 # Returns the new cwd; the caller keeps the stack (omh_stack, omh_sp) between calls.
 function omh_cd_cmd(cwd, i, home,   k, arg) {
+  # pushd -n (no cd), pushd/popd +N or -N (stack rotation) and popd with options
+  # change the stack in ways we do not model: unknown cwd, fail closed.
+  for (k = i + 1; k <= NF; k++) {
+    if ($i != "cd" && ($k == "-n" || $k ~ /^[+-][0-9]+$/)) { omh_sp = 0; return "?" }
+  }
   if ($i == "popd") { return (omh_sp > 0) ? omh_stack[omh_sp--] : "?" }
   arg = ""
   for (k = i + 1; k <= NF; k++) { if ($k ~ /^-./ && $k != "-") continue; arg = $k; break }

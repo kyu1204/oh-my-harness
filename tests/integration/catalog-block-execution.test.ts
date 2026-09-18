@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir, chmod } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
@@ -244,7 +244,10 @@ EOF
       "git checkout -- .claude/settings.json",
       "git -C . restore .pi/extensions/omh-harness.ts",
       "mv .codex/config.toml /tmp/x",
-      "cp /tmp/evil.sh /abs/path/project/.omh/hooks/catalog-tdd-guard.sh",
+      `cp /tmp/evil.sh ${realpathSync(tmpDir)}/.omh/hooks/catalog-tdd-guard.sh`,   // absolute path under the project root
+      `cd ${realpathSync(tmpDir)} && rm -rf .omh`,
+      `cd /tmp && rm -rf ${realpathSync(tmpDir)}/.omh/hooks`,
+      "rm -rf $PWD/.omh",                                                      // unresolvable variable: name match, fail closed
       "cd src && rm -rf ../.omh/hooks",
       "sudo rm -rf .omh",
       "bash -c 'rm -rf .omh'",
@@ -285,9 +288,47 @@ EOF
       "git commit -m 'touch .omh/hooks in the message'",
       "echo 'rm -rf .omh'",
       "find src -name '*.ts' -delete",
+      "rm -rf /tmp/other-project/.omh",                     // another project's harness (#133)
+      "cd /tmp/other-project && rm -rf .omh",
+      "sed -i 's/a/b/' /srv/elsewhere/.claude/settings.json",
+      "cd /tmp/other-project && git checkout -- .claude/settings.json",
+      "echo x > /tmp/other-project/.codex/hooks.json",
     ]) {
       const stdout = runScript(scriptPath, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
       expect(stdout.trim(), command).toBe("");
+    }
+  });
+
+  it("harness-guard: scope=any keeps the old name-based matching (#133)", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+    const rendered = renderTemplate(harnessGuard.template, { extraPaths: [], scope: "any" });
+    const scriptPath = join(tmpDir, "harness-guard-any.sh");
+    await writeFile(scriptPath, wrapWithLogger(rendered, "PreToolUse"), { mode: 0o755 });
+    const stdout = runScript(scriptPath, JSON.stringify({ tool_name: "Bash", tool_input: { command: "rm -rf /tmp/other-project/.omh" } }));
+    expect(JSON.parse(stdout.trim()).decision).toBe("block");
+  });
+
+  it("branch-guard: only governs commits inside the project (#133)", async () => {
+    if (!hasJq()) {
+      console.log("jq not found, skipping");
+      return;
+    }
+    execSync("git init -q -b main && git -c user.name=t -c user.email=t@t commit -q --allow-empty -m init", { cwd: tmpDir });
+    const rendered = renderTemplate(branchGuard.template, { mainBranch: "main" });
+    const scriptPath = join(tmpDir, "branch-guard.sh");
+    await writeFile(scriptPath, wrapWithLogger(rendered, "PreToolUse"), { mode: 0o755 });
+    const root = realpathSync(tmpDir);
+    for (const command of ["git commit -m x", `cd ${root} && git commit -m x`, "cd sub && git commit -m x", "git -C . commit -m x"]) {
+      const out = runScript(scriptPath, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
+      expect(JSON.parse(out.trim()).decision, command).toBe("block");
+      expect(JSON.parse(out.trim()).reason, command).toMatch(/direct commits to main/);
+    }
+    for (const command of ["cd /tmp/other-project && git commit -m x", "git -C /tmp/other-project commit -m x", "cd ~/llm-wiki && git add -A && git commit -m note"]) {
+      const out = runScript(scriptPath, JSON.stringify({ tool_name: "Bash", tool_input: { command } }));
+      expect(out.trim(), command).toBe("");
     }
   });
 

@@ -210,7 +210,43 @@ _omh_gate_record() {
   printf '%s %s\\n' "$fp" "$(date +%s)" > "$file"
 }`;
 
-const OMH_CMD_HELPERS = `${OMH_TREE_FINGERPRINT}
+// Path resolution shared by guards that must know whether a token points
+// inside THIS project (#133). Exposed as a bash variable holding awk function
+// definitions; templates concatenate it in front of their own awk program:
+//   awk -v root=... "${_OMH_AWK_PATHLIB}"'BEGIN { ... }'
+// omh_abs returns "" when the token cannot be resolved ($VAR, backticks,
+// unknown cwd); callers fall back to name matching, so unknown stays fail-closed.
+const OMH_AWK_PATHLIB = String.raw`
+function omh_norm(p,    n, parts, out, i, depth, res, s) {
+  n = split(p, parts, "/"); depth = 0
+  for (i = 1; i <= n; i++) {
+    s = parts[i]
+    if (s == "" || s == ".") continue
+    if (s == "..") { if (depth > 0) depth--; continue }
+    out[++depth] = s
+  }
+  res = ""; for (i = 1; i <= depth; i++) res = res "/" out[i]
+  return res == "" ? "/" : res
+}
+function omh_abs(cwd, t, home) {
+  if (t == "" || index(t, "$") > 0 || index(t, "\140") > 0) return ""
+  if (t ~ /^~(\/|$)/) { if (home == "") return ""; t = home substr(t, 2) }
+  else if (t !~ /^\//) { if (cwd == "?") return ""; t = cwd "/" t }
+  return omh_norm(t)
+}
+function omh_cd(cwd, arg, home,   a) {
+  if (arg == "" || arg == "-") return "?"
+  a = omh_abs(cwd, arg, home)
+  return a == "" ? "?" : a
+}
+function omh_under(a, root) {
+  return a == root || substr(a, 1, length(root) + 1) == root "/"
+}`;
+
+const OMH_CMD_HELPERS = `_OMH_AWK_PATHLIB='${OMH_AWK_PATHLIB}'
+# The project this hook belongs to: the parent of .omh/state (absolute, symlinks resolved).
+_OMH_PROJECT_ROOT="$(cd "$(dirname "$(dirname "$_OMH_STATE_DIR")")" 2>/dev/null && pwd -P || pwd -P)"
+${OMH_TREE_FINGERPRINT}
 _omh_tokenize() {
   printf '%s\\n' "\${1:-}" | awk '${OMH_CMD_TOKENIZER_AWK}'
 }

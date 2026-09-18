@@ -232,6 +232,8 @@ EOF
 
     for (const command of [
       "sed -i 's/block/allow/' .omh/hooks/catalog-tdd-guard.sh",
+      "sed -ni 's/block/allow/p' .omh/hooks/catalog-tdd-guard.sh",
+      "sed --in-place=.bak 's/a/b/' .codex/config.toml",
       "rm -rf .omh",
       "rm .omh/state/tdd-edits.json",
       "chmod -x ./.omh/hooks/catalog-command-guard.sh",
@@ -266,6 +268,8 @@ EOF
 
     for (const command of [
       "cat .omh/hooks/catalog-tdd-guard.sh",
+      "sed -n '/BLOCKED/,/^}/p' .omh/hooks/catalog-tdd-guard.sh",   // read-only sed (QA)
+      "sed 's/a/b/' .claude/settings.json",
       "grep -n block .claude/settings.json",
       "ls -la .omh/hooks",
       "diff .codex/hooks.json /tmp/other.json",

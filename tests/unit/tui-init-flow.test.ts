@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { formatDepResults, formatConfigSummary, formatProjectFacts } from "../../src/cli/tui/init-flow.js";
+import { formatDepResults, formatConfigSummary, formatProjectFacts, buildModeOptions } from "../../src/cli/tui/init-flow.js";
 import type { DepCheck } from "../../src/cli/deps-checker.js";
 import type { HarnessConfig } from "../../src/core/harness-schema.js";
 import { emptyFacts } from "../../src/detector/types.js";
@@ -364,5 +364,19 @@ describe("NL mode provider integration", () => {
     expect(mockHasProviderConfig).toHaveBeenCalledOnce();
     expect(mockLoadProviderConfig).toHaveBeenCalledOnce();
     expect(mockGenerateHarnessConfig).toHaveBeenCalledOnce();
+  });
+});
+
+describe("buildModeOptions (QA: TUI must offer presets and use Jev)", () => {
+  it("always offers a preset mode, and labels the AI mode by what will run", () => {
+    const withJev = buildModeOptions({ claudeInstalled: false, providerConfigured: false, jevKey: true });
+    expect(withJev.map((o) => o.value)).toEqual(["nl", "preset", "import"]);
+    expect(withJev[0].label).toMatch(/Jev/);
+    expect(withJev[0].hint).toBeUndefined();
+    const bare = buildModeOptions({ claudeInstalled: false, providerConfigured: false, jevKey: false });
+    expect(bare[0].hint).toMatch(/provider/i);
+    expect(bare.find((o) => o.value === "preset")!.label).toMatch(/no AI/i);
+    const cli = buildModeOptions({ claudeInstalled: true, providerConfigured: false, jevKey: false });
+    expect(cli[0].hint).toBeUndefined();
   });
 });

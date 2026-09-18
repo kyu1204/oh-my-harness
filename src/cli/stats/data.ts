@@ -1,5 +1,6 @@
 import { readEvents, aggregateStats, type HookEvent, type EventStats } from "../event-logger.js";
 import { HarnessConfigSchema, type HarnessConfig } from "../../core/harness-schema.js";
+import { effectiveHookEntries } from "../../core/harness-converter-v2.js";
 import { builtinBlocks } from "../../catalog/blocks/index.js";
 import type { BuildingBlock, HookEntry } from "../../catalog/types.js";
 import fs from "node:fs/promises";
@@ -170,7 +171,7 @@ export async function loadStatsData(
     const parsed = yaml.load(raw);
     const result = HarnessConfigSchema.safeParse(parsed);
     if (result.success) {
-      hookEntries = result.data.hooks ?? [];
+      hookEntries = effectiveHookEntries(result.data, { has: (id) => builtinBlocks.some((b) => b.id === id) });
     }
   } catch {
     // harness.yaml 없으면 빈 배열

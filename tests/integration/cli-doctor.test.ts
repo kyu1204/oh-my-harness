@@ -363,6 +363,7 @@ describe("doctorCommand: TypeSafe chooser (#129)", () => {
     try {
       const result = await doctorCommand({ projectDir: tmpDir });
       expect(result.messages.join("\n")).toMatch(/INFO: .*Jev/);
+      expect(result.messages.join("\n")).not.toMatch(/No AI provider configured for natural-language mode/);
     } finally {
       if (prev === undefined) delete process.env.TYPESAFE_API_KEY; else process.env.TYPESAFE_API_KEY = prev;
     }

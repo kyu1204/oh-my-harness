@@ -61,6 +61,34 @@ function convertEnforcementToHooks(enforcement: HarnessConfig["enforcement"]): H
   return hooks;
 }
 
+// A harness that enforces anything also guards itself: without this an agent
+// could delete or rewrite the hooks through Bash (#113), skip git hooks or
+// force-push main (#98, #99, #114). An explicit entry keeps its mode/params;
+// custom registries without the block are skipped.
+export const ALWAYS_ON_GUARDS = ["harness-guard", "no-verify-guard", "force-push-guard"] as const;
+
+function addAlwaysOnGuards(entries: HookEntry[], registry: { has(id: string): boolean }): void {
+  if (entries.length === 0) return;
+  for (const id of ALWAYS_ON_GUARDS) {
+    if (registry.has(id) && !entries.some((h) => h.block === id)) {
+      entries.push({ block: id, params: {}, mode: "block" });
+    }
+  }
+}
+
+/**
+ * The hook entries a harness really runs: enforcement-derived + explicit +
+ * the always-on guards. `omh test` and `omh stats` use this so they see the
+ * same set the generator emits (QA: they used to miss the always-on guards).
+ * Loop-guard is added by harnessToMergedConfigV2 only, because its params
+ * come from the loop config.
+ */
+export function effectiveHookEntries(harness: HarnessConfig, registry: { has(id: string): boolean }): HookEntry[] {
+  const entries = mergeEnforcementAndHooks(harness);
+  addAlwaysOnGuards(entries, registry);
+  return entries;
+}
+
 export function mergeEnforcementAndHooks(harness: HarnessConfig): HookEntry[] {
   const enforcementHooks = convertEnforcementToHooks(harness.enforcement);
   const explicitHooks = harness.hooks ?? [];
@@ -111,18 +139,7 @@ export async function harnessToMergedConfigV2(
   // Resolve registry — use provided one or create the default
   const resolvedRegistry = registry ?? (await createDefaultRegistry());
 
-  // A harness that enforces anything also guards itself: without this an
-  // agent could delete or rewrite the hooks through Bash (#113). An explicit
-  // entry may change its mode or add paths. Skipped for custom registries
-  // that do not ship the block.
-  // Same rule for the git-safety pair (#114): a harness that enforces anything
-  // gets no-verify-guard and force-push-guard on every runtime, instead of the
-  // Claude-only permissions.deny list the NL prompt sometimes emitted.
-  for (const id of ["harness-guard", "no-verify-guard", "force-push-guard"]) {
-    if (resolvedRegistry.has(id) && !allHookEntries.some((h) => h.block === id)) {
-      allHookEntries.push({ block: id, params: {}, mode: "block" });
-    }
-  }
+  addAlwaysOnGuards(allHookEntries, resolvedRegistry);
 
   const catalogResult = await convertHookEntries(allHookEntries, resolvedRegistry, projectDir ?? ".");
 

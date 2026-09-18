@@ -223,14 +223,17 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<Doctor
  * Returns whether a provider is configured. Never reads or echoes the API key.
  */
 async function checkProviderConfig(messages: string[], projectDir: string): Promise<boolean> {
-  if (resolveTypesafeApiKey(projectDir)) {
+  const jev = Boolean(resolveTypesafeApiKey(projectDir));
+  if (jev) {
     messages.push("INFO: Chooser: TypeSafe Jev (TYPESAFE_API_KEY found) — `omh init \"...\"` picks catalog blocks with it; no LLM provider needed.");
   }
   const config = await loadProviderConfig();
 
   if (!config) {
     messages.push(
-      "INFO: No AI provider configured for natural-language mode — run `omh config` to set one up.",
+      jev
+        ? "INFO: LLM provider: none (optional; only needed for generated rule text — `omh config` to add one)."
+        : "INFO: No AI provider configured for natural-language mode — run `omh config` to set one up, or use `omh init --preset`.",
     );
     return false;
   }

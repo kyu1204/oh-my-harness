@@ -32,7 +32,12 @@ export function createCli(): Command {
     .option("--preset <name>", "Deterministic setup with no AI provider: minimal | safe | strict (Jev tunes it when TYPESAFE_API_KEY is set)")
     .action(async (description: string[], options) => {
       const { initCommand } = await import("./commands/init.js");
-      await initCommand(description, options);
+      try {
+        await initCommand(description, options);
+      } catch (err) {
+        console.error(`error: ${(err as Error).message}`);
+        process.exitCode = 1;
+      }
     });
 
   program

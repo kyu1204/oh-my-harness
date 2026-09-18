@@ -178,7 +178,10 @@ const OMH_TREE_FINGERPRINT = `_omh_tree_fingerprint() {
   # Always from the repository root, whatever directory the hook runs in.
   # .omh/state is hook-owned scratch (events.jsonl grows on every hook run) and
   # must never count as a change, whether or not the user gitignored it.
-  tree=$(GIT_INDEX_FILE="$idx" git -C "$root" add -A -- . ':(exclude).omh/state' >/dev/null 2>&1 && GIT_INDEX_FILE="$idx" git -C "$root" write-tree 2>/dev/null) || tree=none
+  # (Naming .omh/state in an exclude pathspec makes git refuse when the path
+  # is gitignored, which every omh project does; so add everything, then drop
+  # it from the temporary index.)
+  tree=$(GIT_INDEX_FILE="$idx" git -C "$root" add -A -- . >/dev/null 2>&1 && { GIT_INDEX_FILE="$idx" git -C "$root" rm -r -q --cached --ignore-unmatch -- .omh/state >/dev/null 2>&1 || true; } && GIT_INDEX_FILE="$idx" git -C "$root" write-tree 2>/dev/null) || tree=none
   rm -f "$idx"
   [ "$tree" = "none" ] && { echo none; return 0; }
   printf '%s:%s\\n' "$head" "$tree"

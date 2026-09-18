@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { harnessToMergedConfigV2 } from "../../src/core/harness-converter-v2.js";
+import { harnessToMergedConfigV2, effectiveHookEntries } from "../../src/core/harness-converter-v2.js";
 import { CatalogRegistry } from "../../src/catalog/registry.js";
 import { createDefaultRegistry } from "../../src/catalog/registry.js";
 import type { HarnessConfig } from "../../src/core/harness-schema.js";
@@ -333,5 +333,25 @@ describe("harnessToMergedConfigV2", () => {
     expect(lintHooks[0].id).not.toBe(lintHooks[1].id);
     // No duplicate error
     expect(result.catalogErrors?.some((e) => e.includes("Duplicate"))).toBeFalsy();
+  });
+});
+
+describe("effectiveHookEntries (QA: omh test / omh stats must see always-on guards)", () => {
+  it("adds harness-guard, no-verify-guard and force-push-guard to any harness that has a hook", async () => {
+    const { HarnessConfigSchema } = await import("../../src/core/harness-schema.js");
+    const registry = await createDefaultRegistry();
+    const h = HarnessConfigSchema.parse({ version: "1.0", loop: { enabled: false }, hooks: [{ block: "path-guard", params: { blockedPaths: ["dist/"] } }] });
+    const ids = effectiveHookEntries(h, registry).map((e) => e.block);
+    expect(ids).toEqual(["path-guard", "harness-guard", "no-verify-guard", "force-push-guard"]);
+  });
+
+  it("is empty for a harness with no hooks, and keeps an explicit entry's mode", async () => {
+    const { HarnessConfigSchema } = await import("../../src/core/harness-schema.js");
+    const registry = await createDefaultRegistry();
+    expect(effectiveHookEntries(HarnessConfigSchema.parse({ version: "1.0", loop: { enabled: false } }), registry)).toEqual([]);
+    const h = HarnessConfigSchema.parse({ version: "1.0", loop: { enabled: false }, hooks: [{ block: "force-push-guard", params: {}, mode: "ask" }] });
+    const entries = effectiveHookEntries(h, registry);
+    expect(entries.filter((e) => e.block === "force-push-guard")).toHaveLength(1);
+    expect(entries.find((e) => e.block === "force-push-guard")!.mode).toBe("ask");
   });
 });

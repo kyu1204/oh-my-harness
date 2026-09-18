@@ -130,6 +130,15 @@ describe.skipIf(!hasJq())("commit gate cache (#112)", () => {
     expect(await runs()).toBe(2);
   });
 
+  it("still caches when .omh/state is gitignored, as omh's own .gitignore does (QA)", async () => {
+    await writeFile(join(dir, ".gitignore"), ".omh/state/\nnode_modules/\n");
+    sh("git add -A && git -c user.name=t -c user.email=t@t commit -q -m ignore");
+    const s = await gate(commitTestGate, { testCommand: record(), cacheTtlSeconds: 600 }, "gate.sh");
+    commitAttempt(s);
+    commitAttempt(s);
+    expect(await runs()).toBe(1);
+  });
+
   it("the two gates keep separate caches", async () => {
     const t = await gate(commitTestGate, { testCommand: record(), cacheTtlSeconds: 600 }, "test-gate.sh");
     const y = await gate(commitTypecheckGate, { typecheckCommand: record(), cacheTtlSeconds: 600 }, "type-gate.sh");

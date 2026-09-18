@@ -5,6 +5,13 @@ import { join } from "node:path";
 import yaml from "js-yaml";
 import { initCommand } from "../../src/cli/commands/init.js";
 
+// `omh init "description"` without -y must confirm and proceed, never drop
+// the description into the TUI (QA).
+vi.mock("@inquirer/prompts", () => ({
+  confirm: vi.fn(async () => true),
+  input: vi.fn(async () => ""),
+}));
+
 // #116 / #129: `omh init --preset <name>` needs no AI provider and no network;
 // with TYPESAFE_API_KEY it lets Jev tune the preset to the description.
 
@@ -92,5 +99,15 @@ describe("omh init --preset", () => {
     const ids = (await harness()).hooks.map((x) => x.block);
     expect(ids).toContain("commit-test-gate");   // fell back to the 'safe' preset
     expect(logs.join("\n")).toMatch(/--preset/);
+  });
+});
+
+describe("omh init \"description\" without -y (QA)", () => {
+  it("uses the non-interactive generator with a confirm prompt instead of the TUI", async () => {
+    process.env.HOME = dir;
+    await initCommand(["TypeScript API"], { projectDir: dir });
+    const ids = (await harness()).hooks.map((x) => x.block);
+    expect(ids).toContain("commit-test-gate");
+    expect(logs.join("\n")).toMatch(/safe/);
   });
 });

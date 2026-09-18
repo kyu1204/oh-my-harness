@@ -99,6 +99,7 @@ omh init "Next.js + FastAPI, TDD enforced, no auto PRs"
 - Get a key from the [TypeSafe console](https://typesafe.ai) (early access at the time of writing). One init costs a fraction of a cent (input $0.042 per million tokens, output free) and takes about half a second.
 - `--preset` always wins and never calls Jev. No key and no LLM provider? `omh init "description"` falls back to `safe` and says so.
 - `omh doctor` and `omh config --show` tell you whether the chooser is active. Remove the key to go back to the LLM providers or presets.
+- `omh modify "..."` later edits the same way: Jev answers enable / disable / ask / keep per block, you confirm the change set, `omh sync` runs. Mark an entry `locked: true` in harness.yaml and modify will refuse to remove or weaken it.
 - Interactive `omh init` offers both: "Describe your project (Jev picks the blocks)" and "Use a preset (no AI)".
 - Descriptions in English work best; other languages are handled but with lower confidence, so include the specifics.
 
@@ -194,6 +195,7 @@ Hand omh a `WORKPLAN.md` and it runs one work order per fresh agent session, in 
 omh init "your project description"      # Jev with TYPESAFE_API_KEY, else an LLM provider, else the "safe" preset
 omh init --preset strict                  # No provider: minimal | safe | strict
 omh explain                               # Why were the last tool calls blocked, and what to do about it
+omh modify "no auto PRs, TDD guard asks"  # Edit harness.yaml from a sentence (Jev decides per block; locked: true entries stay)
 omh init                                  # Interactive TUI (import existing harness.yaml)
 
 # 📋 Catalog

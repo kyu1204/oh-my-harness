@@ -31,7 +31,8 @@ afterEach(async () => {
 describe("blockIdFromHook", () => {
   it("strips the catalog prefix and .sh", () => {
     expect(blockIdFromHook("catalog-tdd-guard.sh")).toBe("tdd-guard");
-    expect(blockIdFromHook("harness-file-guard.sh")).toBe("file-guard");
+    expect(blockIdFromHook("harness-file-guard.sh")).toBe("file-guard");   // legacy harness-<name>.sh scripts
+    expect(blockIdFromHook("catalog-harness-guard.sh")).toBe("harness-guard");   // the block called harness-guard
     expect(blockIdFromHook("custom.sh")).toBe("custom");
   });
 });

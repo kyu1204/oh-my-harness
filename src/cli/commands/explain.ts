@@ -29,8 +29,17 @@ const GENERIC_CHANGE = (id: string) =>
 const UNKNOWN_HOOK_CHANGE =
   "this hook is not a catalog block: look it up in .claude/settings.json (or harness.yaml if you added it there)";
 
-export function blockIdFromHook(hook: string): string {
-  return hook.replace(/\.sh$/, "").replace(/^catalog-/, "").replace(/^harness-/, "");
+const BUILTIN_IDS = new Set(builtinBlocks.map((b) => b.id));
+
+/**
+ * catalog-<id>.sh -> id. Legacy scripts were named harness-<name>.sh, so a
+ * harness- prefix is stripped too, but only when what is left is not itself a
+ * block id: catalog-harness-guard.sh must stay harness-guard.
+ */
+export function blockIdFromHook(hook: string, knownIds: Set<string> = BUILTIN_IDS): string {
+  const id = hook.replace(/\.sh$/, "").replace(/^catalog-/, "");
+  if (id.startsWith("harness-") && !knownIds.has(id)) return id.slice("harness-".length);
+  return id;
 }
 
 function relativeTime(ts: string, now: number): string {

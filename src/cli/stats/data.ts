@@ -65,6 +65,15 @@ export function deduplicateBlocks(blocks: BlockStats[]): BlockStats[] {
   return [...map.values()];
 }
 
+const BUILTIN_IDS = new Set(builtinBlocks.map((b) => b.id));
+
+/** catalog-<id>.sh -> id; legacy harness-<name>.sh -> name, unless the name is itself a block id (harness-guard). */
+export function normalizeHookName(hook: string): string {
+  const id = hook.replace(/\.sh$/, "").replace(/^catalog-/, "");
+  if (id.startsWith("harness-") && !BUILTIN_IDS.has(id)) return id.slice("harness-".length);
+  return id;
+}
+
 export function getActiveBlocks(
   hookEntries: HookEntry[],
   allBlocks: BuildingBlock[],
@@ -84,7 +93,7 @@ export function getDormantBlocks(
   events: HookEvent[],
 ): string[] {
   const hitHooks = new Set(events.map(e =>
-    e.hook.replace(/\.sh$/, "").replace(/^catalog-/, "").replace(/^harness-/, ""),
+    normalizeHookName(e.hook),
   ));
   return activeBlocks
     .filter(ab => !hitHooks.has(ab.block.id))
@@ -132,7 +141,7 @@ export function getBlockDetail(
 ): BlockStats {
   const block = allBlocks.find(b => b.id === blockId);
   const hookEvents = events.filter(e => {
-    const normalized = e.hook.replace(/\.sh$/, "").replace(/^catalog-/, "").replace(/^harness-/, "");
+    const normalized = normalizeHookName(e.hook);
     return normalized === blockId;
   });
 

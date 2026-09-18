@@ -306,3 +306,13 @@ describe("loadStatsData includes the always-on guards (QA)", () => {
     }
   });
 });
+
+describe("hook name normalisation keeps harness-guard intact (explain/stats)", () => {
+  it("counts a catalog-harness-guard.sh event as a hit for harness-guard, not for 'guard'", () => {
+    const hg = { id: "harness-guard", name: "Harness Guard", description: "", category: "security", event: "PreToolUse", canBlock: true, params: [], template: "", tags: [] } as unknown as BuildingBlock;
+    const detail = getBlockDetail("harness-guard", [
+      { ts: new Date().toISOString(), event: "PreToolUse", hook: "catalog-harness-guard.sh", decision: "block", reason: "x" } as HookEvent,
+    ], [hg], {});
+    expect(detail.hits).toBe(1);
+  });
+});

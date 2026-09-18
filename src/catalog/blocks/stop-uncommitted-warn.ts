@@ -16,7 +16,12 @@ export const stopUncommittedWarn: BuildingBlock = {
 set -euo pipefail
 INPUT=$(cat)
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
-CHANGES=$(git status --porcelain 2>/dev/null || true)
+if ! CHANGES=$(git status --porcelain 2>&1); then
+  MSG="oh-my-harness: could not read git status, so uncommitted changes may be unreported: $(printf '%s' "$CHANGES" | head -n 3)"
+  _log_event "allow" "$MSG"
+  jq -cn --arg m "$MSG" '{systemMessage:$m}'
+  exit 0
+fi
 [[ -z "$CHANGES" ]] && exit 0
 N=$(printf '%s\\n' "$CHANGES" | wc -l | tr -d ' ')
 MSG="oh-my-harness: $N uncommitted change(s) left behind:

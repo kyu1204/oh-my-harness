@@ -53,7 +53,11 @@ if [[ "$COUNT" -ge {{maxRetries}} ]]; then
 fi
 
 FP=$(_omh_tree_fingerprint)
-if _omh_gate_cached stop-test-gate {{cacheTtlSeconds}} "$FP"; then
+GATE_CMD=$(cat <<'OMH_GATE_CMD'
+{{{testCommand}}}
+OMH_GATE_CMD
+)
+if _omh_gate_cached stop-test-gate {{cacheTtlSeconds}} "$FP" "$GATE_CMD"; then
   rm -f "$COUNT_FILE"
   _log_event "allow" "cached: tree unchanged since last passing run"
   exit 0
@@ -74,6 +78,6 @@ $TAIL"
   exit 0
 fi
 rm -f "$COUNT_FILE"
-_omh_gate_record stop-test-gate "$FP"
+_omh_gate_record stop-test-gate "$FP" "$GATE_CMD"
 exit 0`,
 };

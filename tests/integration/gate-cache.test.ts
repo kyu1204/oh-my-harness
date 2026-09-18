@@ -139,6 +139,14 @@ describe.skipIf(!hasJq())("commit gate cache (#112)", () => {
     expect(await runs()).toBe(1);
   });
 
+  it("re-runs when the test command changes on the same tree (review of #139)", async () => {
+    const a = await gate(commitTestGate, { testCommand: record(), cacheTtlSeconds: 600 }, "gate-a.sh");
+    const b = await gate(commitTestGate, { testCommand: `${record()} && true`, cacheTtlSeconds: 600 }, "gate-b.sh");
+    commitAttempt(a);
+    commitAttempt(b);   // different command, same tree: must not be served from a's cache
+    expect(await runs()).toBe(2);
+  });
+
   it("the two gates keep separate caches", async () => {
     const t = await gate(commitTestGate, { testCommand: record(), cacheTtlSeconds: 600 }, "test-gate.sh");
     const y = await gate(commitTypecheckGate, { typecheckCommand: record(), cacheTtlSeconds: 600 }, "type-gate.sh");

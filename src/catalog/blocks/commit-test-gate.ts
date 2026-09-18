@@ -29,7 +29,11 @@ INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 if _omh_cmd_matches "$COMMAND" git commit; then
   FP=$(_omh_tree_fingerprint)
-  if _omh_gate_cached commit-test-gate {{cacheTtlSeconds}} "$FP"; then
+  GATE_CMD=$(cat <<'OMH_GATE_CMD'
+{{{testCommand}}}
+OMH_GATE_CMD
+)
+  if _omh_gate_cached commit-test-gate {{cacheTtlSeconds}} "$FP" "$GATE_CMD"; then
     echo "oh-my-harness: tests already passed on this exact tree; skipping" >&2
     _log_event "allow" "cached: tree unchanged since last passing run"
     exit 0
@@ -41,7 +45,7 @@ if _omh_cmd_matches "$COMMAND" git commit; then
     _emit_decision "block" "$REASON"
     exit 0
   fi
-  _omh_gate_record commit-test-gate "$FP"
+  _omh_gate_record commit-test-gate "$FP" "$GATE_CMD"
 fi
 exit 0`,
 };

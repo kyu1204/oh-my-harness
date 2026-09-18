@@ -192,11 +192,17 @@ const OMH_TREE_FINGERPRINT = `_omh_tree_fingerprint() {
 #   _omh_gate_cached <name> <ttl-seconds> <fp>  -> 0 when the last recorded pass
 #                                                  for <name> is <fp> and younger than ttl.
 #   _omh_gate_record <name> <fp>                -> remember <fp> as passed.
+# The optional [cmd] argument becomes part of the cache key, so changing the
+# command in harness.yaml never reuses a pass recorded for the old one.
+_omh_gate_key() {
+  local name="\${1:-}" cmd="\${2:-}"
+  if [ -n "$cmd" ]; then printf '%s-%s' "$name" "$(printf '%s' "$cmd" | cksum | cut -d' ' -f1)"; else printf '%s' "$name"; fi
+}
 _omh_gate_cached() {
   local name="$1" ttl="\${2:-0}" fp="\${3:-none}" file now cached_fp cached_ts
   [ "$ttl" -gt 0 ] 2>/dev/null || return 1
   [ "$fp" = "none" ] && return 1
-  file="\${_OMH_STATE_DIR:-.omh/state}/gate-$name.fp"
+  file="\${_OMH_STATE_DIR:-.omh/state}/gate-$(_omh_gate_key "$name" "\${4:-}").fp"
   [ -f "$file" ] || return 1
   read -r cached_fp cached_ts < "$file" || return 1
   now=$(date +%s)
@@ -205,7 +211,7 @@ _omh_gate_cached() {
 _omh_gate_record() {
   local name="$1" fp="\${2:-none}" file
   [ "$fp" = "none" ] && return 0
-  file="\${_OMH_STATE_DIR:-.omh/state}/gate-$name.fp"
+  file="\${_OMH_STATE_DIR:-.omh/state}/gate-$(_omh_gate_key "$name" "\${3:-}").fp"
   mkdir -p "$(dirname "$file")" 2>/dev/null || true
   printf '%s %s\\n' "$fp" "$(date +%s)" > "$file"
 }`;

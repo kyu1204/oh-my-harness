@@ -253,6 +253,17 @@ export function generateBlockTestCases(
         break;
       }
 
+      case "stop-test-gate": {
+        cases.push({
+          name: "Stop with stop_hook_active → ALLOWED (loop guard)",
+          category: "stop-test-gate",
+          hookScript,
+          input: { tool_name: "", tool_input: {}, stop_hook_active: true, session_id: "omh-test" } as unknown as TestCase["input"],
+          expectation: "allow",
+        });
+        break;
+      }
+
       case "no-verify-guard": {
         cases.push({
           name: '"git commit --no-verify" → BLOCKED',

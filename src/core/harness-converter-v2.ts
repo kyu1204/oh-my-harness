@@ -34,7 +34,7 @@ function harnessToMergedConfig(harness: HarnessConfig): MergedConfig {
     presets: ["harness"],
     variables,
     claudeMdSections,
-    hooks: { preToolUse: [], postToolUse: [], sessionStart: [], notification: [], configChange: [], worktreeCreate: [] },
+    hooks: { preToolUse: [], postToolUse: [], sessionStart: [], notification: [], configChange: [], worktreeCreate: [], stop: [] },
     settings: { permissions: { allow: harness.permissions.allow, deny: harness.permissions.deny } },
     ...(harness.loop?.enabled ? { loop: harness.loop } : {}),
   };
@@ -119,6 +119,7 @@ const eventToField: Record<string, keyof HooksConfig> = {
   Notification: "notification",
   ConfigChange: "configChange",
   WorktreeCreate: "worktreeCreate",
+  Stop: "stop",
 };
 
 export async function harnessToMergedConfigV2(
@@ -180,6 +181,7 @@ export async function harnessToMergedConfigV2(
     notification: [...(base.hooks.notification ?? []), ...(additionalHooks.notification ?? [])],
     configChange: [...(base.hooks.configChange ?? []), ...(additionalHooks.configChange ?? [])],
     worktreeCreate: [...(base.hooks.worktreeCreate ?? []), ...(additionalHooks.worktreeCreate ?? [])],
+    stop: [...(base.hooks.stop ?? []), ...(additionalHooks.stop ?? [])],
   };
 
   return {

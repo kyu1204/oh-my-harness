@@ -119,6 +119,8 @@ All enforcement is powered by **catalog blocks** — reusable, parameterized hoo
 | 🪝 `harness-guard` | security | Blocks shell writes to the harness's own hooks and config (always on) |
 | 🚫 `no-verify-guard` | git | Blocks `--no-verify` / `-n` / hooksPath overrides on commit and push (always on) |
 | 💥 `force-push-guard` | git | Blocks force pushes to protected branches (always on) |
+| 🛑 `stop-test-gate` | quality | When the agent tries to end its turn with failing tests, sends it back (retry-capped) |
+| 📝 `stop-uncommitted-warn` | git | Lists uncommitted changes as a system message when the turn ends |
 | 📁 `path-guard` | file-protection | Blocks writes to protected paths |
 | 🔐 `lockfile-guard` | file-protection | Prevents manual lockfile edits |
 | 🤫 `secret-file-guard` | security | Blocks edits to .env, credentials |

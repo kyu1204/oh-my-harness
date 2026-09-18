@@ -22,6 +22,7 @@ export const SELECTABLE_BLOCKS = [
   "branch-guard", "commit-test-gate", "commit-typecheck-gate", "command-guard", "path-guard",
   "lockfile-guard", "secret-file-guard", "tdd-guard", "sql-guard",
   "lint-on-save", "format-on-save", "test-on-save", "auto-pr", "desktop-notify", "compact-context",
+  "stop-test-gate", "stop-uncommitted-warn",
 ] as const;
 
 export type Decision = "on" | "off" | "undecided";

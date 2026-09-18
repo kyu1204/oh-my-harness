@@ -54,6 +54,8 @@ export function defaultParamsFor(blockId: string, facts?: ProjectFacts): Params 
       return facts?.lintCommands?.[0] ? { filePattern: l.glob, command: facts.lintCommands[0] } : null;
     case "test-on-save":
       return facts?.testCommands?.[0] ? { testCommand: facts.testCommands[0], filePattern: l.src } : null;
+    case "stop-test-gate":
+      return facts?.testCommands?.[0] ? { testCommand: facts.testCommands[0] } : null;
     case "format-on-save":
       return null; // no formatter detection yet; ponytail: add when the detector learns formatters
     case "path-guard":

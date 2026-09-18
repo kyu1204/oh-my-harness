@@ -67,7 +67,7 @@ export function extractPiBindings(hooksConfig: HooksOutput["hooksConfig"]): PiBi
   const pre = hooksConfig["PreToolUse"] ?? [];
   const bindings: PiBinding[] = [];
   for (const entry of pre) {
-    const tools = matcherToPiTools(entry.matcher);
+    const tools = matcherToPiTools(entry.matcher ?? "");
     if (tools.length === 0) continue;
     for (const hook of entry.hooks) {
       bindings.push({ tools, command: hook.command });

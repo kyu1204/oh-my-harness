@@ -25,6 +25,8 @@ export interface HooksConfig {
   notification?: HookDefinition[];
   configChange?: HookDefinition[];
   worktreeCreate?: HookDefinition[];
+  /** Stop-event hooks (#117): fire when the agent is about to end its turn. No matcher. */
+  stop?: HookDefinition[];
 }
 
 export interface SettingsConfig {

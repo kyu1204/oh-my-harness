@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import { resolveTypesafeApiKey } from "../../nl/typesafe-chooser.js";
 import {
   loadProviderConfig,
   deleteProviderConfig,
@@ -28,6 +29,15 @@ export interface ConfigResult {
 
 const NO_CONFIG_MESSAGE =
   "No AI provider configured yet. Run `omh config` (or `omh init`) to set one up.";
+
+function printChooserLine(): void {
+  const key = resolveTypesafeApiKey(process.cwd());
+  console.log(
+    key
+      ? `  chooser:  ${chalk.cyan("TypeSafe Jev")} ${chalk.dim("(TYPESAFE_API_KEY found; `omh init \"...\"` selects catalog blocks with it, no LLM call)")}`
+      : `  chooser:  ${chalk.dim("none (set TYPESAFE_API_KEY to let Jev pick catalog blocks; `omh init --preset` needs neither)")}`,
+  );
+}
 
 function printSummary(config: ProviderConfig): void {
   console.log(chalk.bold("Current AI provider configuration:"));
@@ -81,6 +91,7 @@ export async function configCommand(options: ConfigOptions = {}): Promise<Config
   if (options.show) {
     if (!existing) {
       console.log(NO_CONFIG_MESSAGE);
+    printChooserLine();
       return { exitCode: 0 };
     }
     printSummary(existing);
@@ -91,6 +102,7 @@ export async function configCommand(options: ConfigOptions = {}): Promise<Config
   if (options.reset) {
     if (!existing) {
       console.log(NO_CONFIG_MESSAGE);
+    printChooserLine();
       return { exitCode: 0 };
     }
     const confirm = options.confirm ?? defaultConfirm;

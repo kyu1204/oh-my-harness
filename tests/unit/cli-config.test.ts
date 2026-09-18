@@ -224,3 +224,23 @@ describe("configCommand mutually exclusive flags", () => {
     expect(loggedOutput()).toBe("");
   });
 });
+
+describe("configCommand: TypeSafe chooser line (#129)", () => {
+  it("mentions Jev when TYPESAFE_API_KEY is set, and how to enable it otherwise", async () => {
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => { logs.push(a.join(" ")); });
+    const prev = process.env.TYPESAFE_API_KEY;
+    try {
+      process.env.TYPESAFE_API_KEY = "k";
+      await configCommand({ show: true });
+      expect(logs.join("\n")).toMatch(/Jev/);
+      delete process.env.TYPESAFE_API_KEY;
+      logs.length = 0;
+      await configCommand({ show: true });
+      expect(logs.join("\n")).toMatch(/TYPESAFE_API_KEY/);
+    } finally {
+      spy.mockRestore();
+      if (prev !== undefined) process.env.TYPESAFE_API_KEY = prev;
+    }
+  });
+});

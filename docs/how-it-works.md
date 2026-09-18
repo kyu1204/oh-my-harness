@@ -52,6 +52,12 @@ oh-my-harness automatically detects your project type and injects accurate facts
 | 🔷 Scala | build.sbt | sbt test |
 | ⚡ Zig | build.zig | zig build test |
 
+## 🎛️ Presets and the Jev chooser
+
+`omh init --preset minimal|safe|strict` builds a valid `harness.yaml` with no model and no network: the project detector supplies test, lint and typecheck commands and the build directories, rule text is templated, and a block whose required parameter cannot be filled is left out rather than emitted half-configured.
+
+With `TYPESAFE_API_KEY` set (environment or a `.env` in the project), `omh init "description"` sends the description and the detector facts to [Jev](https://docs.typesafe.ai/introduction), TypeSafe's System One model, and asks one yes/no question per catalog block plus one strictness choice in a single call. Jev returns calibrated probabilities, never text: at or above 0.65 a block is enabled, at or below 0.35 disabled, in between the preset's default stands. The strictness choice picks the base preset unless `--preset` was given. It runs in roughly half a second and costs a fraction of a cent (input $0.042 per million tokens, output free). Jev is in early access, so this path is optional; without a key the LLM providers below, or the presets, are used.
+
 ## 🤖 AI Provider Setup
 
 Natural language mode (`omh init "description"`) needs one LLM call. Pick a provider once with `omh config`; it is saved globally in `~/.omh/config.json`.

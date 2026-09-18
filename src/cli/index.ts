@@ -29,6 +29,7 @@ export function createCli(): Command {
     .command("init [description...]")
     .description("Initialize harness from a project description")
     .option("-y, --yes", "Skip confirmation prompts")
+    .option("--preset <name>", "Deterministic setup with no AI provider: minimal | safe | strict (Jev tunes it when TYPESAFE_API_KEY is set)")
     .action(async (description: string[], options) => {
       const { initCommand } = await import("./commands/init.js");
       await initCommand(description, options);

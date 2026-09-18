@@ -274,10 +274,10 @@ hooks:
     expect(data.blockCount).toBe(1);
     expect(data.allowCount).toBe(1);
     expect(data.blockRate).toBe(50);
-    // the explicit block plus the three always-on guards (harness, no-verify, force-push)
-    expect(data.blocks).toHaveLength(4);
+    // the explicit block, loop-guard (loop defaults to enabled) and the three always-on guards
+    expect(data.blocks).toHaveLength(5);
     expect(data.blocks[0].id).toBe("command-guard");
-    expect(data.blocks.map((b) => b.id)).toEqual(expect.arrayContaining(["harness-guard", "no-verify-guard", "force-push-guard"]));
+    expect(data.blocks.map((b) => b.id)).toEqual(expect.arrayContaining(["loop-guard", "harness-guard", "no-verify-guard", "force-push-guard"]));
     expect(data.dateRange).toBe("all");
   });
 

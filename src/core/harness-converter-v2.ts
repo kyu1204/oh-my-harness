@@ -76,15 +76,30 @@ function addAlwaysOnGuards(entries: HookEntry[], registry: { has(id: string): bo
   }
 }
 
+// The loop engine brings its guard along. An explicit loop-guard entry may
+// choose its mode, but the paths it protects always come from the loop
+// config — otherwise an empty explicit entry would silently unguard the
+// real work-order directory.
+function addLoopGuard(entries: HookEntry[], harness: HarnessConfig): void {
+  if (!harness.loop?.enabled) return;
+  const loopParams = { workOrders: harness.loop.workOrders, architectOnly: harness.loop.architectOnly };
+  const explicit = entries.find((h) => h.block === "loop-guard");
+  if (explicit) {
+    explicit.params = { ...explicit.params, ...loopParams };
+  } else {
+    entries.push({ block: "loop-guard", params: loopParams, mode: "block" });
+  }
+}
+
 /**
  * The hook entries a harness really runs: enforcement-derived + explicit +
- * the always-on guards. `omh test` and `omh stats` use this so they see the
- * same set the generator emits (QA: they used to miss the always-on guards).
- * Loop-guard is added by harnessToMergedConfigV2 only, because its params
- * come from the loop config.
+ * loop-guard (when the loop is on) + the always-on guards, in the order the
+ * generator emits them. `omh test` and `omh stats` use this so they see the
+ * same set (QA: they used to miss the always-on guards).
  */
 export function effectiveHookEntries(harness: HarnessConfig, registry: { has(id: string): boolean }): HookEntry[] {
   const entries = mergeEnforcementAndHooks(harness);
+  addLoopGuard(entries, harness);
   addAlwaysOnGuards(entries, registry);
   return entries;
 }
@@ -117,19 +132,7 @@ export async function harnessToMergedConfigV2(
   // Merge enforcement-derived hooks with explicit hooks (dedup by block id)
   const allHookEntries = mergeEnforcementAndHooks(harness);
 
-  // The loop engine brings its guard along. An explicit loop-guard entry may
-  // choose its mode, but the paths it protects always come from the loop
-  // config — otherwise an empty explicit entry would silently unguard the
-  // real work-order directory.
-  if (harness.loop?.enabled) {
-    const loopParams = { workOrders: harness.loop.workOrders, architectOnly: harness.loop.architectOnly };
-    const explicit = allHookEntries.find((h) => h.block === "loop-guard");
-    if (explicit) {
-      explicit.params = { ...explicit.params, ...loopParams };
-    } else {
-      allHookEntries.push({ block: "loop-guard", params: loopParams, mode: "block" });
-    }
-  }
+  addLoopGuard(allHookEntries, harness);
 
   // If no hook entries at all, return base config unchanged
   if (allHookEntries.length === 0) {

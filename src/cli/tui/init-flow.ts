@@ -184,7 +184,7 @@ export async function runInitTUI(options?: { projectDir?: string }): Promise<voi
     handleCancel(confirmed);
     if (!confirmed) { p.cancel("Aborted."); process.exit(0); }
   } else if (mode === "nl") {
-    if (!jevKey && !providerConfigured) {
+    if (!jevKey && !providerConfigured && !claudeInstalled) {
       p.log.info("No AI provider configured yet. Let's set one up (or pick a preset instead).");
       const providerConfig = await runProviderSetup();
       if (!providerConfig) {

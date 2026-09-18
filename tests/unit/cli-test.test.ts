@@ -242,8 +242,10 @@ describe("testCommand covers the always-on guards (QA)", () => {
       for (const id of ids) {
         const block = builtinBlocks.find((b) => b.id === id)!;
         const params = Object.fromEntries(block.params.map((pp) => [pp.name, pp.default]));
-        await fs.writeFile(path.join(hooksDir, `catalog-${id}.sh`), wrapWithLogger(renderTemplate(block.template, params), "PreToolUse", dir), { mode: 0o755 });
-        registered.push({ matcher: "Bash", hooks: [{ type: "command", command: `bash .omh/hooks/catalog-${id}.sh` }] });
+        // one of them under a custom file name: omh test must follow the registered path (review)
+        const file = id === "no-verify-guard" ? `custom-${id}.sh` : `catalog-${id}.sh`;
+        await fs.writeFile(path.join(hooksDir, file), wrapWithLogger(renderTemplate(block.template, params), "PreToolUse", dir), { mode: 0o755 });
+        registered.push({ matcher: "Bash", hooks: [{ type: "command", command: `bash .omh/hooks/${file}` }] });
       }
       await fs.writeFile(path.join(dir, ".claude", "settings.json"), JSON.stringify({ hooks: { PreToolUse: registered } }));
       await fs.writeFile(path.join(dir, "harness.yaml"), "version: '1.0'\nhooks:\n  - block: path-guard\n    params:\n      blockedPaths: [dist/]\n");

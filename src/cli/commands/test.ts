@@ -104,7 +104,7 @@ export async function testCommand(options: TestCommandOptions = {}): Promise<{
   // Generate test cases from block-based hooks only. A case whose hook script
   // is not on disk (harness.yaml ahead of `omh sync`) is reported as skipped
   // rather than failed, so the dry run stays about hook behaviour.
-  const allCases = generateBlockTestCases(hookEntries, builtinBlocks, currentBranch);
+  const allCases = generateBlockTestCases(hookEntries, builtinBlocks, currentBranch, hooks);
   const testCases: typeof allCases = [];
   const missingScripts = new Set<string>();
   for (const tc of allCases) {

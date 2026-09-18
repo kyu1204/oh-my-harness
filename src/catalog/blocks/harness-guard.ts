@@ -72,7 +72,13 @@ HIT=$(_omh_simple_commands "$COMMAND" | awk -F '\\t' \\
     a0 = $i
     write = 0
     if (isw[a0]) write = 1
-    else if (a0 == "sed") { for (k = i + 1; k <= NF; k++) if ($k ~ /^-[A-Za-z]*i/ || $k ~ /^--in-place/) write = 1 }   # sed only writes in place
+    else if (a0 == "sed") {   # sed only writes in place: -i, any -i cluster, --in-place or a GNU abbreviation of it (--i, --in-p ...)
+      for (k = i + 1; k <= NF; k++) {
+        if ($k == "--") break
+        if ($k ~ /^-[A-Za-z]*i/) { write = 1; break }
+        if ($k ~ /^--i/) { o = $k; sub(/=.*/, "", o); if (index("--in-place", o) == 1) { write = 1; break } }
+      }
+    }
     else if (a0 == "git") {
       j = i + 1; while (j <= NF && $j ~ /^-/) { if ($j == "-c" || $j == "-C") j++; j++ }
       if (j <= NF && isg[$j]) write = 1

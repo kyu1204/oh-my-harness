@@ -355,3 +355,14 @@ describe("effectiveHookEntries (QA: omh test / omh stats must see always-on guar
     expect(entries.find((e) => e.block === "force-push-guard")!.mode).toBe("ask");
   });
 });
+
+describe("effectiveHookEntries mirrors the loop-guard rule (review)", () => {
+  it("adds loop-guard with the loop's paths, then the always-on guards, when the loop is enabled", async () => {
+    const { HarnessConfigSchema } = await import("../../src/core/harness-schema.js");
+    const registry = await createDefaultRegistry();
+    const h = HarnessConfigSchema.parse({ version: "1.0", loop: { enabled: true, workOrders: "orders" } });
+    const entries = effectiveHookEntries(h, registry);
+    expect(entries.map((e) => e.block)).toEqual(["loop-guard", "harness-guard", "no-verify-guard", "force-push-guard"]);
+    expect(entries[0].params).toMatchObject({ workOrders: "orders" });
+  });
+});

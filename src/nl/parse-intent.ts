@@ -33,7 +33,7 @@ export async function createDefaultRunner(): Promise<LLMRunner> {
 }
 
 /** CI-friendly fallback: pick an API provider from the usual env vars when nothing is saved. */
-function providerConfigFromEnv(): ProviderConfig | undefined {
+export function providerConfigFromEnv(): ProviderConfig | undefined {
   const key = (name: string): string | undefined => process.env[name]?.trim() || undefined;
   const candidates: Array<[ProviderConfig["provider"], string | undefined]> = [
     ["claude", key("ANTHROPIC_API_KEY")],

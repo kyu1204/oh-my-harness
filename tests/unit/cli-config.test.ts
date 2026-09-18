@@ -224,3 +224,45 @@ describe("configCommand mutually exclusive flags", () => {
     expect(loggedOutput()).toBe("");
   });
 });
+
+describe("configCommand: TypeSafe chooser line (#129)", () => {
+  it("mentions Jev when TYPESAFE_API_KEY is set, and how to enable it otherwise", async () => {
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => { logs.push(a.join(" ")); });
+    const prev = process.env.TYPESAFE_API_KEY;
+    try {
+      process.env.TYPESAFE_API_KEY = "k";
+      await configCommand({ show: true });
+      expect(logs.join("\n")).toMatch(/Jev/);
+      delete process.env.TYPESAFE_API_KEY;
+      logs.length = 0;
+      await configCommand({ show: true });
+      expect(logs.join("\n")).toMatch(/TYPESAFE_API_KEY/);
+    } finally {
+      spy.mockRestore();
+      if (prev !== undefined) process.env.TYPESAFE_API_KEY = prev;
+    }
+  });
+});
+
+
+describe("configCommand --show with a saved provider still reports the chooser (review)", () => {
+  it("prints the chooser line after the provider summary", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omh-config-chooser-"));
+    const home = process.env.HOME; const key = process.env.TYPESAFE_API_KEY;
+    process.env.HOME = dir; process.env.TYPESAFE_API_KEY = "k";
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => { logs.push(a.join(" ")); });
+    try {
+      await saveProviderConfig({ provider: "openai", method: "api", apiKey: "sk-test", model: "gpt-x" } as ProviderConfig);
+      await configCommand({ show: true });
+      expect(logs.join("\n")).toMatch(/provider: .*openai/);
+      expect(logs.join("\n")).toMatch(/chooser:.*Jev/);
+    } finally {
+      spy.mockRestore();
+      if (home === undefined) delete process.env.HOME; else process.env.HOME = home;
+      if (key === undefined) delete process.env.TYPESAFE_API_KEY; else process.env.TYPESAFE_API_KEY = key;
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+});

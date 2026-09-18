@@ -355,3 +355,16 @@ describe("doctorCommand provider check", () => {
     expect(result.healthy).toBe(true);
   });
 });
+
+describe("doctorCommand: TypeSafe chooser (#129)", () => {
+  it("adds an INFO line about Jev when TYPESAFE_API_KEY is available", async () => {
+    const prev = process.env.TYPESAFE_API_KEY;
+    process.env.TYPESAFE_API_KEY = "k";
+    try {
+      const result = await doctorCommand({ projectDir: tmpDir });
+      expect(result.messages.join("\n")).toMatch(/INFO: .*Jev/);
+    } finally {
+      if (prev === undefined) delete process.env.TYPESAFE_API_KEY; else process.env.TYPESAFE_API_KEY = prev;
+    }
+  });
+});

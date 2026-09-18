@@ -1,0 +1,232 @@
+{
+  "name": "ts-api",
+  "description": "TypeScript Express API with Prisma and Postgres. TDD enforced, lint on save, block dangerous commands.",
+  "facts": {
+    "languages": [
+      "typescript"
+    ],
+    "frameworks": [
+      "express"
+    ],
+    "packageManagers": [
+      "npm"
+    ],
+    "testCommands": [
+      "npx vitest run"
+    ],
+    "lintCommands": [
+      "npx eslint --fix"
+    ],
+    "buildCommands": [],
+    "typecheckCommands": [
+      "npx tsc --noEmit"
+    ],
+    "blockedPaths": [
+      "dist/",
+      "node_modules/"
+    ],
+    "detectedFiles": []
+  },
+  "request": {
+    "model": "jev-latest",
+    "state": {
+      "user_description": "TypeScript Express API with Prisma and Postgres. TDD enforced, lint on save, block dangerous commands.",
+      "detected_project_facts": {
+        "languages": [
+          "typescript"
+        ],
+        "frameworks": [
+          "express"
+        ],
+        "packageManagers": [
+          "npm"
+        ],
+        "testCommands": [
+          "npx vitest run"
+        ],
+        "lintCommands": [
+          "npx eslint --fix"
+        ],
+        "typecheckCommands": [
+          "npx tsc --noEmit"
+        ],
+        "blockedPaths": [
+          "dist/",
+          "node_modules/"
+        ]
+      }
+    },
+    "questions": {
+      "block:branch-guard": {
+        "type": "noul",
+        "instructions": "Should the 'branch-guard' guardrail be enabled for this project? It blocks commits on main/master and already-merged branches. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "block:commit-test-gate": {
+        "type": "noul",
+        "instructions": "Should the 'commit-test-gate' guardrail be enabled for this project? It runs tests before git commit and blocks on failure. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "block:commit-typecheck-gate": {
+        "type": "noul",
+        "instructions": "Should the 'commit-typecheck-gate' guardrail be enabled for this project? It runs type checking before git commit and blocks on failure. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "block:command-guard": {
+        "type": "noul",
+        "instructions": "Should the 'command-guard' guardrail be enabled for this project? It blocks dangerous shell commands matching specified patterns. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "block:path-guard": {
+        "type": "noul",
+        "instructions": "Should the 'path-guard' guardrail be enabled for this project? It blocks edits or writes to specified paths or directories. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "block:lockfile-guard": {
+        "type": "noul",
+        "instructions": "Should the 'lockfile-guard' guardrail be enabled for this project? It blocks direct edits to lockfiles (package-lock.json, yarn.lock, etc.). Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "block:secret-file-guard": {
+        "type": "noul",
+        "instructions": "Should the 'secret-file-guard' guardrail be enabled for this project? It blocks edits to files that may contain secrets or credentials. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "block:tdd-guard": {
+        "type": "noul",
+        "instructions": "Should the 'tdd-guard' guardrail be enabled for this project? It blocks source file edits unless corresponding test file was modified first. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "block:sql-guard": {
+        "type": "noul",
+        "instructions": "Should the 'sql-guard' guardrail be enabled for this project? It blocks dangerous SQL commands in shell. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "block:lint-on-save": {
+        "type": "noul",
+        "instructions": "Should the 'lint-on-save' guardrail be enabled for this project? It runs a linter on files after they are saved. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "block:format-on-save": {
+        "type": "noul",
+        "instructions": "Should the 'format-on-save' guardrail be enabled for this project? It runs a formatter on files after they are saved. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "block:test-on-save": {
+        "type": "noul",
+        "instructions": "Should the 'test-on-save' guardrail be enabled for this project? It runs related tests after source file edits. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "block:auto-pr": {
+        "type": "noul",
+        "instructions": "Should the 'auto-pr' guardrail be enabled for this project? It automatically creates a pull request after a git push if one does not already exist. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "block:desktop-notify": {
+        "type": "noul",
+        "instructions": "Should the 'desktop-notify' guardrail be enabled for this project? It sends desktop notification when Claude needs attention. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "block:compact-context": {
+        "type": "noul",
+        "instructions": "Should the 'compact-context' guardrail be enabled for this project? It re-injects project context after context compaction. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "strictness": {
+        "type": "choice",
+        "instructions": "How strict should the generated guardrails be overall, given the user's description?",
+        "criteria": {
+          "minimal": "only catastrophic actions are blocked (dangerous shell commands, direct commits to main, writes into build output)",
+          "safe": "tests and typecheck must pass before commits, lockfiles and secret files are protected, lint runs on save; the workflow stays smooth",
+          "strict": "test-first (TDD) is enforced on every source edit in addition to every quality gate"
+        }
+      }
+    }
+  },
+  "response": {
+    "model": "jev-1.13.0",
+    "answers": {
+      "block:branch-guard": {
+        "type": "noul",
+        "noul": 0.67
+      },
+      "block:commit-test-gate": {
+        "type": "noul",
+        "noul": 0.92
+      },
+      "block:commit-typecheck-gate": {
+        "type": "noul",
+        "noul": 0.91
+      },
+      "block:command-guard": {
+        "type": "noul",
+        "noul": 0.94
+      },
+      "block:path-guard": {
+        "type": "noul",
+        "noul": 0.92
+      },
+      "block:lockfile-guard": {
+        "type": "noul",
+        "noul": 0.7
+      },
+      "block:secret-file-guard": {
+        "type": "noul",
+        "noul": 0.83
+      },
+      "block:tdd-guard": {
+        "type": "noul",
+        "noul": 0.93
+      },
+      "block:sql-guard": {
+        "type": "noul",
+        "noul": 0.87
+      },
+      "block:lint-on-save": {
+        "type": "noul",
+        "noul": 0.97
+      },
+      "block:format-on-save": {
+        "type": "noul",
+        "noul": 0.76
+      },
+      "block:test-on-save": {
+        "type": "noul",
+        "noul": 0.77
+      },
+      "block:auto-pr": {
+        "type": "noul",
+        "noul": 0.28
+      },
+      "block:desktop-notify": {
+        "type": "noul",
+        "noul": 0.33
+      },
+      "block:compact-context": {
+        "type": "noul",
+        "noul": 0.68
+      },
+      "strictness": {
+        "type": "choice",
+        "choice": "strict",
+        "confidence": 0.86,
+        "probabilities": {
+          "safe": 0.09,
+          "strict": 0.91,
+          "minimal": 0
+        }
+      }
+    },
+    "usage": {
+      "input_tokens": 1743,
+      "output_tokens": 351
+    }
+  },
+  "expected": {
+    "on": [
+      "branch-guard",
+      "commit-test-gate",
+      "commit-typecheck-gate",
+      "command-guard",
+      "path-guard",
+      "lockfile-guard",
+      "secret-file-guard",
+      "tdd-guard",
+      "sql-guard",
+      "lint-on-save",
+      "format-on-save",
+      "test-on-save",
+      "compact-context"
+    ],
+    "off": [
+      "auto-pr",
+      "desktop-notify"
+    ],
+    "strictness": "strict"
+  }
+}

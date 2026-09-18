@@ -47,6 +47,12 @@ Because agents read instructions and then forget them halfway through a long ses
 # Zero-install: run directly with npx
 npx oh-my-harness init "TypeScript Next.js frontend with Python FastAPI backend"
 
+# No AI provider? Deterministic presets need nothing but the repo:
+npx oh-my-harness init --preset strict     # minimal | safe | strict
+
+# With a TypeSafe key, Jev tunes the preset to your description in one ~500 ms, sub-cent call:
+TYPESAFE_API_KEY=... npx oh-my-harness init "TypeScript API, TDD enforced, no auto PRs"
+
 # Or install globally
 npm install -g oh-my-harness
 oh-my-harness init "React app with TDD"
@@ -147,7 +153,8 @@ Hand omh a `WORKPLAN.md` and it runs one work order per fresh agent session, in 
 
 ```bash
 # 🚀 Initialize
-omh init "your project description"      # NL-powered (requires AI provider)
+omh init "your project description"      # Jev with TYPESAFE_API_KEY, else an LLM provider, else the "safe" preset
+omh init --preset strict                  # No provider: minimal | safe | strict
 omh init                                  # Interactive TUI (import existing harness.yaml)
 
 # 📋 Catalog

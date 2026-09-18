@@ -2,8 +2,12 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import yaml from "js-yaml";
 import { generate } from "../../core/generator.js";
-import { generateHarnessConfig } from "../../nl/parse-intent.js";
+import { generateHarnessConfig, providerConfigFromEnv } from "../../nl/parse-intent.js";
 import type { ClaudeRunner } from "../../nl/parse-intent.js";
+import { hasProviderConfig } from "../../nl/config-store.js";
+import { buildPresetHarness, isPresetName, PRESET_NAMES, type PresetName } from "../../core/presets.js";
+import { chooseWithJev, harnessFromChoices, resolveTypesafeApiKey, TYPESAFE_MODEL } from "../../nl/typesafe-chooser.js";
+import type { HarnessConfig } from "../../core/harness-schema.js";
 import { detectProject } from "../../detector/project-detector.js";
 import type { ProjectFacts } from "../../detector/project-detector.js";
 import { harnessToMergedConfigV2 } from "../../core/harness-converter-v2.js";
@@ -15,6 +19,8 @@ export interface InitOptions {
   projectDir?: string;
   nlRunner?: ClaudeRunner;
   description?: string;
+  /** Deterministic preset (#116): minimal | safe | strict. No provider, no network. */
+  preset?: string;
 }
 
 export interface HarnessState {
@@ -53,7 +59,7 @@ export async function initCommand(
     options = { ...options, description: inlineDescription };
   }
 
-  if (options.nlRunner || options.yes) {
+  if (options.nlRunner || options.yes || options.preset) {
     await initWithNL(projectDir, options);
     return;
   }
@@ -68,25 +74,29 @@ export async function initWithNL(
   projectDir: string,
   options: InitOptions,
 ): Promise<void> {
-  let description: string;
+  if (options.preset !== undefined && !isPresetName(options.preset)) {
+    throw new Error(`Unknown preset "${options.preset}". Valid presets: ${PRESET_NAMES.join(", ")}`);
+  }
+  const preset = options.preset as PresetName | undefined;
 
-  if (options.yes && (options.description || options.nlRunner)) {
-    description = options.description ?? "generate config";
-  } else if (!options.yes) {
-    const { input } = await import("@inquirer/prompts");
-    description = await input({
-      message: "Describe your project (e.g., 'Next.js e-commerce app with Stripe'):",
-    });
-    if (!description.trim()) {
+  let description = options.description?.trim() ?? "";
+  if (!description && options.nlRunner) description = "generate config";
+  if (!description && !preset) {
+    if (options.yes) {
       console.log("No description provided.");
       return;
     }
-  } else {
-    console.log("No description provided.");
-    return;
+    const { input } = await import("@inquirer/prompts");
+    description = (await input({
+      message: "Describe your project (e.g., 'Next.js e-commerce app with Stripe'):",
+    })).trim();
+    if (!description) {
+      console.log("No description provided.");
+      return;
+    }
   }
 
-  console.log(`Generating harness config for: "${description}"`);
+  if (description) console.log(`Generating harness config for: "${description}"`);
 
   let facts: ProjectFacts | undefined;
   try {
@@ -105,7 +115,44 @@ export async function initWithNL(
     params: b.params.map((p) => ({ name: p.name, type: p.type, description: p.description, required: p.required, default: p.default })),
   }));
 
-  const harness = await generateHarnessConfig(description, options.nlRunner, catalogBlocks, facts);
+  // Which generator? --preset always wins and stays offline and deterministic;
+  // then an injected LLM runner (tests); then Jev when a TYPESAFE_API_KEY is
+  // around and there is a description to judge; then a configured LLM
+  // provider; and with none of those, the "safe" preset with a hint instead
+  // of a provider-setup error (#116, #129).
+  const typesafeKey = resolveTypesafeApiKey(projectDir);
+  const registryBlocks = registry.list();
+  let harness: HarnessConfig;
+  if (preset) {
+    harness = buildPresetHarness(preset, facts, { description: description || undefined });
+    console.log(`preset: ${preset}`);
+  } else if (options.nlRunner) {
+    harness = await generateHarnessConfig(description, options.nlRunner, catalogBlocks, facts);
+  } else if (typesafeKey && description) {
+    try {
+      const result = await chooseWithJev({ description, facts, blocks: registryBlocks }, { apiKey: typesafeKey });
+      const applied = harnessFromChoices(result, facts, { description });
+      const on = [...result.blocks].filter(([, v]) => v === "on").map(([k]) => k);
+      const off = [...result.blocks].filter(([, v]) => v === "off").map(([k]) => k);
+      const undecided = [...result.blocks].filter(([, v]) => v === "undecided").map(([k]) => k);
+      console.log(`Jev (${TYPESAFE_MODEL}) chose: strictness=${result.strictness}, ${result.usage?.input_tokens ?? "?"} input tokens`);
+      console.log(`  enabled:   ${on.join(", ") || "none"}`);
+      console.log(`  disabled:  ${off.join(", ") || "none"}`);
+      if (undecided.length) console.log(`  undecided: ${undecided.join(", ")} (kept as the preset has them)`);
+      for (const s of applied.skipped) console.log(`  skipped:   ${s.reason}`);
+      const { skipped: _skipped, ...rest } = applied;
+      harness = rest;
+    } catch (err) {
+      console.log(`TypeSafe chooser unavailable (${(err as Error).message}); using the "safe" preset instead.`);
+      harness = buildPresetHarness("safe", facts, { description });
+    }
+  } else if ((await hasProviderConfig()) || providerConfigFromEnv()) {
+    harness = await generateHarnessConfig(description, options.nlRunner, catalogBlocks, facts);
+  } else {
+    harness = buildPresetHarness("safe", facts, { description });
+    console.log('No AI provider and no TYPESAFE_API_KEY found; using the "safe" preset.');
+    console.log(`  Pick one explicitly with --preset ${PRESET_NAMES.join("|")}, set TYPESAFE_API_KEY to let Jev tune it, or run \`omh config\` for an LLM provider.`);
+  }
 
   const stackNames = harness.project.stacks.map((s) => `${s.name} (${s.framework})`).join(", ");
   console.log(`\nStacks: ${stackNames}`);

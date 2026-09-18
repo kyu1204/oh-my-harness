@@ -4,6 +4,7 @@ import { parse } from "smol-toml";
 import { OMH_HOOKS_DIR } from "../../utils/paths.js";
 import { computeDrift, HarnessNotFoundError } from "../../core/drift.js";
 import { loadProviderConfig } from "../../nl/config-store.js";
+import { resolveTypesafeApiKey } from "../../nl/typesafe-chooser.js";
 
 export interface DoctorOptions {
   projectDir?: string;
@@ -196,7 +197,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<Doctor
   // 9. AI provider config (~/.omh/config.json). Global and optional, so this is
   // purely informational (INFO) and never affects health — it just surfaces
   // `omh config` so users can rotate an expired key or switch provider/model.
-  const providerConfigured = await checkProviderConfig(messages);
+  const providerConfigured = await checkProviderConfig(messages, projectDir);
 
   const checksHealthy = Object.values(checks).every(Boolean);
   const healthy = checksHealthy && (!options.strict || inSync !== false);
@@ -221,7 +222,10 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<Doctor
  * Inspects the global AI provider config and appends an INFO hint to `messages`.
  * Returns whether a provider is configured. Never reads or echoes the API key.
  */
-async function checkProviderConfig(messages: string[]): Promise<boolean> {
+async function checkProviderConfig(messages: string[], projectDir: string): Promise<boolean> {
+  if (resolveTypesafeApiKey(projectDir)) {
+    messages.push("INFO: Chooser: TypeSafe Jev (TYPESAFE_API_KEY found) — `omh init \"...\"` picks catalog blocks with it; no LLM provider needed.");
+  }
   const config = await loadProviderConfig();
 
   if (!config) {

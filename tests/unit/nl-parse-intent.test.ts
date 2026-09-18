@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { buildPresetSelectionPrompt, buildHarnessGenerationPrompt } from "../../src/nl/prompt-templates.js";
-import { parseNaturalLanguage, generateHarnessConfig } from "../../src/nl/parse-intent.js";
+import { parseNaturalLanguage, generateHarnessConfig, providerConfigFromEnv } from "../../src/nl/parse-intent.js";
 import type { ClaudeRunner } from "../../src/nl/parse-intent.js";
 import yaml from "js-yaml";
 
@@ -437,5 +437,19 @@ describe("LLMRunner type compatibility", () => {
     const runner: ClaudeRunner = async (prompt: string) => `echo ${prompt}`;
     // Should be usable wherever LLMRunner is expected
     expect(typeof runner).toBe("function");
+  });
+});
+
+describe("providerConfigFromEnv", () => {
+  it("returns undefined with no provider keys and the first matching provider otherwise", () => {
+    const saved: Record<string, string | undefined> = {};
+    for (const k of ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY"]) { saved[k] = process.env[k]; delete process.env[k]; }
+    try {
+      expect(providerConfigFromEnv()).toBeUndefined();
+      process.env.OPENAI_API_KEY = "sk-x";
+      expect(providerConfigFromEnv()).toMatchObject({ provider: "openai", method: "api", apiKey: "sk-x" });
+    } finally {
+      for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    }
   });
 });

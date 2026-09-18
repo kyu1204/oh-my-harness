@@ -58,6 +58,17 @@ describe("routeAnswers (confidence routing)", () => {
     expect(r.strictness).toBe("strict");
   });
 
+  it("ignores answers for unknown block ids and malformed noul values (review)", () => {
+    const r = routeAnswers({
+      "block:harness-guard": { type: "noul", noul: 0.01 },      // always-on, never selectable
+      "block:made-up-block": { type: "noul", noul: 0.99 },
+      "block:tdd-guard": { type: "noul", noul: Number.NaN },
+      "block:sql-guard": { type: "noul", noul: 7 },
+      "block:auto-pr": { type: "noul", noul: 0.2 },
+    });
+    expect([...r.blocks.keys()]).toEqual(["auto-pr"]);
+  });
+
   it("falls back to 'safe' when the strictness choice is missing or low-confidence", () => {
     expect(routeAnswers({}).strictness).toBe("safe");
     expect(routeAnswers({ strictness: { type: "choice", choice: "minimal", confidence: 0.3, probabilities: {} } }).strictness).toBe("safe");

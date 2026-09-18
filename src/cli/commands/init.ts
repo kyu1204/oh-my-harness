@@ -115,14 +115,15 @@ export async function initWithNL(
     params: b.params.map((p) => ({ name: p.name, type: p.type, description: p.description, required: p.required, default: p.default })),
   }));
 
-  // Which generator? --preset always wins; then an injected LLM runner (tests);
-  // then Jev when a TYPESAFE_API_KEY is around and there is a description to
-  // judge; then a configured LLM provider; and with none of those, the "safe"
-  // preset with a hint instead of a provider-setup error (#116, #129).
+  // Which generator? --preset always wins and stays offline and deterministic;
+  // then an injected LLM runner (tests); then Jev when a TYPESAFE_API_KEY is
+  // around and there is a description to judge; then a configured LLM
+  // provider; and with none of those, the "safe" preset with a hint instead
+  // of a provider-setup error (#116, #129).
   const typesafeKey = resolveTypesafeApiKey(projectDir);
   const registryBlocks = registry.list();
   let harness: HarnessConfig;
-  if (preset && !(typesafeKey && description)) {
+  if (preset) {
     harness = buildPresetHarness(preset, facts, { description: description || undefined });
     console.log(`preset: ${preset}`);
   } else if (options.nlRunner) {
@@ -130,11 +131,11 @@ export async function initWithNL(
   } else if (typesafeKey && description) {
     try {
       const result = await chooseWithJev({ description, facts, blocks: registryBlocks }, { apiKey: typesafeKey });
-      const applied = harnessFromChoices(result, facts, { description }, preset);
+      const applied = harnessFromChoices(result, facts, { description });
       const on = [...result.blocks].filter(([, v]) => v === "on").map(([k]) => k);
       const off = [...result.blocks].filter(([, v]) => v === "off").map(([k]) => k);
       const undecided = [...result.blocks].filter(([, v]) => v === "undecided").map(([k]) => k);
-      console.log(`Jev (${TYPESAFE_MODEL}) chose: strictness=${preset ?? result.strictness}${preset ? " (from --preset)" : ""}, ${result.usage?.input_tokens ?? "?"} input tokens`);
+      console.log(`Jev (${TYPESAFE_MODEL}) chose: strictness=${result.strictness}, ${result.usage?.input_tokens ?? "?"} input tokens`);
       console.log(`  enabled:   ${on.join(", ") || "none"}`);
       console.log(`  disabled:  ${off.join(", ") || "none"}`);
       if (undecided.length) console.log(`  undecided: ${undecided.join(", ")} (kept as the preset has them)`);
@@ -142,9 +143,8 @@ export async function initWithNL(
       const { skipped: _skipped, ...rest } = applied;
       harness = rest;
     } catch (err) {
-      const fallback = preset ?? "safe";
-      console.log(`TypeSafe chooser unavailable (${(err as Error).message}); using the "${fallback}" preset instead.`);
-      harness = buildPresetHarness(fallback, facts, { description });
+      console.log(`TypeSafe chooser unavailable (${(err as Error).message}); using the "safe" preset instead.`);
+      harness = buildPresetHarness("safe", facts, { description });
     }
   } else if ((await hasProviderConfig()) || providerConfigFromEnv()) {
     harness = await generateHarnessConfig(description, options.nlRunner, catalogBlocks, facts);

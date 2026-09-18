@@ -153,7 +153,7 @@ Hand omh a `WORKPLAN.md` and it runs one work order per fresh agent session, in 
 
 ```bash
 # 🚀 Initialize
-omh init "your project description"      # NL-powered (Jev with TYPESAFE_API_KEY, else an LLM provider)
+omh init "your project description"      # Jev with TYPESAFE_API_KEY, else an LLM provider, else the "safe" preset
 omh init --preset strict                  # No provider: minimal | safe | strict
 omh init                                  # Interactive TUI (import existing harness.yaml)
 

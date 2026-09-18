@@ -95,6 +95,7 @@ export async function configCommand(options: ConfigOptions = {}): Promise<Config
       return { exitCode: 0 };
     }
     printSummary(existing);
+    printChooserLine();
     return { exitCode: 0 };
   }
 
@@ -120,6 +121,7 @@ export async function configCommand(options: ConfigOptions = {}): Promise<Config
   // `omh config` is a safe read; `--yes` skips the prompt.
   if (existing) {
     printSummary(existing);
+    printChooserLine();
     console.log("");
     if (!options.yes) {
       const confirm = options.confirm ?? defaultConfirm;

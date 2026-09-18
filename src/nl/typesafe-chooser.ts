@@ -88,6 +88,10 @@ export function routeAnswers(answers: Record<string, Answer>): Pick<ChooserResul
     if (!key.startsWith("block:") || a.type !== "noul") continue;
     const p = (a as NoulAnswer).noul;
     const id = key.slice("block:".length);
+    // Only ids we asked about, only well-formed probabilities: the response is
+    // external input and must not be able to enable an arbitrary block.
+    if (!(SELECTABLE_BLOCKS as readonly string[]).includes(id)) continue;
+    if (typeof p !== "number" || !Number.isFinite(p) || p < 0 || p > 1) continue;
     probabilities[id] = p;
     blocks.set(id, p >= THRESHOLDS.on ? "on" : p <= THRESHOLDS.off ? "off" : "undecided");
   }
@@ -152,9 +156,8 @@ export function harnessFromChoices(
   result: Pick<ChooserResult, "strictness" | "blocks">,
   facts: ProjectFacts | undefined,
   meta: { description?: string },
-  presetOverride?: PresetName,
 ): AppliedHarness {
-  const base = buildPresetHarness(presetOverride ?? result.strictness, facts, meta);
+  const base = buildPresetHarness(result.strictness, facts, meta);
   return applyChoices(base, result, facts);
 }
 

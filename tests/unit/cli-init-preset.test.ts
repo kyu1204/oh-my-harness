@@ -10,20 +10,23 @@ import { initCommand } from "../../src/cli/commands/init.js";
 
 let dir: string;
 let logs: string[];
+const ENV_KEYS = ["TYPESAFE_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY", "HOME"];
+let savedEnv: Record<string, string | undefined>;
 
 beforeEach(async () => {
+  savedEnv = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
   dir = await mkdtemp(join(tmpdir(), "omh-init-preset-"));
   await writeFile(join(dir, "package.json"), JSON.stringify({ name: "acme", scripts: { test: "vitest run", lint: "eslint ." }, devDependencies: { vitest: "^3", typescript: "^5" } }));
   await writeFile(join(dir, "tsconfig.json"), "{}");
   logs = [];
   vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => { logs.push(a.join(" ")); });
-  delete process.env.TYPESAFE_API_KEY;
-  for (const k of ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY"]) delete process.env[k];
+  for (const k of ENV_KEYS) if (k !== "HOME") delete process.env[k];
 });
 
 afterEach(async () => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  for (const [k, v] of Object.entries(savedEnv)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   await rm(dir, { recursive: true, force: true });
 });
 
@@ -51,6 +54,17 @@ describe("omh init --preset", () => {
     expect(ids).toContain("command-guard");
   });
 
+  it("--preset stays deterministic and offline even when TYPESAFE_API_KEY and a description are present (review)", async () => {
+    process.env.TYPESAFE_API_KEY = "test-key";
+    const fetchMock = vi.fn(async () => { throw new Error("network must not be used with --preset"); });
+    vi.stubGlobal("fetch", fetchMock);
+    await initCommand(["TypeScript API, TDD enforced"], { preset: "minimal", yes: true, projectDir: dir });
+    expect(fetchMock).not.toHaveBeenCalled();
+    const ids = (await harness()).hooks.map((x) => x.block);
+    expect(ids).not.toContain("tdd-guard");
+    expect(logs.join("\n")).toMatch(/preset: minimal/);
+  });
+
   it("rejects an unknown preset name with the valid list", async () => {
     await expect(initCommand([], { preset: "yolo", yes: true, projectDir: dir })).rejects.toThrow(/minimal, safe, strict/);
   });
@@ -72,16 +86,11 @@ describe("omh init --preset", () => {
   });
 
   it("with a description but neither a provider nor a key, points at --preset instead of failing on the provider", async () => {
-    // HOME is redirected so no real ~/.omh/config.json can leak in
-    const home = process.env.HOME;
+    // HOME is redirected so no real ~/.omh/config.json can leak in (restored in afterEach)
     process.env.HOME = dir;
-    try {
-      await initCommand(["TypeScript API"], { yes: true, projectDir: dir });
-      const ids = (await harness()).hooks.map((x) => x.block);
-      expect(ids).toContain("commit-test-gate");   // fell back to the 'safe' preset
-      expect(logs.join("\n")).toMatch(/--preset/);
-    } finally {
-      process.env.HOME = home;
-    }
+    await initCommand(["TypeScript API"], { yes: true, projectDir: dir });
+    const ids = (await harness()).hooks.map((x) => x.block);
+    expect(ids).toContain("commit-test-gate");   // fell back to the 'safe' preset
+    expect(logs.join("\n")).toMatch(/--preset/);
   });
 });

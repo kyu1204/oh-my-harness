@@ -8,7 +8,7 @@ import { checkHarnessCommands } from "../command-checker.js";
 import type { TestResult } from "../harness-tester.js";
 import type { CommandCheckResult } from "../command-checker.js";
 import { HarnessConfigSchema } from "../../core/harness-schema.js";
-import { mergeEnforcementAndHooks } from "../../core/harness-converter-v2.js";
+import { effectiveHookEntries } from "../../core/harness-converter-v2.js";
 import { builtinBlocks } from "../../catalog/blocks/index.js";
 import type { HookEntry } from "../../catalog/types.js";
 
@@ -54,7 +54,7 @@ export async function testCommand(options: TestCommandOptions = {}): Promise<{
     const result = HarnessConfigSchema.safeParse(parsed);
     if (result.success) {
       // Merge enforcement-derived hooks with explicit hooks
-      hookEntries = mergeEnforcementAndHooks(result.data);
+      hookEntries = effectiveHookEntries(result.data, { has: (id) => builtinBlocks.some((b) => b.id === id) });
     } else {
       console.log(chalk.yellow(`Warning: harness.yaml schema validation failed: ${result.error.message}`));
     }
@@ -101,8 +101,21 @@ export async function testCommand(options: TestCommandOptions = {}): Promise<{
     // git 없으면 undefined
   }
 
-  // Generate test cases from block-based hooks only
-  const testCases = generateBlockTestCases(hookEntries, builtinBlocks, currentBranch);
+  // Generate test cases from block-based hooks only. A case whose hook script
+  // is not on disk (harness.yaml ahead of `omh sync`) is reported as skipped
+  // rather than failed, so the dry run stays about hook behaviour.
+  const allCases = generateBlockTestCases(hookEntries, builtinBlocks, currentBranch, hooks);
+  const testCases: typeof allCases = [];
+  const missingScripts = new Set<string>();
+  for (const tc of allCases) {
+    try {
+      await fs.access(path.isAbsolute(tc.hookScript) ? tc.hookScript : path.join(projectDir, tc.hookScript));
+      testCases.push(tc);
+    } catch {
+      missingScripts.add(tc.hookScript);
+    }
+  }
+  for (const s of missingScripts) console.log(chalk.dim(`  skipped: ${s} not found (run \`omh sync\`)`));
   const results: TestResult[] = [];
 
   // 카테고리별 그룹핑

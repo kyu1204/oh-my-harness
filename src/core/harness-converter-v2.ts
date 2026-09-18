@@ -61,6 +61,49 @@ function convertEnforcementToHooks(enforcement: HarnessConfig["enforcement"]): H
   return hooks;
 }
 
+// A harness that enforces anything also guards itself: without this an agent
+// could delete or rewrite the hooks through Bash (#113), skip git hooks or
+// force-push main (#98, #99, #114). An explicit entry keeps its mode/params;
+// custom registries without the block are skipped.
+export const ALWAYS_ON_GUARDS = ["harness-guard", "no-verify-guard", "force-push-guard"] as const;
+
+function addAlwaysOnGuards(entries: HookEntry[], registry: { has(id: string): boolean }): void {
+  if (entries.length === 0) return;
+  for (const id of ALWAYS_ON_GUARDS) {
+    if (registry.has(id) && !entries.some((h) => h.block === id)) {
+      entries.push({ block: id, params: {}, mode: "block" });
+    }
+  }
+}
+
+// The loop engine brings its guard along. An explicit loop-guard entry may
+// choose its mode, but the paths it protects always come from the loop
+// config — otherwise an empty explicit entry would silently unguard the
+// real work-order directory.
+function addLoopGuard(entries: HookEntry[], harness: HarnessConfig): void {
+  if (!harness.loop?.enabled) return;
+  const loopParams = { workOrders: harness.loop.workOrders, architectOnly: harness.loop.architectOnly };
+  const explicit = entries.find((h) => h.block === "loop-guard");
+  if (explicit) {
+    explicit.params = { ...explicit.params, ...loopParams };
+  } else {
+    entries.push({ block: "loop-guard", params: loopParams, mode: "block" });
+  }
+}
+
+/**
+ * The hook entries a harness really runs: enforcement-derived + explicit +
+ * loop-guard (when the loop is on) + the always-on guards, in the order the
+ * generator emits them. `omh test` and `omh stats` use this so they see the
+ * same set (QA: they used to miss the always-on guards).
+ */
+export function effectiveHookEntries(harness: HarnessConfig, registry: { has(id: string): boolean }): HookEntry[] {
+  const entries = mergeEnforcementAndHooks(harness);
+  addLoopGuard(entries, harness);
+  addAlwaysOnGuards(entries, registry);
+  return entries;
+}
+
 export function mergeEnforcementAndHooks(harness: HarnessConfig): HookEntry[] {
   const enforcementHooks = convertEnforcementToHooks(harness.enforcement);
   const explicitHooks = harness.hooks ?? [];
@@ -89,19 +132,7 @@ export async function harnessToMergedConfigV2(
   // Merge enforcement-derived hooks with explicit hooks (dedup by block id)
   const allHookEntries = mergeEnforcementAndHooks(harness);
 
-  // The loop engine brings its guard along. An explicit loop-guard entry may
-  // choose its mode, but the paths it protects always come from the loop
-  // config — otherwise an empty explicit entry would silently unguard the
-  // real work-order directory.
-  if (harness.loop?.enabled) {
-    const loopParams = { workOrders: harness.loop.workOrders, architectOnly: harness.loop.architectOnly };
-    const explicit = allHookEntries.find((h) => h.block === "loop-guard");
-    if (explicit) {
-      explicit.params = { ...explicit.params, ...loopParams };
-    } else {
-      allHookEntries.push({ block: "loop-guard", params: loopParams, mode: "block" });
-    }
-  }
+  addLoopGuard(allHookEntries, harness);
 
   // If no hook entries at all, return base config unchanged
   if (allHookEntries.length === 0) {
@@ -111,18 +142,7 @@ export async function harnessToMergedConfigV2(
   // Resolve registry — use provided one or create the default
   const resolvedRegistry = registry ?? (await createDefaultRegistry());
 
-  // A harness that enforces anything also guards itself: without this an
-  // agent could delete or rewrite the hooks through Bash (#113). An explicit
-  // entry may change its mode or add paths. Skipped for custom registries
-  // that do not ship the block.
-  // Same rule for the git-safety pair (#114): a harness that enforces anything
-  // gets no-verify-guard and force-push-guard on every runtime, instead of the
-  // Claude-only permissions.deny list the NL prompt sometimes emitted.
-  for (const id of ["harness-guard", "no-verify-guard", "force-push-guard"]) {
-    if (resolvedRegistry.has(id) && !allHookEntries.some((h) => h.block === id)) {
-      allHookEntries.push({ block: id, params: {}, mode: "block" });
-    }
-  }
+  addAlwaysOnGuards(allHookEntries, resolvedRegistry);
 
   const catalogResult = await convertHookEntries(allHookEntries, resolvedRegistry, projectDir ?? ".");
 

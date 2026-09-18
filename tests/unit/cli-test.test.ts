@@ -226,3 +226,35 @@ describe("formatCategoryName - additional categories", () => {
     expect(formatCategoryName("path-guard")).toBe("File guards");
   });
 });
+
+describe("testCommand covers the always-on guards (QA)", () => {
+  it("generates and runs cases for harness-guard, no-verify-guard and force-push-guard from a harness.yaml that does not list them", async () => {
+    const { renderTemplate } = await import("../../src/catalog/template-engine.js");
+    const { wrapWithLogger } = await import("../../src/generators/hooks.js");
+    const { builtinBlocks } = await import("../../src/catalog/blocks/index.js");
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omh-test-always-on-"));
+    try {
+      const hooksDir = path.join(dir, ".omh", "hooks");
+      await fs.mkdir(hooksDir, { recursive: true });
+      await fs.mkdir(path.join(dir, ".claude"), { recursive: true });
+      const ids = ["harness-guard", "no-verify-guard", "force-push-guard"];
+      const registered = [];
+      for (const id of ids) {
+        const block = builtinBlocks.find((b) => b.id === id)!;
+        const params = Object.fromEntries(block.params.map((pp) => [pp.name, pp.default]));
+        // one of them under a custom file name: omh test must follow the registered path (review)
+        const file = id === "no-verify-guard" ? `custom-${id}.sh` : `catalog-${id}.sh`;
+        await fs.writeFile(path.join(hooksDir, file), wrapWithLogger(renderTemplate(block.template, params), "PreToolUse", dir), { mode: 0o755 });
+        registered.push({ matcher: "Bash", hooks: [{ type: "command", command: `bash .omh/hooks/${file}` }] });
+      }
+      await fs.writeFile(path.join(dir, ".claude", "settings.json"), JSON.stringify({ hooks: { PreToolUse: registered } }));
+      await fs.writeFile(path.join(dir, "harness.yaml"), "version: '1.0'\nhooks:\n  - block: path-guard\n    params:\n      blockedPaths: [dist/]\n");
+      const result = await testCommand({ projectDir: dir });
+      const categories = new Set(result.results.map((r) => r.testCase.category));
+      for (const id of ids) expect(categories, id).toContain(id);
+      expect(result.results.filter((r) => ids.includes(r.testCase.category)).every((r) => r.passed)).toBe(true);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+});

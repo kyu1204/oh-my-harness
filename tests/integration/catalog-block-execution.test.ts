@@ -232,6 +232,10 @@ EOF
 
     for (const command of [
       "sed -i 's/block/allow/' .omh/hooks/catalog-tdd-guard.sh",
+      "sed -ni 's/block/allow/p' .omh/hooks/catalog-tdd-guard.sh",
+      "sed --in-place=.bak 's/a/b/' .codex/config.toml",
+      "sed --in-p 's/a/b/' .omh/hooks/catalog-tdd-guard.sh",      // GNU long-option abbreviation (review)
+      "sed --i 's/a/b/' .claude/settings.json",
       "rm -rf .omh",
       "rm .omh/state/tdd-edits.json",
       "chmod -x ./.omh/hooks/catalog-command-guard.sh",
@@ -266,6 +270,9 @@ EOF
 
     for (const command of [
       "cat .omh/hooks/catalog-tdd-guard.sh",
+      "sed -n '/BLOCKED/,/^}/p' .omh/hooks/catalog-tdd-guard.sh",   // read-only sed (QA)
+      "sed 's/a/b/' .claude/settings.json",
+      "sed -e 's/a/b/' -- .omh/hooks/catalog-tdd-guard.sh",       // operands after -- are not options
       "grep -n block .claude/settings.json",
       "ls -la .omh/hooks",
       "diff .codex/hooks.json /tmp/other.json",

@@ -5,7 +5,7 @@ import type { BuildingBlock } from "../types.js";
 // commands that would rewrite, delete or neuter them: file tools with a
 // protected path as an argument, output redirections into a protected path,
 // and git checkout/restore/clean/rm/mv on one. Read-only commands (cat, grep,
-// ls, diff) stay allowed so the agent can inspect its own rules, and `omh` is
+// ls, diff, sed without -i) stay allowed so the agent can inspect its own rules, and `omh` is
 // never a writer here, so `omh sync` / `omh hook add` remain the sanctioned
 // way to change the harness.
 // ponytail: harness.yaml itself is deliberately not protected (it is the
@@ -40,7 +40,7 @@ COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 [[ -z "$COMMAND" ]] && exit 0
 
 PROTECTED=(".omh" ".claude/settings.json" ".codex/hooks.json" ".codex/config.toml" ".pi/extensions/omh-harness.ts" {{#each extraPaths}}"{{{this}}}" {{/each}})
-WRITERS="rm mv cp sed tee chmod chown chgrp truncate dd ln touch install rsync shred unlink perl"
+WRITERS="rm mv cp tee chmod chown chgrp truncate dd ln touch install rsync shred unlink perl"
 GIT_WRITERS="checkout restore clean rm mv"
 
 HIT=$(_omh_simple_commands "$COMMAND" | awk -F '\\t' \\
@@ -72,6 +72,13 @@ HIT=$(_omh_simple_commands "$COMMAND" | awk -F '\\t' \\
     a0 = $i
     write = 0
     if (isw[a0]) write = 1
+    else if (a0 == "sed") {   # sed only writes in place: -i, any -i cluster, --in-place or a GNU abbreviation of it (--i, --in-p ...)
+      for (k = i + 1; k <= NF; k++) {
+        if ($k == "--") break
+        if ($k ~ /^-[A-Za-z]*i/) { write = 1; break }
+        if ($k ~ /^--i/) { o = $k; sub(/=.*/, "", o); if (index("--in-place", o) == 1) { write = 1; break } }
+      }
+    }
     else if (a0 == "git") {
       j = i + 1; while (j <= NF && $j ~ /^-/) { if ($j == "-c" || $j == "-C") j++; j++ }
       if (j <= NF && isg[$j]) write = 1

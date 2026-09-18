@@ -9,7 +9,9 @@ import { checkReferencedTools } from "../tool-checker.js";
 import type { ToolCheck } from "../tool-checker.js";
 import { writeHarnessState } from "../commands/init.js";
 import { generate } from "../../core/generator.js";
-import { generateHarnessConfig, createDefaultRunner } from "../../nl/parse-intent.js";
+import { generateHarnessConfig, createDefaultRunner, providerConfigFromEnv } from "../../nl/parse-intent.js";
+import { buildPresetHarness, PRESET_NAMES, type PresetName } from "../../core/presets.js";
+import { chooseWithJev, harnessFromChoices, resolveTypesafeApiKey, TYPESAFE_MODEL } from "../../nl/typesafe-chooser.js";
 import { hasProviderConfig } from "../../nl/config-store.js";
 import { runProviderSetup } from "./provider-setup.js";
 import { mergeEnforcementAndHooks } from "../../core/harness-converter-v2.js";
@@ -18,6 +20,22 @@ import { HarnessConfigSchema } from "../../core/harness-schema.js";
 import { detectProject } from "../../detector/project-detector.js";
 import { hasStarPromptBeenShown, markStarPromptShown, starRepo } from "../github-star.js";
 import type { ProjectFacts } from "../../detector/types.js";
+
+export type ModeValue = "nl" | "preset" | "import";
+
+/** Mode menu for the TUI; the AI entry says what will actually run (QA). */
+export function buildModeOptions(ctx: { claudeInstalled: boolean; providerConfigured: boolean; jevKey: boolean }): Array<{ value: ModeValue; label: string; hint?: string }> {
+  const nl = ctx.jevKey
+    ? { value: "nl" as const, label: "Describe your project (Jev picks the blocks, no LLM)" }
+    : ctx.providerConfigured || ctx.claudeInstalled
+      ? { value: "nl" as const, label: "Describe your project (AI-powered)" }
+      : { value: "nl" as const, label: "Describe your project (AI-powered)", hint: "needs an AI provider or TYPESAFE_API_KEY" };
+  return [
+    nl,
+    { value: "preset", label: "Use a preset (no AI): minimal | safe | strict" },
+    { value: "import", label: "Import existing harness.yaml" },
+  ];
+}
 
 export function formatDepResults(deps: DepCheck[]): string {
   if (deps.length === 0) return "";
@@ -141,30 +159,33 @@ export async function runInitTUI(options?: { projectDir?: string }): Promise<voi
   if (projectFacts) p.note(formatProjectFacts(projectFacts), "Detected Project");
 
   // Mode Selection
-  type ModeValue = "nl" | "import";
-  const modeOptions: Array<{ value: ModeValue; label: string; hint?: string }> = [
-    claudeInstalled
-      ? { value: "nl", label: "Describe your project (AI-powered)" }
-      : { value: "nl", label: "Describe your project (AI-powered)", hint: "requires claude CLI" },
-    { value: "import", label: "Import existing harness.yaml" },
-  ];
+  const jevKey = resolveTypesafeApiKey(projectDir);
+  const providerConfigured = (await hasProviderConfig()) || Boolean(providerConfigFromEnv());
+  const modeOptions = buildModeOptions({ claudeInstalled, providerConfigured, jevKey: Boolean(jevKey) });
 
   const mode = await p.select({ message: "How would you like to configure your harness?", options: modeOptions });
   handleCancel(mode);
 
-  if (mode === "nl" && !claudeInstalled) {
-    p.log.error("claude CLI is required for AI-powered mode. Install it with:");
-    p.log.info("  npm install -g @anthropic-ai/claude-code");
-    p.cancel("Cannot proceed without claude CLI.");
-    process.exit(1);
-  }
-
   let harnessConfig: HarnessConfig | undefined;
 
-  if (mode === "nl") {
-    const hasConfig = await hasProviderConfig();
-    if (!hasConfig) {
-      p.log.info("No AI provider configured yet. Let's set one up.");
+  if (mode === "preset") {
+    const preset = await p.select({
+      message: "Which preset?",
+      options: [
+        { value: "safe" as PresetName, label: "safe", hint: "commit gates, lockfile/secret guards, lint on save" },
+        { value: "strict" as PresetName, label: "strict", hint: "safe + test-first (TDD) on every source edit" },
+        { value: "minimal" as PresetName, label: "minimal", hint: "dangerous commands, main branch, build output only" },
+      ],
+    });
+    handleCancel(preset);
+    harnessConfig = buildPresetHarness(preset as PresetName, projectFacts);
+    p.note(formatConfigSummary(harnessConfig), `Preset: ${preset as string}`);
+    const confirmed = await p.confirm({ message: "Proceed with this configuration?", initialValue: true });
+    handleCancel(confirmed);
+    if (!confirmed) { p.cancel("Aborted."); process.exit(0); }
+  } else if (mode === "nl") {
+    if (!jevKey && !providerConfigured && !claudeInstalled) {
+      p.log.info("No AI provider configured yet. Let's set one up (or pick a preset instead).");
       const providerConfig = await runProviderSetup();
       if (!providerConfig) {
         p.cancel("Provider setup cancelled.");
@@ -172,7 +193,6 @@ export async function runInitTUI(options?: { projectDir?: string }): Promise<voi
       }
     }
 
-    const runner = await createDefaultRunner();
     const description = await p.text({
       message: "Describe your project:",
       placeholder: "e.g., Next.js e-commerce app with Stripe and Tailwind",
@@ -181,20 +201,31 @@ export async function runInitTUI(options?: { projectDir?: string }): Promise<voi
     handleCancel(description);
 
     const genSpinner = p.spinner();
-    genSpinner.start("Generating harness configuration...");
+    genSpinner.start(jevKey ? `Asking Jev (${TYPESAFE_MODEL}) which blocks fit...` : "Generating harness configuration...");
     try {
       const { createDefaultRegistry } = await import("../../catalog/registry.js");
       const catalogRegistry = await createDefaultRegistry();
-      const catalogBlocks = catalogRegistry.list().map((b) => ({
-        id: b.id,
-        description: b.description,
-        params: b.params.map((pp) => ({ name: pp.name, required: pp.required, default: pp.default, description: pp.description })),
-      }));
-      harnessConfig = await generateHarnessConfig(description as string, runner, catalogBlocks, projectFacts);
-      genSpinner.stop("Configuration generated");
+      if (jevKey) {
+        const result = await chooseWithJev({ description: description as string, facts: projectFacts, blocks: catalogRegistry.list() }, { apiKey: jevKey });
+        const applied = harnessFromChoices(result, projectFacts, { description: description as string });
+        const { skipped, ...rest } = applied;
+        harnessConfig = rest;
+        genSpinner.stop(`Jev chose strictness=${result.strictness} (${result.usage?.input_tokens ?? "?"} input tokens)`);
+        for (const s of skipped) p.log.warn(`skipped: ${s.reason}`);
+      } else {
+        const runner = await createDefaultRunner();
+        const catalogBlocks = catalogRegistry.list().map((b) => ({
+          id: b.id,
+          description: b.description,
+          params: b.params.map((pp) => ({ name: pp.name, required: pp.required, default: pp.default, description: pp.description })),
+        }));
+        harnessConfig = await generateHarnessConfig(description as string, runner, catalogBlocks, projectFacts);
+        genSpinner.stop("Configuration generated");
+      }
     } catch (err) {
       genSpinner.stop("Generation failed");
       p.log.error(`Failed to generate config: ${(err as Error).message}`);
+      p.log.info(`Tip: \`omh init --preset ${PRESET_NAMES.join("|")}\` needs no provider.`);
       p.cancel("Try again.");
       process.exit(1);
     }

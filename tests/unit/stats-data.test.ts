@@ -274,8 +274,10 @@ hooks:
     expect(data.blockCount).toBe(1);
     expect(data.allowCount).toBe(1);
     expect(data.blockRate).toBe(50);
-    expect(data.blocks).toHaveLength(1);
+    // the explicit block, loop-guard (loop defaults to enabled) and the three always-on guards
+    expect(data.blocks).toHaveLength(5);
     expect(data.blocks[0].id).toBe("command-guard");
+    expect(data.blocks.map((b) => b.id)).toEqual(expect.arrayContaining(["loop-guard", "harness-guard", "no-verify-guard", "force-push-guard"]));
     expect(data.dateRange).toBe("all");
   });
 
@@ -288,5 +290,19 @@ hooks:
     expect(data.blockRate).toBe(0);
     expect(data.blocks).toHaveLength(0);
     expect(data.hourlyDistribution).toHaveLength(24);
+  });
+});
+
+describe("loadStatsData includes the always-on guards (QA)", () => {
+  it("lists harness-guard / no-verify-guard / force-push-guard even though harness.yaml does not name them", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omh-stats-always-on-"));
+    try {
+      await fs.writeFile(path.join(dir, "harness.yaml"), "version: '1.0'\nhooks:\n  - block: path-guard\n    params:\n      blockedPaths: [dist/]\n");
+      const data = await loadStatsData(dir);
+      const ids = [...data.activeBlocks, ...data.dormantBlocks].map((b) => b.id);
+      for (const id of ["path-guard", "harness-guard", "no-verify-guard", "force-push-guard"]) expect(ids).toContain(id);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
   });
 });

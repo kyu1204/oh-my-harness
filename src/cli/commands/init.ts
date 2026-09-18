@@ -59,7 +59,9 @@ export async function initCommand(
     options = { ...options, description: inlineDescription };
   }
 
-  if (options.nlRunner || options.yes || options.preset) {
+  // Anything that already says what to build skips the TUI; initWithNL still
+  // asks "Proceed?" unless -y was given.
+  if (options.nlRunner || options.yes || options.preset || options.description) {
     await initWithNL(projectDir, options);
     return;
   }

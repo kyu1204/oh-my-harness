@@ -60,7 +60,7 @@ GIT_WRITERS="checkout restore clean rm mv"
 
 HIT=$(_omh_simple_commands "$COMMAND" | awk -F '\\t' \\
   -v protected="$(IFS='|'; printf '%s' "\${PROTECTED[*]}")" -v writers="$WRITERS" -v gitw="$GIT_WRITERS" \\
-  -v root="$_OMH_PROJECT_ROOT" -v home="\${HOME:-}" -v scope='{{scope}}' "\${_OMH_AWK_PATHLIB}"'
+  -v root="$_OMH_PROJECT_ROOT" -v home="\${HOME:-}" -v scope='{{scope}}' -v seq_unsafe="$(_omh_seq_unsafe "$COMMAND")" "\${_OMH_AWK_PATHLIB}"'
   BEGIN {
     cwd = root
     np = split(protected, P, "|")
@@ -81,9 +81,8 @@ HIT=$(_omh_simple_commands "$COMMAND" | awk -F '\\t' \\
     return ""
   }
   # project scope: the token must resolve (through cd, ~, .., absolute paths) to a protected path under root
-  function check(t,   a, rel, k, p, L) {
-    if (scope == "any") return hits(t)
-    a = omh_abs(cwd, t, home)
+  function check_at(base, t,   a, rel, k, p, L) {
+    a = omh_abs(base, t, home)
     if (a == "") return hits(t)
     if (!omh_under(a, root)) return ""
     rel = (a == root) ? "" : substr(a, length(root) + 2)
@@ -94,6 +93,13 @@ HIT=$(_omh_simple_commands "$COMMAND" | awk -F '\\t' \\
     }
     return ""
   }
+  function check(t,   p) {
+    if (scope == "any") return hits(t)
+    p = check_at(cwd, t)
+    # with semicolon or newline chaining a failed cd leaves the shell where it was: judge from the root too
+    if (p == "" && seq_unsafe == "1" && cwd != root && t !~ /^\\//) p = check_at(root, t)
+    return p
+  }
   found != "" { next }
   {
     if ($1 == "__omh_redirect__") { p = check($2); if (p != "") found = "redirect into " p; next }
@@ -101,7 +107,7 @@ HIT=$(_omh_simple_commands "$COMMAND" | awk -F '\\t' \\
     while (i <= NF && $i ~ /^[A-Za-z_][A-Za-z0-9_]*=/) i++
     if (i <= NF && ($i == "sudo" || $i == "doas")) { i++; while (i <= NF && $i ~ /^-/) i++ }
     if (i > NF) next
-    if ($i == "cd" || $i == "pushd") { cwd = omh_cd(cwd, (i + 1 <= NF ? $(i + 1) : ""), home); next }
+    if ($i == "cd" || $i == "pushd" || $i == "popd") { cwd = omh_cd_cmd(cwd, i, home); next }
     a0 = $i
     write = 0
     if (isw[a0]) write = 1

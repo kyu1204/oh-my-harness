@@ -21,6 +21,8 @@ import { loopGuard } from "./loop-guard.js";
 import { harnessGuard } from "./harness-guard.js";
 import { noVerifyGuard } from "./no-verify-guard.js";
 import { forcePushGuard } from "./force-push-guard.js";
+import { stopTestGate } from "./stop-test-gate.js";
+import { stopUncommittedWarn } from "./stop-uncommitted-warn.js";
 
 export const builtinBlocks: BuildingBlock[] = [
   branchGuard,
@@ -44,4 +46,6 @@ export const builtinBlocks: BuildingBlock[] = [
   harnessGuard,
   noVerifyGuard,
   forcePushGuard,
+  stopTestGate,
+  stopUncommittedWarn,
 ];

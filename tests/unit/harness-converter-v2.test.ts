@@ -366,3 +366,24 @@ describe("effectiveHookEntries mirrors the loop-guard rule (review)", () => {
     expect(entries[0].params).toMatchObject({ workOrders: "orders" });
   });
 });
+
+describe("Stop event routing (#117)", () => {
+  it("routes a Stop block to hooks.stop and the generator emits a matcher-less Stop hook", async () => {
+    const { HarnessConfigSchema } = await import("../../src/core/harness-schema.js");
+    const { computeHooks } = await import("../../src/generators/hooks.js");
+    const registry = await createDefaultRegistry();
+    const h = HarnessConfigSchema.parse({ version: "1.0", loop: { enabled: false }, hooks: [{ block: "stop-test-gate", params: { testCommand: "npm test" } }, { block: "stop-uncommitted-warn", params: {} }] });
+    const merged = await harnessToMergedConfigV2(h, registry);
+    expect(merged.hooks.stop?.map((x) => x.id)).toEqual(["catalog-stop-test-gate", "catalog-stop-uncommitted-warn"]);
+    const fs = await import("node:fs/promises"); const os = await import("node:os"); const path = await import("node:path");
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omh-stop-route-"));
+    try {
+      const plan = await computeHooks({ projectDir: dir, config: merged });
+      expect(plan.hooksConfig["Stop"]).toHaveLength(2);
+      expect(plan.hooksConfig["Stop"][0]).not.toHaveProperty("matcher");   // Stop has no matcher support
+      expect(plan.hooksConfig["Stop"][0].hooks[0].command).toMatch(/catalog-stop-test-gate\.sh/);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+});

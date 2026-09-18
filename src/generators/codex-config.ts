@@ -69,7 +69,7 @@ export function buildCodexHooks(hooksOutput: HooksOutput): {
       continue;
     }
     codexHooks.hooks[event] = entries.map((entry) => ({
-      matcher: normalizeMatcher(entry.matcher),
+      matcher: normalizeMatcher(entry.matcher ?? ""),
       hooks: entry.hooks.map((h) => ({ type: h.type, command: h.command })),
     }));
   }

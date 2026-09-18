@@ -410,7 +410,7 @@ export interface HookCommand {
 }
 
 export interface HooksOutput {
-  hooksConfig: Record<string, Array<{ matcher: string; hooks: HookCommand[] }>>;
+  hooksConfig: Record<string, Array<{ matcher?: string; hooks: HookCommand[] }>>;
   generatedFiles: string[];
 }
 
@@ -466,7 +466,7 @@ async function writeHookManifest(manifestPath: string, hooks: string[]): Promise
 export interface HooksPlan {
   /** Hook script files (each chmod 0o755). */
   files: PlannedFile[];
-  hooksConfig: Record<string, Array<{ matcher: string; hooks: HookCommand[] }>>;
+  hooksConfig: Record<string, Array<{ matcher?: string; hooks: HookCommand[] }>>;
   generatedFiles: string[];
   /** Absolute paths of stale hook scripts that a sync would remove. */
   wouldDelete: string[];
@@ -492,6 +492,7 @@ export async function computeHooks(options: GenerateHooksOptions): Promise<Hooks
     ["Notification", config.hooks.notification ?? []],
     ["ConfigChange", config.hooks.configChange ?? []],
     ["WorktreeCreate", config.hooks.worktreeCreate ?? []],
+    ["Stop", config.hooks.stop ?? []],
   ];
 
   const allHooks = eventMap.flatMap(([event, hooks]) =>
@@ -536,11 +537,12 @@ export async function computeHooks(options: GenerateHooksOptions): Promise<Hooks
   }
 
   const generatedFiles = planned.map((p) => p.scriptPath);
-  const hooksConfig: Record<string, Array<{ matcher: string; hooks: HookCommand[] }>> = {};
+  const hooksConfig: Record<string, Array<{ matcher?: string; hooks: HookCommand[] }>> = {};
   for (const p of planned) {
     if (!hooksConfig[p.event]) hooksConfig[p.event] = [];
     hooksConfig[p.event].push({
-      matcher: p.matcher,
+      // Stop (and SubagentStop) have no matcher support in Claude Code: omit the key rather than emit "".
+      ...(p.event === "Stop" || p.event === "SubagentStop" ? {} : { matcher: p.matcher }),
       hooks: [{ type: "command", command: `bash ${shellSingleQuote(p.scriptPath)}` }],
     });
   }

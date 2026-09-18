@@ -100,6 +100,14 @@
         "type": "noul",
         "instructions": "Should the 'compact-context' guardrail be enabled for this project? It re-injects project context after context compaction. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
       },
+      "block:stop-test-gate": {
+        "type": "noul",
+        "instructions": "Should the 'stop-test-gate' guardrail be enabled for this project? It runs tests when the agent tries to end its turn and sends it back to work while they fail. Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
+      "block:stop-uncommitted-warn": {
+        "type": "noul",
+        "instructions": "Should the 'stop-uncommitted-warn' guardrail be enabled for this project? It when the agent ends its turn with uncommitted changes, lists them as a system message (never blocks). Enable it only if the user's description or the detected project facts call for it, or it is a sensible default that would not get in the user's way. If the user explicitly rejects it, the answer is no."
+      },
       "strictness": {
         "type": "choice",
         "instructions": "How strict should the generated guardrails be overall, given the user's description?",
@@ -116,11 +124,11 @@
     "answers": {
       "block:branch-guard": {
         "type": "noul",
-        "noul": 0.69
+        "noul": 0.65
       },
       "block:commit-test-gate": {
         "type": "noul",
-        "noul": 0.91
+        "noul": 0.92
       },
       "block:commit-typecheck-gate": {
         "type": "noul",
@@ -132,7 +140,7 @@
       },
       "block:path-guard": {
         "type": "noul",
-        "noul": 0.38
+        "noul": 0.36
       },
       "block:lockfile-guard": {
         "type": "noul",
@@ -140,15 +148,15 @@
       },
       "block:secret-file-guard": {
         "type": "noul",
-        "noul": 0.69
+        "noul": 0.68
       },
       "block:tdd-guard": {
         "type": "noul",
-        "noul": 0.34
+        "noul": 0.33
       },
       "block:sql-guard": {
         "type": "noul",
-        "noul": 0.38
+        "noul": 0.32
       },
       "block:lint-on-save": {
         "type": "noul",
@@ -156,11 +164,11 @@
       },
       "block:format-on-save": {
         "type": "noul",
-        "noul": 0.51
+        "noul": 0.5
       },
       "block:test-on-save": {
         "type": "noul",
-        "noul": 0.59
+        "noul": 0.6
       },
       "block:auto-pr": {
         "type": "noul",
@@ -168,26 +176,34 @@
       },
       "block:desktop-notify": {
         "type": "noul",
-        "noul": 0.33
+        "noul": 0.32
       },
       "block:compact-context": {
         "type": "noul",
-        "noul": 0.66
+        "noul": 0.64
+      },
+      "block:stop-test-gate": {
+        "type": "noul",
+        "noul": 0.83
+      },
+      "block:stop-uncommitted-warn": {
+        "type": "noul",
+        "noul": 0.59
       },
       "strictness": {
         "type": "choice",
         "choice": "safe",
-        "confidence": 0.94,
+        "confidence": 0.95,
         "probabilities": {
-          "safe": 0.96,
-          "minimal": 0,
-          "strict": 0.04
+          "safe": 0.97,
+          "strict": 0.03,
+          "minimal": 0
         }
       }
     },
     "usage": {
-      "input_tokens": 1700,
-      "output_tokens": 351
+      "input_tokens": 1884,
+      "output_tokens": 395
     }
   },
   "expected": {
@@ -198,11 +214,12 @@
       "command-guard",
       "secret-file-guard",
       "lint-on-save",
-      "compact-context"
+      "stop-test-gate"
     ],
     "off": [
       "lockfile-guard",
       "tdd-guard",
+      "sql-guard",
       "auto-pr",
       "desktop-notify"
     ],

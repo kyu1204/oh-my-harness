@@ -21,9 +21,10 @@ describe("harnessGuard block", () => {
     }
   });
 
-  it("only has an optional extraPaths param", () => {
-    expect(harnessGuard.params.map((p) => p.name)).toEqual(["extraPaths"]);
-    expect(harnessGuard.params[0].required).toBe(false);
+  it("has optional extraPaths and scope params, scope defaulting to the project root (#133)", () => {
+    expect(harnessGuard.params.map((p) => p.name)).toEqual(["extraPaths", "scope"]);
+    expect(harnessGuard.params.every((p) => !p.required)).toBe(true);
+    expect(harnessGuard.params.find((p) => p.name === "scope")!.default).toBe("project");
   });
 });
 

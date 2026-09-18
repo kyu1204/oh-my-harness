@@ -8,6 +8,10 @@ import type { BuildingBlock } from "../types.js";
 // ls, diff, sed without -i) stay allowed so the agent can inspect its own rules, and `omh` is
 // never a writer here, so `omh sync` / `omh hook add` remain the sanctioned
 // way to change the harness.
+// Scope (#133): by default only paths that resolve inside this project root
+// count, following cd / pushd, ~, .. and absolute paths, so another checkout's
+// .omh is not this harness's business. Tokens that cannot be resolved ($VAR,
+// backticks, unknown cwd) fall back to name matching and stay fail-closed.
 // ponytail: harness.yaml itself is deliberately not protected (it is the
 // user's knob); per-hook `locked: true` is tracked in #118. `rm -rf .` / `*`
 // from the project root are left to command-guard patterns.
@@ -28,6 +32,13 @@ export const harnessGuard: BuildingBlock = {
       default: [],
       required: false,
     },
+    {
+      name: "scope",
+      type: "string",
+      description: "project: only paths that resolve inside this project root are protected (cd and absolute paths are followed); any: match the protected names anywhere in the command",
+      default: "project",
+      required: false,
+    },
   ],
   tags: ["security", "bash", "guard", "harness", "self-protection"],
   template: `#!/bin/bash
@@ -44,12 +55,15 @@ WRITERS="rm mv cp tee chmod chown chgrp truncate dd ln touch install rsync shred
 GIT_WRITERS="checkout restore clean rm mv"
 
 HIT=$(_omh_simple_commands "$COMMAND" | awk -F '\\t' \\
-  -v protected="$(IFS='|'; printf '%s' "\${PROTECTED[*]}")" -v writers="$WRITERS" -v gitw="$GIT_WRITERS" '
+  -v protected="$(IFS='|'; printf '%s' "\${PROTECTED[*]}")" -v writers="$WRITERS" -v gitw="$GIT_WRITERS" \\
+  -v root="$_OMH_PROJECT_ROOT" -v home="\${HOME:-}" -v scope='{{scope}}' "\${_OMH_AWK_PATHLIB}"'
   BEGIN {
+    cwd = root
     np = split(protected, P, "|")
     nw = split(writers, W, " "); for (k = 1; k <= nw; k++) isw[W[k]] = 1
     ng = split(gitw, G, " ");    for (k = 1; k <= ng; k++) isg[G[k]] = 1
   }
+  # name-based matching: scope=any, and the fallback for tokens that cannot be resolved
   function hits(t,   k, p, L) {
     sub(/^\\.\\//, "", t)
     for (k = 1; k <= np; k++) {
@@ -62,13 +76,28 @@ HIT=$(_omh_simple_commands "$COMMAND" | awk -F '\\t' \\
     }
     return ""
   }
+  # project scope: the token must resolve (through cd, ~, .., absolute paths) to a protected path under root
+  function check(t,   a, rel, k, p, L) {
+    if (scope == "any") return hits(t)
+    a = omh_abs(cwd, t, home)
+    if (a == "") return hits(t)
+    if (!omh_under(a, root)) return ""
+    rel = (a == root) ? "" : substr(a, length(root) + 2)
+    for (k = 1; k <= np; k++) {
+      p = P[k]; if (p == "") continue
+      sub(/^\\.\\//, "", p); L = length(p)
+      if (rel == p || substr(rel, 1, L + 1) == p "/") return p
+    }
+    return ""
+  }
   found != "" { next }
   {
-    if ($1 == "__omh_redirect__") { p = hits($2); if (p != "") found = "redirect into " p; next }
+    if ($1 == "__omh_redirect__") { p = check($2); if (p != "") found = "redirect into " p; next }
     i = 1
     while (i <= NF && $i ~ /^[A-Za-z_][A-Za-z0-9_]*=/) i++
     if (i <= NF && ($i == "sudo" || $i == "doas")) { i++; while (i <= NF && $i ~ /^-/) i++ }
     if (i > NF) next
+    if ($i == "cd" || $i == "pushd") { cwd = omh_cd(cwd, (i + 1 <= NF ? $(i + 1) : ""), home); next }
     a0 = $i
     write = 0
     if (isw[a0]) write = 1
@@ -85,7 +114,7 @@ HIT=$(_omh_simple_commands "$COMMAND" | awk -F '\\t' \\
     }
     else if (a0 == "find") { for (k = i; k <= NF; k++) if ($k == "-delete" || $k == "-exec" || $k == "-execdir") write = 1 }
     if (!write) next
-    for (k = i + 1; k <= NF; k++) { p = hits($k); if (p != "") { found = a0 " on " p; next } }
+    for (k = i + 1; k <= NF; k++) { p = check($k); if (p != "") { found = a0 " on " p; next } }
   }
   END { if (found != "") print found }')
 if [[ -n "$HIT" ]]; then

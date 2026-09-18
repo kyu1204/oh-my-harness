@@ -12,6 +12,10 @@ export const branchGuard: BuildingBlock = {
     { name: "mainBranch", type: "string", description: "Main branch name", default: "main", required: false },
   ],
   tags: ["git", "branch", "merge", "guard"],
+  explain: {
+    allowOnce: "create a feature branch (git switch -c feat/x) and commit there",
+    change: "harness.yaml > hooks > branch-guard > params.mainBranch, or remove the hook, then omh sync",
+  },
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)

@@ -18,6 +18,10 @@ export const secretFileGuard: BuildingBlock = {
     },
   ],
   tags: ["security", "secrets", "credentials", "guard"],
+  explain: {
+    allowOnce: "edit the secret file yourself outside the agent",
+    change: "harness.yaml > hooks > secret-file-guard > params.patterns: remove the pattern, or remove the hook, then omh sync",
+  },
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)

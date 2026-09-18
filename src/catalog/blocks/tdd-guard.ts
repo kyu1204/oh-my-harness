@@ -24,6 +24,10 @@ export const tddGuard: BuildingBlock = {
       default: "\\.(test|spec)\\.(ts|tsx|js|jsx)$",
     },
   ],
+  explain: {
+    allowOnce: "edit or create the matching test file first (the guard records test edits per session), then edit the source",
+    change: "harness.yaml > hooks > tdd-guard: narrow srcPattern/testPattern, set mode: ask, or remove it, then omh sync",
+  },
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)

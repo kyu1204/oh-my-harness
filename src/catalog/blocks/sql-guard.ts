@@ -18,6 +18,10 @@ export const sqlGuard: BuildingBlock = {
     },
   ],
   tags: ["security", "sql", "guard", "database"],
+  explain: {
+    allowOnce: "run the statement yourself outside the agent, or use a narrower statement",
+    change: "harness.yaml > hooks > sql-guard > params.patterns: remove or edit the pattern, then omh sync",
+  },
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)

@@ -19,6 +19,10 @@ export const commitTypecheckGate: BuildingBlock = {
     },
   ],
   tags: ["git", "typecheck", "quality", "guard"],
+  explain: {
+    allowOnce: "fix the type errors the typecheck command reports",
+    change: "harness.yaml > hooks > commit-typecheck-gate: change typecheckCommand, set mode: ask, or remove it, then omh sync",
+  },
   template: `#!/bin/bash
 set -euo pipefail
 INPUT=$(cat)

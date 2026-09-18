@@ -56,6 +56,13 @@ export interface BuildingBlock {
   params: ParamDefinition[];
   template: string;
   tags: string[];
+  /** Plain-language remedies shown by `omh explain` (#115). */
+  explain?: {
+    /** How to get past this block one time without changing the rule. */
+    allowOnce?: string;
+    /** Where the rule lives and how to change it. */
+    change?: string;
+  };
 }
 
 export interface HookEntry {

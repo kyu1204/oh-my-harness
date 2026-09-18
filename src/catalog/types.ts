@@ -72,6 +72,8 @@ export interface HookEntry {
   // for approval on runtimes that support it (Claude), falling back to block
   // elsewhere (Codex). Only meaningful for blocks with canBlock === true.
   mode?: "block" | "ask";
+  /** `omh modify` may never remove or weaken a locked entry (#118). */
+  locked?: boolean;
 }
 
 export const ParamDefinitionSchema = z.object({
@@ -99,4 +101,6 @@ export const HookEntrySchema = z.object({
   block: z.string(),
   params: z.record(z.unknown()).default({}),
   mode: z.enum(["block", "ask"]).default("block"),
+  /** `omh modify` may never remove or weaken a locked entry (#118). */
+  locked: z.boolean().optional(),
 });

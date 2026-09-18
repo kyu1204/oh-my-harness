@@ -41,6 +41,18 @@ export function createCli(): Command {
     });
 
   program
+    .command("modify [request...]")
+    .description('Edit harness.yaml from a sentence, e.g. omh modify "no auto PRs, make the TDD guard ask" (needs TYPESAFE_API_KEY)')
+    .option("-d, --project-dir <dir>", "Project directory")
+    .option("-y, --yes", "Apply without confirmation")
+    .option("--dry-run", "Show the change set without writing")
+    .action(async (request: string[], options: { projectDir?: string; yes?: boolean; dryRun?: boolean }) => {
+      const { modifyCommand } = await import("./commands/modify.js");
+      const result = await modifyCommand(request, options);
+      if (result.exitCode !== 0) process.exitCode = result.exitCode;
+    });
+
+  program
     .command("explain")
     .description("Show the last blocked tool calls in plain language, with how to allow once and how to change the rule")
     .option("-d, --project-dir <dir>", "Project directory")

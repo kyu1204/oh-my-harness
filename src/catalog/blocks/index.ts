@@ -23,6 +23,8 @@ import { noVerifyGuard } from "./no-verify-guard.js";
 import { forcePushGuard } from "./force-push-guard.js";
 import { stopTestGate } from "./stop-test-gate.js";
 import { stopUncommittedWarn } from "./stop-uncommitted-warn.js";
+import { semanticRuleGuard } from "./semantic-rule-guard.js";
+import { semanticDiffGate } from "./semantic-diff-gate.js";
 
 export const builtinBlocks: BuildingBlock[] = [
   branchGuard,
@@ -48,4 +50,6 @@ export const builtinBlocks: BuildingBlock[] = [
   forcePushGuard,
   stopTestGate,
   stopUncommittedWarn,
+  semanticRuleGuard,
+  semanticDiffGate,
 ];

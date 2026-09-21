@@ -364,6 +364,13 @@ describe("doctorCommand: TypeSafe chooser (#129)", () => {
       const result = await doctorCommand({ projectDir: tmpDir });
       expect(result.messages.join("\n")).toMatch(/INFO: .*Jev/);
       expect(result.messages.join("\n")).not.toMatch(/No AI provider configured for natural-language mode/);
+      // #145: with a Jev key but no jgrep on PATH, point at the optional semantic diff gate
+      const prevPath = process.env.PATH;
+      process.env.PATH = "/nonexistent";
+      try {
+        const noJgrep = await doctorCommand({ projectDir: tmpDir });
+        expect(noJgrep.messages.join("\n")).toMatch(/INFO: jgrep not found.*jevgrep/);
+      } finally { process.env.PATH = prevPath; }
     } finally {
       if (prev === undefined) delete process.env.TYPESAFE_API_KEY; else process.env.TYPESAFE_API_KEY = prev;
     }

@@ -113,3 +113,15 @@ describe("defaultParamsFor", () => {
     expect(defaultParamsFor("format-on-save", tsFacts)).toBeNull();   // no formatter detected
   });
 });
+
+describe("strict preset and jgrep (#145)", () => {
+  it("includes semantic-diff-gate with three generic lints only when jgrep is available", () => {
+    const withJgrep = buildPresetHarness("strict", tsFacts, {}, { jgrep: true });
+    const gate = withJgrep.hooks.find((h) => h.block === "semantic-diff-gate")!;
+    expect(gate).toBeDefined();
+    expect(gate.params.rules).toHaveLength(3);
+    expect(gate.params.rules).toEqual(expect.arrayContaining([expect.stringMatching(/secret/), expect.stringMatching(/silently ignores/), expect.stringMatching(/skips? a test|disables/)]));
+    expect(buildPresetHarness("strict", tsFacts).hooks.map((h) => h.block)).not.toContain("semantic-diff-gate");
+    expect(buildPresetHarness("safe", tsFacts, {}, { jgrep: true }).hooks.map((h) => h.block)).not.toContain("semantic-diff-gate");
+  });
+});

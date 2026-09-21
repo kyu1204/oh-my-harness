@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { builtinBlocks } from "../../src/catalog/blocks/index.js";
 
 describe("builtinBlocks", () => {
-  it("exports exactly 23 blocks", () => {
-    expect(builtinBlocks).toHaveLength(23);
+  it("exports exactly 25 blocks", () => {
+    expect(builtinBlocks).toHaveLength(25);
   });
 
   it("all blocks have required fields (id, name, event, template)", () => {

@@ -105,6 +105,24 @@ omh init "Next.js + FastAPI, TDD enforced, no auto PRs"
 
 The always-on guards (harness self-protection, `--no-verify`, force-push) are added to every preset and every Jev result.
 
+### Rules that enforce themselves
+
+Two fields on a rule in `harness.yaml` turn prose into a check:
+
+```yaml
+rules:
+  - id: no-deps
+    title: No new dependencies
+    content: Do not add npm dependencies without asking.
+    enforce: true          # every Bash/Edit/Write call is judged against this rule by Jev
+  - id: no-secrets
+    title: No secrets in code
+    content: Never commit tokens or passwords.
+    lint: hardcodes a secret, token or password   # the staged diff is linted with jgrep before commit
+```
+
+`enforce: true` adds `semantic-rule-guard`: one Jev question per enforced rule per tool call, block at p ≥ 0.9, ask between 0.6 and 0.9, allow below; without a key, or on an API error, it allows and logs `skipped`. `lint:` adds `semantic-diff-gate`, which runs `jgrep --diff --staged "<description>"` and blocks the commit on a hit with `file:line`. jgrep is optional: `npm i -g jevgrep && jgrep init`; the `strict` preset adds three generic lints when `omh init` finds it. Both layers are additive and never relax a deterministic guard.
+
 ---
 
 ## 🧱 Building Block Catalog
@@ -122,6 +140,8 @@ All enforcement is powered by **catalog blocks** — reusable, parameterized hoo
 | 💥 `force-push-guard` | git | Blocks force pushes to protected branches (always on) |
 | 🛑 `stop-test-gate` | quality | When the agent tries to end its turn with failing tests, sends it back (retry-capped) |
 | 📝 `stop-uncommitted-warn` | git | Lists uncommitted changes as a system message when the turn ends |
+| 🧠 `semantic-rule-guard` | security | Rules marked `enforce: true` are judged by Jev on every Bash/Edit/Write call |
+| 🔎 `semantic-diff-gate` | quality | Lints the staged diff with [jgrep](https://github.com/kyu1204/jgrep) against `lint:` rule descriptions before commit (optional) |
 | 📁 `path-guard` | file-protection | Blocks writes to protected paths |
 | 🔐 `lockfile-guard` | file-protection | Prevents manual lockfile edits |
 | 🤫 `secret-file-guard` | security | Blocks edits to .env, credentials |

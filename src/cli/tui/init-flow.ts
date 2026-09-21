@@ -207,7 +207,7 @@ export async function runInitTUI(options?: { projectDir?: string }): Promise<voi
       const catalogRegistry = await createDefaultRegistry();
       if (jevKey) {
         const result = await chooseWithJev({ description: description as string, facts: projectFacts, blocks: catalogRegistry.list() }, { apiKey: jevKey });
-        const applied = harnessFromChoices(result, projectFacts, { description: description as string });
+        const applied = harnessFromChoices(result, projectFacts, { description: description as string }, { jgrep: await commandExists("jgrep") });
         const { skipped, ...rest } = applied;
         harnessConfig = rest;
         genSpinner.stop(`Jev chose strictness=${result.strictness} (${result.usage?.input_tokens ?? "?"} input tokens)`);

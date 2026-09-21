@@ -6,6 +6,7 @@ import {
   routeAnswers,
   applyChoices,
   chooseWithJev,
+  harnessFromChoices,
   resolveTypesafeApiKey,
   SELECTABLE_BLOCKS,
 } from "../../src/nl/typesafe-chooser.js";
@@ -131,5 +132,14 @@ describe("resolveTypesafeApiKey", () => {
     writeFileSync(join(dir, ".env"), "OTHER=1\nTYPESAFE_API_KEY=from-file\n");
     expect(resolveTypesafeApiKey(dir, {})).toBe("from-file");
     expect(resolveTypesafeApiKey(dir, { TYPESAFE_API_KEY: "from-env" })).toBe("from-env");
+  });
+});
+
+describe("harnessFromChoices and jgrep (#145)", () => {
+  it("adds semantic-diff-gate to a Jev-chosen strict harness only when jgrep is available", () => {
+    const result = { strictness: "strict" as const, blocks: new Map() };
+    expect(harnessFromChoices(result, undefined, {}, { jgrep: true }).hooks.map((h) => h.block)).toContain("semantic-diff-gate");
+    expect(harnessFromChoices(result, undefined, {}).hooks.map((h) => h.block)).not.toContain("semantic-diff-gate");
+    expect(harnessFromChoices({ ...result, strictness: "safe" }, undefined, {}, { jgrep: true }).hooks.map((h) => h.block)).not.toContain("semantic-diff-gate");
   });
 });

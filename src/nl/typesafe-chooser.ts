@@ -157,8 +157,9 @@ export function harnessFromChoices(
   result: Pick<ChooserResult, "strictness" | "blocks">,
   facts: ProjectFacts | undefined,
   meta: { description?: string },
+  tools: { jgrep?: boolean } = {},
 ): AppliedHarness {
-  const base = buildPresetHarness(result.strictness, facts, meta);
+  const base = buildPresetHarness(result.strictness, facts, meta, tools);
   return applyChoices(base, result, facts);
 }
 

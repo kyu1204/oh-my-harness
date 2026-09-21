@@ -126,8 +126,8 @@ export async function initWithNL(
   const typesafeKey = resolveTypesafeApiKey(projectDir);
   const registryBlocks = registry.list();
   let harness: HarnessConfig;
+  const jgrep = await commandExists("jgrep");
   if (preset) {
-    const jgrep = await commandExists("jgrep");
     harness = buildPresetHarness(preset, facts, { description: description || undefined }, { jgrep });
     console.log(`preset: ${preset}${preset === "strict" ? (jgrep ? " (jgrep found: semantic-diff-gate enabled)" : " (install jgrep to add the semantic diff gate: npm i -g jevgrep)") : ""}`);
   } else if (options.nlRunner) {
@@ -135,7 +135,7 @@ export async function initWithNL(
   } else if (typesafeKey && description) {
     try {
       const result = await chooseWithJev({ description, facts, blocks: registryBlocks }, { apiKey: typesafeKey });
-      const applied = harnessFromChoices(result, facts, { description });
+      const applied = harnessFromChoices(result, facts, { description }, { jgrep });
       const on = [...result.blocks].filter(([, v]) => v === "on").map(([k]) => k);
       const off = [...result.blocks].filter(([, v]) => v === "off").map(([k]) => k);
       const undecided = [...result.blocks].filter(([, v]) => v === "undecided").map(([k]) => k);

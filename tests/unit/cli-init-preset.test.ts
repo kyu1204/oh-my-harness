@@ -111,3 +111,21 @@ describe("omh init \"description\" without -y (QA)", () => {
     expect(logs.join("\n")).toMatch(/safe/);
   });
 });
+
+describe("omh init --preset strict detects jgrep (#145)", () => {
+  it("adds semantic-diff-gate when a jgrep binary is on PATH, and reports it", async () => {
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    const fakeBin = join(dir, "fakebin");
+    mkdirSync(fakeBin);
+    writeFileSync(join(fakeBin, "jgrep"), "#!/bin/bash\nexit 1\n", { mode: 0o755 });
+    const savedPath = process.env.PATH;
+    process.env.PATH = `${fakeBin}:${savedPath}`;
+    try {
+      await initCommand([], { preset: "strict", yes: true, projectDir: dir });
+      expect((await harness()).hooks.map((x) => x.block)).toContain("semantic-diff-gate");
+      expect(logs.join("\n")).toMatch(/jgrep/);
+    } finally {
+      process.env.PATH = savedPath;
+    }
+  });
+});

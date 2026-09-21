@@ -6,6 +6,7 @@ import { generateHarnessConfig, providerConfigFromEnv } from "../../nl/parse-int
 import type { ClaudeRunner } from "../../nl/parse-intent.js";
 import { hasProviderConfig } from "../../nl/config-store.js";
 import { buildPresetHarness, isPresetName, PRESET_NAMES, type PresetName } from "../../core/presets.js";
+import { commandExists } from "../deps-checker.js";
 import { chooseWithJev, harnessFromChoices, resolveTypesafeApiKey, TYPESAFE_MODEL } from "../../nl/typesafe-chooser.js";
 import type { HarnessConfig } from "../../core/harness-schema.js";
 import { detectProject } from "../../detector/project-detector.js";
@@ -125,15 +126,16 @@ export async function initWithNL(
   const typesafeKey = resolveTypesafeApiKey(projectDir);
   const registryBlocks = registry.list();
   let harness: HarnessConfig;
+  const jgrep = await commandExists("jgrep");
   if (preset) {
-    harness = buildPresetHarness(preset, facts, { description: description || undefined });
-    console.log(`preset: ${preset}`);
+    harness = buildPresetHarness(preset, facts, { description: description || undefined }, { jgrep });
+    console.log(`preset: ${preset}${preset === "strict" ? (jgrep ? " (jgrep found: semantic-diff-gate enabled)" : " (install jgrep to add the semantic diff gate: npm i -g jevgrep)") : ""}`);
   } else if (options.nlRunner) {
     harness = await generateHarnessConfig(description, options.nlRunner, catalogBlocks, facts);
   } else if (typesafeKey && description) {
     try {
       const result = await chooseWithJev({ description, facts, blocks: registryBlocks }, { apiKey: typesafeKey });
-      const applied = harnessFromChoices(result, facts, { description });
+      const applied = harnessFromChoices(result, facts, { description }, { jgrep });
       const on = [...result.blocks].filter(([, v]) => v === "on").map(([k]) => k);
       const off = [...result.blocks].filter(([, v]) => v === "off").map(([k]) => k);
       const undecided = [...result.blocks].filter(([, v]) => v === "undecided").map(([k]) => k);

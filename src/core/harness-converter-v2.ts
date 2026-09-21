@@ -97,9 +97,25 @@ function addLoopGuard(entries: HookEntry[], harness: HarnessConfig): void {
  * generator emits them. `omh test` and `omh stats` use this so they see the
  * same set (QA: they used to miss the always-on guards).
  */
+// Rules can carry their own enforcement (#144, #145): `enforce: true` sends
+// the rule to semantic-rule-guard on every tool call; `lint:` sends a change
+// description to semantic-diff-gate before commits. The blocks are added only
+// when such rules exist; an explicit entry keeps its own params and mode.
+function addRuleDerivedGuards(entries: HookEntry[], harness: HarnessConfig, registry: { has(id: string): boolean }): void {
+  const enforced = harness.rules.filter((r) => r.enforce).map((r) => `${r.title}: ${r.content}`);
+  if (enforced.length > 0 && registry.has("semantic-rule-guard") && !entries.some((h) => h.block === "semantic-rule-guard")) {
+    entries.push({ block: "semantic-rule-guard", params: { rules: enforced }, mode: "block" });
+  }
+  const lints = harness.rules.map((r) => r.lint).filter((l): l is string => Boolean(l && l.trim()));
+  if (lints.length > 0 && registry.has("semantic-diff-gate") && !entries.some((h) => h.block === "semantic-diff-gate")) {
+    entries.push({ block: "semantic-diff-gate", params: { rules: lints }, mode: "block" });
+  }
+}
+
 export function effectiveHookEntries(harness: HarnessConfig, registry: { has(id: string): boolean }): HookEntry[] {
   const entries = mergeEnforcementAndHooks(harness);
   addLoopGuard(entries, harness);
+  addRuleDerivedGuards(entries, harness, registry);
   addAlwaysOnGuards(entries, registry);
   return entries;
 }
@@ -143,6 +159,7 @@ export async function harnessToMergedConfigV2(
   // Resolve registry — use provided one or create the default
   const resolvedRegistry = registry ?? (await createDefaultRegistry());
 
+  addRuleDerivedGuards(allHookEntries, harness, resolvedRegistry);
   addAlwaysOnGuards(allHookEntries, resolvedRegistry);
 
   const catalogResult = await convertHookEntries(allHookEntries, resolvedRegistry, projectDir ?? ".");

@@ -48,6 +48,10 @@ export const HarnessConfigSchema = z.object({
     title: z.string(),
     content: z.string(),
     priority: z.number().default(50),
+    /** Judge every Bash/Edit/Write call against this rule with Jev (semantic-rule-guard, #144). */
+    enforce: z.boolean().optional(),
+    /** English description of a change that must not be committed; checked on the staged diff with jgrep (semantic-diff-gate, #145). */
+    lint: z.string().optional(),
   })).default([]),
 
   // Enforcement hooks

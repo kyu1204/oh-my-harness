@@ -57,7 +57,7 @@ const DEPS: DepSpec[] = [
   },
 ];
 
-async function commandExists(command: string): Promise<boolean> {
+export async function commandExists(command: string): Promise<boolean> {
   try {
     await execFileAsync("which", [command]);
     return true;

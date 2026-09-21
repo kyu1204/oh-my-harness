@@ -23,6 +23,8 @@ export function formatCategoryName(category: string): string {
     "harness-guard": "Harness self-protection",
     "no-verify-guard": "Git hook bypass guard",
     "stop-test-gate": "Stop test gate",
+    "semantic-rule-guard": "Semantic rule guard (Jev)",
+    "semantic-diff-gate": "Semantic diff gate (jgrep)",
     "force-push-guard": "Force push guard",
     "branch-guard": "Branch guard",
     "lockfile-guard": "Lockfile guard",

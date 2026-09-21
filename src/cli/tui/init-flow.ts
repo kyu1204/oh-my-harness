@@ -3,7 +3,7 @@ import chalk from "chalk";
 import fs from "node:fs/promises";
 import path from "node:path";
 import yaml from "js-yaml";
-import { checkDependencies } from "../deps-checker.js";
+import { checkDependencies, commandExists } from "../deps-checker.js";
 import type { DepCheck } from "../deps-checker.js";
 import { checkReferencedTools } from "../tool-checker.js";
 import type { ToolCheck } from "../tool-checker.js";
@@ -178,7 +178,7 @@ export async function runInitTUI(options?: { projectDir?: string }): Promise<voi
       ],
     });
     handleCancel(preset);
-    harnessConfig = buildPresetHarness(preset as PresetName, projectFacts);
+    harnessConfig = buildPresetHarness(preset as PresetName, projectFacts, {}, { jgrep: await commandExists("jgrep") });
     p.note(formatConfigSummary(harnessConfig), `Preset: ${preset as string}`);
     const confirmed = await p.confirm({ message: "Proceed with this configuration?", initialValue: true });
     handleCancel(confirmed);
@@ -207,7 +207,7 @@ export async function runInitTUI(options?: { projectDir?: string }): Promise<voi
       const catalogRegistry = await createDefaultRegistry();
       if (jevKey) {
         const result = await chooseWithJev({ description: description as string, facts: projectFacts, blocks: catalogRegistry.list() }, { apiKey: jevKey });
-        const applied = harnessFromChoices(result, projectFacts, { description: description as string });
+        const applied = harnessFromChoices(result, projectFacts, { description: description as string }, { jgrep: await commandExists("jgrep") });
         const { skipped, ...rest } = applied;
         harnessConfig = rest;
         genSpinner.stop(`Jev chose strictness=${result.strictness} (${result.usage?.input_tokens ?? "?"} input tokens)`);

@@ -117,16 +117,27 @@ const RULES = {
   },
 };
 
+/** Generic change descriptions the strict preset lints with jgrep when it is installed (#145). */
+export const STRICT_LINTS = [
+  "catches an error and silently ignores it",
+  "hardcodes a secret, token or password",
+  "disables or skips a test instead of fixing it",
+];
+
 export function buildPresetHarness(
   preset: PresetName,
   facts?: ProjectFacts,
   meta: { name?: string; description?: string } = {},
+  tools: { jgrep?: boolean } = {},
 ): HarnessConfig {
   const hooks: { block: string; params: Params; mode: "block" | "ask" }[] = [];
   for (const block of HOOKS_BY_PRESET[preset]) {
     const params = defaultParamsFor(block, facts);
     if (params === null) continue;
     hooks.push({ block, params, mode: "block" });
+  }
+  if (preset === "strict" && tools.jgrep) {
+    hooks.push({ block: "semantic-diff-gate", params: { rules: [...STRICT_LINTS] }, mode: "block" });
   }
 
   const stacks = (facts?.languages ?? []).map((language, i) => ({

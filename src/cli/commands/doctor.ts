@@ -5,6 +5,7 @@ import { OMH_HOOKS_DIR } from "../../utils/paths.js";
 import { computeDrift, HarnessNotFoundError } from "../../core/drift.js";
 import { loadProviderConfig } from "../../nl/config-store.js";
 import { resolveTypesafeApiKey } from "../../nl/typesafe-chooser.js";
+import { commandExists } from "../deps-checker.js";
 
 export interface DoctorOptions {
   projectDir?: string;
@@ -226,6 +227,9 @@ async function checkProviderConfig(messages: string[], projectDir: string): Prom
   const jev = Boolean(resolveTypesafeApiKey(projectDir));
   if (jev) {
     messages.push("INFO: Chooser: TypeSafe Jev (TYPESAFE_API_KEY found) — `omh init \"...\"` picks catalog blocks with it; no LLM provider needed.");
+    if (!(await commandExists("jgrep"))) {
+      messages.push("INFO: jgrep not found — `npm i -g jevgrep && jgrep init` enables semantic-diff-gate (strict preset, rules with lint:).");
+    }
   }
   const config = await loadProviderConfig();
 

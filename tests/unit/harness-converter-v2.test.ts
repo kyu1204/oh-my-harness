@@ -387,3 +387,42 @@ describe("Stop event routing (#117)", () => {
     }
   });
 });
+
+describe("rule-derived guards (#144, #145)", () => {
+  it("adds semantic-rule-guard from rules marked enforce: true and semantic-diff-gate from rules with lint:", async () => {
+    const { HarnessConfigSchema } = await import("../../src/core/harness-schema.js");
+    const registry = await createDefaultRegistry();
+    const h = HarnessConfigSchema.parse({
+      version: "1.0", loop: { enabled: false },
+      rules: [
+        { id: "deps", title: "No new deps", content: "Do not add npm dependencies without asking", enforce: true },
+        { id: "style", title: "Style", content: "Prefer named exports" },
+        { id: "secrets", title: "Secrets", content: "Never commit secrets", lint: "hardcodes a secret, token or password" },
+      ],
+      hooks: [{ block: "branch-guard", params: {} }],
+    });
+    const entries = effectiveHookEntries(h, registry);
+    const srg = entries.find((e) => e.block === "semantic-rule-guard")!;
+    expect(srg.params.rules).toEqual(["No new deps: Do not add npm dependencies without asking"]);
+    const sdg = entries.find((e) => e.block === "semantic-diff-gate")!;
+    expect(sdg.params.rules).toEqual(["hardcodes a secret, token or password"]);
+    const merged = await harnessToMergedConfigV2(h, registry);
+    expect(merged.hooks.preToolUse.map((x) => x.id)).toEqual(expect.arrayContaining(["catalog-semantic-rule-guard", "catalog-semantic-diff-gate"]));
+  });
+
+  it("adds neither without such rules, and an explicit entry keeps its own params", async () => {
+    const { HarnessConfigSchema } = await import("../../src/core/harness-schema.js");
+    const registry = await createDefaultRegistry();
+    const plain = HarnessConfigSchema.parse({ version: "1.0", loop: { enabled: false }, rules: [{ id: "a", title: "A", content: "x" }], hooks: [{ block: "branch-guard", params: {} }] });
+    expect(effectiveHookEntries(plain, registry).map((e) => e.block)).not.toEqual(expect.arrayContaining(["semantic-rule-guard", "semantic-diff-gate"]));
+    const explicit = HarnessConfigSchema.parse({
+      version: "1.0", loop: { enabled: false },
+      rules: [{ id: "a", title: "A", content: "no deps", enforce: true }],
+      hooks: [{ block: "semantic-rule-guard", params: { rules: ["custom"], blockAbove: 0.95 }, mode: "ask" }],
+    });
+    const e = effectiveHookEntries(explicit, registry).filter((x) => x.block === "semantic-rule-guard");
+    expect(e).toHaveLength(1);
+    expect(e[0].params).toMatchObject({ rules: ["custom"], blockAbove: 0.95 });
+    expect(e[0].mode).toBe("ask");
+  });
+});

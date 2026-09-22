@@ -129,6 +129,24 @@ case "$*" in *secret*) echo '[{"file":"app.ts","start":1,"end":1,"p":0.97,"text"
     expect(sh("git diff --staged --name-only").trim()).toBe("");
   });
 
+  it("keeps the command's directory context, and falls back to the whole working tree when it cannot replay faithfully (review of #151)", async () => {
+    sh("git reset -q");
+    await mkdir(join(dir, "sub"), { recursive: true });
+    await writeFile(join(dir, "sub", "token.ts"), "const k = 'sk-live-777';\n");
+    await writeFile(join(dir, "clean.ts"), "export const ok = 1;\n");
+    await fakeJgrep(INDEX_AWARE);
+    const s = await gate({ rules: ["hardcodes a secret"], threshold: 0.85, jgrep: "jgrep" });
+    // git -C carries the directory
+    expect(JSON.parse(commitCmd(s, "git -C sub add token.ts && git -C sub commit -m x").trim()).decision).toBe("block");
+    // cd changes what a relative path means: replay everything dirty rather than guess
+    expect(JSON.parse(commitCmd(s, "cd sub && git add token.ts && git commit -m x").trim()).decision).toBe("block");
+    // a git add that cannot be replayed (unknown path) also widens to the whole tree
+    expect(JSON.parse(commitCmd(s, "git add nope.ts && git commit -m x").trim()).decision).toBe("block");
+    // a faithful replay stays precise
+    expect(commitCmd(s, "git add clean.ts && git commit -m x").trim()).toBe("");
+    expect(sh("git diff --staged --name-only").trim()).toBe("");
+  });
+
   it("lints tracked modifications for `git commit -a`", async () => {
     sh("git add app.ts && git -c user.name=t -c user.email=t@t commit -qm base");
     await writeFile(join(dir, "app.ts"), "const token = 'sk-live-456';\n");

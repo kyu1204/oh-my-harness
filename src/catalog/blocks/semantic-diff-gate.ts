@@ -47,27 +47,37 @@ GIT_DIR_PATH=$(git rev-parse --git-dir 2>/dev/null) || { _log_event "allow" "ski
 TMPIDX=$(mktemp)
 if [[ -f "$GIT_DIR_PATH/index" ]]; then cp "$GIT_DIR_PATH/index" "$TMPIDX"; else rm -f "$TMPIDX"; fi
 export GIT_INDEX_FILE="$TMPIDX"
+# WIDEN=1 means the replay cannot be trusted (cd/pushd in the command, or a
+# git add that fails here): stage every change instead, so nothing that
+# the real command would stage is missed. Over-approximating can block on
+# an unrelated dirty file; missing a file would let a secret through.
+WIDEN=0
 while IFS= read -r ADD_LINE; do
   [[ -z "$ADD_LINE" ]] && continue
+  if [[ "$ADD_LINE" == "__widen__" ]]; then WIDEN=1; continue; fi
   IFS=$'\\t' read -r -a ADD_ARGS <<< "$ADD_LINE"
-  git add "\${ADD_ARGS[@]}" >/dev/null 2>&1 || true
+  git "\${ADD_ARGS[@]}" >/dev/null 2>&1 || WIDEN=1
 done < <(_omh_simple_commands "$COMMAND" | awk -F '\\t' '
   { i = 1
     while (i <= NF && $i ~ /^[A-Za-z_][A-Za-z0-9_]*=/) i++
-    if (i > NF || $i != "git") next
-    i++
-    while (i <= NF && $i ~ /^-/) { if ($i == "-c" || $i == "-C") i++; i++ }
     if (i > NF) next
+    if ($i == "cd" || $i == "pushd" || $i == "popd") { print "__widen__"; next }
+    if ($i != "git") next
+    i++; cdir = ""
+    while (i <= NF && $i ~ /^-/) { if ($i == "-c") i++; else if ($i == "-C") { i++; cdir = $i }; i++ }
+    if (i > NF) next
+    pre = (cdir == "" ? "" : "-C\\t" cdir "\\t")
     if ($i == "add") {
       line = ""
       for (j = i + 1; j <= NF; j++) {
         if ($j ~ /^-(p|i|e|-patch|-interactive|-edit)$/) next
         line = line (line == "" ? "" : "\\t") $j
       }
-      if (line != "") print line
+      if (line != "") print pre "add\\t" line
     } else if ($i == "commit") {
-      for (j = i + 1; j <= NF; j++) if ($j == "--all" || ($j ~ /^-[A-Za-z]+$/ && $j ~ /a/)) { print "-u"; break }
+      for (j = i + 1; j <= NF; j++) if ($j == "--all" || ($j ~ /^-[A-Za-z]+$/ && $j ~ /a/)) { print pre "add\\t-u"; break }
     } }')
+if [[ "$WIDEN" == "1" ]]; then git add -A >/dev/null 2>&1 || true; fi
 _omh_sdg_done() { rm -f "$TMPIDX"; }
 
 RULES_RAW=$(cat <<'OMH_RULES'

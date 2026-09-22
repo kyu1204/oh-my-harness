@@ -47,6 +47,7 @@ export async function simulateHook(
 
     const child = spawn("bash", [hookPath], {
       cwd,
+      env: { ...process.env, OMH_DRY_RUN: "1" },
       stdio: ["pipe", "pipe", "pipe"],
     });
     let stdout = "";
@@ -121,7 +122,8 @@ export async function runTestCase(
   projectDir: string,
   testCase: TestCase,
 ): Promise<TestResult> {
-  const hookPath = path.join(projectDir, testCase.hookScript);
+  // settings.json registers hooks as `bash '/abs/path.sh'`, so hookScript is usually absolute
+  const hookPath = path.isAbsolute(testCase.hookScript) ? testCase.hookScript : path.join(projectDir, testCase.hookScript);
 
   try {
     await fs.access(hookPath);

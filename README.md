@@ -121,7 +121,7 @@ rules:
     lint: hardcodes a secret, token or password   # the staged diff is linted with jgrep before commit
 ```
 
-`enforce: true` adds `semantic-rule-guard`: one Jev question per enforced rule per tool call, block at p ≥ 0.9, ask between 0.6 and 0.9, allow below; without a key, or on an API error, it allows and logs `skipped`. `lint:` adds `semantic-diff-gate`, which runs `jgrep --diff --staged "<description>"` and blocks the commit on a hit with `file:line`. jgrep is optional: `npm i -g jevgrep && jgrep init`; the `strict` preset adds three generic lints when `omh init` finds it. Both layers are additive and never relax a deterministic guard.
+`enforce: true` adds `semantic-rule-guard`: one Jev question per enforced rule per tool call, block at p ≥ 0.9, ask between 0.6 and 0.9, allow below; without a key, or on an API error, it allows and logs `skipped`. `lint:` adds `semantic-diff-gate`, which runs `jgrep --diff --staged "<description>"` and blocks the commit on a hit with `file:line`. When the same command also stages (`git add … && git commit`, `git commit -a`), the gate previews the index that command would build, so nothing slips through because it was not staged yet. jgrep is optional: `npm i -g jevgrep && jgrep init`; the `strict` preset adds three generic lints when `omh init` finds it. Both layers are additive and never relax a deterministic guard.
 
 ---
 

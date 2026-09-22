@@ -648,6 +648,21 @@ describe("logger meta validation (executed)", () => {
 });
 
 describe("wrapWithLogger", () => {
+  it("writes no event when OMH_DRY_RUN is set (QA: omh test dry runs polluted omh stats)", async () => {
+    const { writeFile, mkdtemp: mk } = await import("node:fs/promises");
+    const { execFile: ef } = await import("node:child_process");
+    const { promisify: pr } = await import("node:util");
+    const dir = await mk(join(tmpdir(), "omh-dry-"));
+    const script = join(dir, "h.sh");
+    await writeFile(script, wrapWithLogger("#!/bin/bash\nset -euo pipefail\nINPUT=$(cat)\n_log_event block x\nexit 0", "PreToolUse", dir), { mode: 0o755 });
+    const run = (env: Record<string, string>) => new Promise<void>((res) => { const c = ef("bash", [script], { cwd: dir, env: { ...process.env, ...env } }, () => res()); c.stdin!.end("{}"); });
+    await run({ OMH_DRY_RUN: "1" });
+    await expect(access(join(dir, ".omh", "state", "events.jsonl"))).rejects.toThrow();
+    await run({});
+    await expect(access(join(dir, ".omh", "state", "events.jsonl"))).resolves.toBeUndefined();
+    await rm(dir, { recursive: true, force: true });
+  });
+
   it("inserts logger after INPUT=$(cat)", () => {
     const script = "#!/bin/bash\nset -euo pipefail\nINPUT=$(cat)\nexit 0";
     const result = wrapWithLogger(script);

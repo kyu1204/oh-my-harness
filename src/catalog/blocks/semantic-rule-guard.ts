@@ -52,6 +52,7 @@ RULES_JSON=$(printf '%s' "$RULES_RAW" | jq -Rs 'rtrimstr("\\nOMH_RULES_SEP") | s
 STATE=$(echo "$INPUT" | jq -c '{
   tool: .tool_name,
   command: .tool_input.command,
+  description: .tool_input.description,
   file_path: .tool_input.file_path,
   old_string: ((.tool_input.old_string // "") | .[0:2000]),
   new_string: ((.tool_input.new_string // "") | .[0:4000]),

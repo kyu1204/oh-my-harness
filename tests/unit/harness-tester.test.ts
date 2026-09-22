@@ -291,6 +291,35 @@ describe("runTestCase", () => {
     expect(result.error).toBeUndefined();
   });
 
+  it("runs a hook registered with an absolute path (QA: settings.json registers bash '/abs/path.sh')", async () => {
+    const scriptDir = path.join(tmpDir, ".omh", "hooks");
+    await fs.mkdir(scriptDir, { recursive: true });
+    const scriptPath = path.join(scriptDir, "abs-guard.sh");
+    await fs.writeFile(scriptPath, `#!/bin/bash\necho '{"decision":"block","reason":"blocked"}'`, { mode: 0o755 });
+
+    const result = await runTestCase(tmpDir, {
+      name: "absolute path",
+      category: "path-guard",
+      hookScript: scriptPath,
+      input: { tool_name: "Edit", tool_input: { file_path: "dist/test.js" } },
+      expectation: "block",
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.passed).toBe(true);
+  });
+
+  it("runs hooks with OMH_DRY_RUN=1 so dry runs never reach the event log", async () => {
+    const scriptDir = path.join(tmpDir, ".omh", "hooks");
+    await fs.mkdir(scriptDir, { recursive: true });
+    const scriptPath = path.join(scriptDir, "env-guard.sh");
+    await fs.writeFile(scriptPath, `#!/bin/bash\n[ "\${OMH_DRY_RUN:-}" = "1" ] && echo '{"decision":"block","reason":"dry"}'\nexit 0`, { mode: 0o755 });
+    const result = await runTestCase(tmpDir, {
+      name: "dry run env", category: "path-guard", hookScript: scriptPath,
+      input: { tool_name: "Edit", tool_input: { file_path: "x" } }, expectation: "block",
+    });
+    expect(result.actual).toBe("block");
+  });
+
   it("returns passed false with error message when decision mismatches", async () => {
     const scriptDir = path.join(tmpDir, ".omh", "hooks");
     await fs.mkdir(scriptDir, { recursive: true });

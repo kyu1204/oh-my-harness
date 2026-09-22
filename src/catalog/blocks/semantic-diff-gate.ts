@@ -37,6 +37,38 @@ if ! command -v "$JGREP" >/dev/null 2>&1; then
   _log_event "allow" "skipped: jgrep not found (npm i -g jevgrep && jgrep init to enable the semantic diff gate)"
   exit 0
 fi
+GIT_DIR_PATH=$(git rev-parse --git-dir 2>/dev/null) || { _log_event "allow" "skipped: not a git repository"; exit 0; }
+
+# The agent usually stages and commits in one call, so at this point the index
+# does not hold what the commit will contain. Preview it in a temporary index:
+# copy the real one, replay every "git add ..." from the command (and
+# "git add -u" for commit -a/--all), then let jgrep read that index through
+# GIT_INDEX_FILE. The real index is never touched.
+TMPIDX=$(mktemp)
+if [[ -f "$GIT_DIR_PATH/index" ]]; then cp "$GIT_DIR_PATH/index" "$TMPIDX"; else rm -f "$TMPIDX"; fi
+export GIT_INDEX_FILE="$TMPIDX"
+while IFS= read -r ADD_LINE; do
+  [[ -z "$ADD_LINE" ]] && continue
+  IFS=$'\\t' read -r -a ADD_ARGS <<< "$ADD_LINE"
+  git add "\${ADD_ARGS[@]}" >/dev/null 2>&1 || true
+done < <(_omh_simple_commands "$COMMAND" | awk -F '\\t' '
+  { i = 1
+    while (i <= NF && $i ~ /^[A-Za-z_][A-Za-z0-9_]*=/) i++
+    if (i > NF || $i != "git") next
+    i++
+    while (i <= NF && $i ~ /^-/) { if ($i == "-c" || $i == "-C") i++; i++ }
+    if (i > NF) next
+    if ($i == "add") {
+      line = ""
+      for (j = i + 1; j <= NF; j++) {
+        if ($j ~ /^-(p|i|e|-patch|-interactive|-edit)$/) next
+        line = line (line == "" ? "" : "\\t") $j
+      }
+      if (line != "") print line
+    } else if ($i == "commit") {
+      for (j = i + 1; j <= NF; j++) if ($j == "--all" || ($j ~ /^-[A-Za-z]+$/ && $j ~ /a/)) { print "-u"; break }
+    } }')
+_omh_sdg_done() { rm -f "$TMPIDX"; }
 
 RULES_RAW=$(cat <<'OMH_RULES'
 {{#each rules}}{{{this}}}
@@ -45,9 +77,11 @@ OMH_RULES_SEP
 OMH_RULES
 )
 HITS=""
+N=0
 ERR=$(mktemp)
 while IFS= read -r RULE; do
   [[ -z "$RULE" ]] && continue
+  N=$((N + 1))
   STATUS=0
   OUT=$("$JGREP" --json -t {{threshold}} --diff --staged "$RULE" 2>"$ERR") || STATUS=$?
   case "$STATUS" in
@@ -59,10 +93,10 @@ $LINES
     1) ;;
     *)
       _log_event "allow" "jgrep failed (exit $STATUS): $(head -c 200 "$ERR" | tr '\\n' ' ')"
-      rm -f "$ERR"; exit 0 ;;
+      rm -f "$ERR"; _omh_sdg_done; exit 0 ;;
   esac
 done < <(printf '%s' "$RULES_RAW" | jq -Rs -r 'rtrimstr("\\nOMH_RULES_SEP") | split("\\nOMH_RULES_SEP\\n") | map(select(. != "")) | .[]')
-rm -f "$ERR"
+rm -f "$ERR"; _omh_sdg_done
 
 if [[ -n "$HITS" ]]; then
   REASON="oh-my-harness: the staged diff matches a lint rule; fix these hunks before committing:
@@ -71,5 +105,6 @@ $HITS"
   _emit_decision "block" "$REASON"
   exit 0
 fi
+_log_event "allow" "no lint hits ($N rules)"
 exit 0`,
 };

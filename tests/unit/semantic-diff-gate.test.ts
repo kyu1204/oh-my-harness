@@ -107,6 +107,37 @@ case "$*" in *secret*) echo '[{"file":"app.ts","start":1,"end":1,"p":0.97,"text"
     expect(ev.at(-1)).toMatchObject({ decision: "allow", reason: expect.stringMatching(/jgrep failed/) });
   });
 
+  // Claude usually stages and commits in one call. At PreToolUse time nothing is
+  // staged yet, so the gate previews the index the command would build.
+  const INDEX_AWARE = `if git diff --staged | grep -q sk-live; then echo '[{"file":"x","start":1,"end":1,"p":0.97,"text":"t"}]'; exit 0; fi; echo '[]'; exit 1`;
+  function commitCmd(script: string, command: string): string {
+    try {
+      return execSync(`/bin/bash "${script}"`, { cwd: dir, encoding: "utf-8", timeout: 15_000, input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }), env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } });
+    } catch (e) { return (e as { stdout?: string }).stdout ?? ""; }
+  }
+
+  it("lints what `git add <paths> && git commit` would stage, and only that", async () => {
+    sh("git reset -q");
+    await writeFile(join(dir, "secret.ts"), "const k = 'sk-live-999';\n");
+    await writeFile(join(dir, "clean.ts"), "export const ok = 1;\n");
+    await fakeJgrep(INDEX_AWARE);
+    const s = await gate({ rules: ["hardcodes a secret"], threshold: 0.85, jgrep: "jgrep" });
+    expect(JSON.parse(commitCmd(s, "git add secret.ts && git commit -m x").trim()).decision).toBe("block");
+    expect(commitCmd(s, "git add clean.ts && git commit -m x").trim()).toBe("");
+    expect(JSON.parse(commitCmd(s, "git add -A && git commit -m x").trim()).decision).toBe("block");
+    // the real index is untouched by the preview
+    expect(sh("git diff --staged --name-only").trim()).toBe("");
+  });
+
+  it("lints tracked modifications for `git commit -a`", async () => {
+    sh("git add app.ts && git -c user.name=t -c user.email=t@t commit -qm base");
+    await writeFile(join(dir, "app.ts"), "const token = 'sk-live-456';\n");
+    await fakeJgrep(INDEX_AWARE);
+    const s = await gate({ rules: ["hardcodes a secret"], threshold: 0.85, jgrep: "jgrep" });
+    expect(JSON.parse(commitCmd(s, "git commit -am x").trim()).decision).toBe("block");
+    expect(commitCmd(s, "git commit -m x").trim()).toBe("");
+  });
+
   it("ignores commands that are not git commit", async () => {
     await fakeJgrep(`echo "should not run" >> "${dir}/jgrep.calls"; exit 0`);
     const s = await gate({ rules: RULES, threshold: 0.85, jgrep: "jgrep" });

@@ -89,6 +89,9 @@ describe.skipIf(!hasJq())("semantic-rule-guard execution", () => {
     expect(out.reason).toMatch(/Do not add npm dependencies/);
     expect(out.reason).toMatch(/0\.96/);
     expect(lastBody).toMatchObject({ model: "jev-latest", state: { tool: "Bash", command: "npm install lodash" } });
+    // Claude Code sends a one-line description with Bash calls; it is context Jev should see
+    await call(s, { tool_name: "Bash", tool_input: { command: "npm i left-pad", description: "Add left-pad dependency" }, transcript_path: "/x" });
+    expect(lastBody!.state).toMatchObject({ command: "npm i left-pad", description: "Add left-pad dependency" });
     expect(Object.keys(lastBody!.questions as object)).toEqual(["rule:1", "rule:2"]);
   });
 

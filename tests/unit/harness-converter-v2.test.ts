@@ -410,6 +410,31 @@ describe("rule-derived guards (#144, #145)", () => {
     expect(merged.hooks.preToolUse.map((x) => x.id)).toEqual(expect.arrayContaining(["catalog-semantic-rule-guard", "catalog-semantic-diff-gate"]));
   });
 
+  it("merges enforce/lint rules into an explicit entry's rules instead of dropping them (QA: strict preset writes the gate explicitly)", async () => {
+    const { HarnessConfigSchema } = await import("../../src/core/harness-schema.js");
+    const registry = await createDefaultRegistry();
+    const h = HarnessConfigSchema.parse({
+      version: "1.0", loop: { enabled: false },
+      rules: [
+        { id: "a", title: "No deps", content: "no new deps", enforce: true },
+        { id: "b", title: "B", content: "x", lint: "logs a secret" },
+        { id: "c", title: "C", content: "x", lint: "preset lint" },
+      ],
+      hooks: [
+        { block: "semantic-diff-gate", params: { rules: ["preset lint"], threshold: 0.9 }, mode: "block" },
+        { block: "semantic-rule-guard", params: { rules: ["custom"], blockAbove: 0.95 }, mode: "ask" },
+      ],
+    });
+    const entries = effectiveHookEntries(h, registry);
+    const sdg = entries.filter((e) => e.block === "semantic-diff-gate");
+    expect(sdg).toHaveLength(1);
+    expect(sdg[0].params).toMatchObject({ rules: ["preset lint", "logs a secret"], threshold: 0.9 });
+    const srg = entries.filter((e) => e.block === "semantic-rule-guard");
+    expect(srg).toHaveLength(1);
+    expect(srg[0].params).toMatchObject({ rules: ["custom", "No deps: no new deps"], blockAbove: 0.95 });
+    expect(srg[0].mode).toBe("ask");
+  });
+
   it("adds neither without such rules, and an explicit entry keeps its own params", async () => {
     const { HarnessConfigSchema } = await import("../../src/core/harness-schema.js");
     const registry = await createDefaultRegistry();
@@ -422,7 +447,7 @@ describe("rule-derived guards (#144, #145)", () => {
     });
     const e = effectiveHookEntries(explicit, registry).filter((x) => x.block === "semantic-rule-guard");
     expect(e).toHaveLength(1);
-    expect(e[0].params).toMatchObject({ rules: ["custom"], blockAbove: 0.95 });
+    expect(e[0].params).toMatchObject({ rules: ["custom", "A: no deps"], blockAbove: 0.95 });
     expect(e[0].mode).toBe("ask");
   });
 });

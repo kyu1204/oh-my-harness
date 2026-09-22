@@ -324,6 +324,8 @@ _OMH_EVENT="${event}"
 _OMH_DECISION_MODE="${mode}"
 _OMH_LOGGED=0
 _log_event() {
+  # omh test runs hooks as dry runs: decisions are reported, never recorded.
+  if [ -n "\${OMH_DRY_RUN:-}" ]; then _OMH_LOGGED=1; return 0; fi
   # Build the JSONL record entirely through jq so every string field is
   # JSON-escaped (quotes, backslashes, newlines, unicode). The previous
   # printf+%s approach corrupted the line whenever reason or any other

@@ -103,12 +103,17 @@ function addLoopGuard(entries: HookEntry[], harness: HarnessConfig): void {
 // when such rules exist; an explicit entry keeps its own params and mode.
 function addRuleDerivedGuards(entries: HookEntry[], harness: HarnessConfig, registry: { has(id: string): boolean }): void {
   const enforced = harness.rules.filter((r) => r.enforce).map((r) => `${r.title}: ${r.content}`);
-  if (enforced.length > 0 && registry.has("semantic-rule-guard") && !entries.some((h) => h.block === "semantic-rule-guard")) {
-    entries.push({ block: "semantic-rule-guard", params: { rules: enforced }, mode: "block" });
-  }
   const lints = harness.rules.map((r) => r.lint).filter((l): l is string => Boolean(l && l.trim()));
-  if (lints.length > 0 && registry.has("semantic-diff-gate") && !entries.some((h) => h.block === "semantic-diff-gate")) {
-    entries.push({ block: "semantic-diff-gate", params: { rules: lints }, mode: "block" });
+  for (const [block, rules] of [["semantic-rule-guard", enforced], ["semantic-diff-gate", lints]] as const) {
+    if (rules.length === 0 || !registry.has(block)) continue;
+    const explicit = entries.find((h) => h.block === block);
+    if (!explicit) {
+      entries.push({ block, params: { rules: [...rules] }, mode: "block" });
+      continue;
+    }
+    // An explicit entry (the strict preset writes one) keeps its params and mode; rule-derived texts are appended.
+    const own = Array.isArray(explicit.params.rules) ? (explicit.params.rules as string[]) : [];
+    explicit.params = { ...explicit.params, rules: [...own, ...rules.filter((r) => !own.includes(r))] };
   }
 }
 

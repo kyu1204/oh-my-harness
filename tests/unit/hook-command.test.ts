@@ -13,9 +13,9 @@ describe("buildHookCommand", () => {
     expect(buildHookCommand(REL, "claude")).toBe(`bash "\${CLAUDE_PROJECT_DIR}/${REL}"`);
   });
 
-  it("codex: anchors on the git root with a cwd fallback", () => {
+  it("codex: walks up from the cwd to the directory that holds .omh/hooks", () => {
     expect(buildHookCommand(REL, "codex")).toBe(
-      `bash "$(git rev-parse --show-toplevel 2>/dev/null || pwd)/${REL}"`,
+      `bash "$(d=$PWD; until [ -e "$d/.omh/hooks" ] || [ "$d" = / ]; do d=$(dirname "$d"); done; echo "$d")/${REL}"`,
     );
   });
 

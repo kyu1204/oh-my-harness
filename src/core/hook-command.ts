@@ -1,4 +1,5 @@
 import path from "node:path";
+import { OMH_HOOKS_DIR } from "../utils/paths.js";
 
 /**
  * Hook command lines, one shape per runtime (#154). None of them embed the
@@ -8,13 +9,15 @@ import path from "node:path";
  * - claude: Claude Code exports CLAUDE_PROJECT_DIR to hooks and keeps it on the
  *   project root even after `cd` or entering a worktree.
  * - codex:  Codex runs hooks in the session cwd (possibly a subdirectory) and
- *   has no project-root variable, so resolve from the git root (cwd fallback).
+ *   has no project-root variable, so walk up from the cwd to the directory that
+ *   holds .omh/hooks. The git root would be wrong inside a submodule or nested
+ *   repository, and absent outside git.
  * - pi:     the Pi bridge spawns with cwd = project root; a relative path is enough.
  */
 export type HookRuntime = "claude" | "codex" | "pi";
 
 const CLAUDE_ROOT = "${CLAUDE_PROJECT_DIR}";
-const CODEX_ROOT = "$(git rev-parse --show-toplevel 2>/dev/null || pwd)";
+const CODEX_ROOT = `$(d=$PWD; until [ -e "$d/${OMH_HOOKS_DIR}" ] || [ "$d" = / ]; do d=$(dirname "$d"); done; echo "$d")`;
 const ROOT_ANCHORS = [CLAUDE_ROOT, "$CLAUDE_PROJECT_DIR", CODEX_ROOT];
 
 export function buildHookCommand(scriptRel: string, runtime: HookRuntime): string {
@@ -38,7 +41,9 @@ export interface ParsedHookCommand {
 
 /** Parse `bash <path>` in any of the emitted shapes (or a bare/legacy path). */
 export function parseHookCommand(command: string): ParsedHookCommand | null {
-  const m = command.trim().match(/^bash\s+(?:'([^']*)'|"([^"]*)"|([^\s'"]+))$/);
+  // The double-quoted form may itself contain double quotes (the Codex anchor
+  // is a small shell snippet), so match greedily up to the closing quote.
+  const m = command.trim().match(/^bash\s+(?:'([^']*)'|"(.*)"|([^\s'"]+))$/);
   if (!m) return null;
   const raw = m[1] ?? m[2] ?? m[3];
   for (const root of ROOT_ANCHORS) {

@@ -71,7 +71,7 @@ export function buildCodexHooks(hooksOutput: HooksOutput): {
     }
     codexHooks.hooks[event] = entries.map((entry) => ({
       matcher: normalizeMatcher(entry.matcher ?? ""),
-      // Codex has no CLAUDE_PROJECT_DIR; re-anchor the command on the git root (#154).
+      // Codex has no CLAUDE_PROJECT_DIR; re-anchor the command on the .omh/hooks owner found from the cwd (#154).
       hooks: entry.hooks.map((h) => ({ type: h.type, command: rewriteHookCommand(h.command, "codex") })),
     }));
   }

@@ -18,7 +18,7 @@ function makeHooksOutput(overrides: Partial<HooksOutput["hooksConfig"]> = {}): H
 }
 
 describe("buildCodexHooks", () => {
-  it("rewrites the Claude project-dir anchor into a git-root anchor (#154)", () => {
+  it("rewrites the Claude project-dir anchor into a cwd walk-up anchor (#154)", () => {
     const out = makeHooksOutput({
       PreToolUse: [
         { matcher: "Bash", hooks: [{ type: "command", command: 'bash "${CLAUDE_PROJECT_DIR}/.omh/hooks/x.sh"' }] },
@@ -26,7 +26,7 @@ describe("buildCodexHooks", () => {
     });
     const { codexHooks } = buildCodexHooks(out);
     expect(codexHooks.hooks.PreToolUse[0].hooks[0].command).toBe(
-      'bash "$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.omh/hooks/x.sh"',
+      'bash "$(d=$PWD; until [ -e "$d/.omh/hooks" ] || [ "$d" = / ]; do d=$(dirname "$d"); done; echo "$d")/.omh/hooks/x.sh"',
     );
   });
 

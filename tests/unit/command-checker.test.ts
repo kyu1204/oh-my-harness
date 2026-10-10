@@ -165,6 +165,14 @@ gh pr create --fill
     await rm(tmpDir, { recursive: true, force: true });
   });
 
+  it("resolves project-dir anchored commands against projectDir (#154)", async () => {
+    const hooks = [
+      { event: "PreToolUse", matcher: "Bash", command: 'bash "${CLAUDE_PROJECT_DIR}/pre-commit-test-gate.sh"' },
+    ];
+    const results = await checkHarnessCommands(hooks, tmpDir);
+    expect(results.find((r) => r.command === "npm test")).toBeDefined();
+  });
+
   it("extracts and checks commands from pre-commit gate script", async () => {
     const hooks = [
       { event: "PreToolUse", matcher: "Bash", command: `bash pre-commit-test-gate.sh` },

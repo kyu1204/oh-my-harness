@@ -14,6 +14,13 @@ function hooksConfig(entries: Record<string, Array<{ matcher: string; command: s
 }
 
 describe("extractPiBindings", () => {
+  it("rewrites the Claude project-dir anchor into a project-relative path (#154)", () => {
+    const cfg = hooksConfig({
+      PreToolUse: [{ matcher: "Bash", command: 'bash "${CLAUDE_PROJECT_DIR}/.omh/hooks/x.sh"' }],
+    });
+    expect(extractPiBindings(cfg)).toEqual([{ tools: ["bash"], command: "bash '.omh/hooks/x.sh'" }]);
+  });
+
   it("maps a Bash PreToolUse hook to the pi 'bash' tool", () => {
     const cfg = hooksConfig({
       PreToolUse: [{ matcher: "Bash", command: "bash '/abs/.omh/hooks/catalog-command-guard.sh'" }],

@@ -47,7 +47,7 @@ function hasJq(): boolean {
 
 async function guard(params: Record<string, unknown>, mode: "block" | "ask" = "block") {
   const p = join(dir, "srg.sh");
-  await writeFile(p, wrapWithLogger(renderTemplate(semanticRuleGuard.template, params), "PreToolUse", dir, mode), { mode: 0o755 });
+  await writeFile(p, wrapWithLogger(renderTemplate(semanticRuleGuard.template, params), "PreToolUse", mode), { mode: 0o755 });
   return p;
 }
 // async on purpose: the fake TypeSafe server runs in this same process, so a

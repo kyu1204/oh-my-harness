@@ -27,7 +27,7 @@ async function fakeJgrep(script: string) {
 }
 async function gate(params: Record<string, unknown>) {
   const p = join(dir, "sdg.sh");
-  await writeFile(p, wrapWithLogger(renderTemplate(semanticDiffGate.template, params), "PreToolUse", dir), { mode: 0o755 });
+  await writeFile(p, wrapWithLogger(renderTemplate(semanticDiffGate.template, params), "PreToolUse"), { mode: 0o755 });
   return p;
 }
 function commit(script: string, withJgrep = true): string {
@@ -148,8 +148,13 @@ case "$*" in *secret*) echo '[{"file":"app.ts","start":1,"end":1,"p":0.97,"text"
   });
 
   it("lints tracked modifications for `git commit -a`", async () => {
-    sh("git add app.ts && git -c user.name=t -c user.email=t@t commit -qm base");
+    // Pin file, index entry and index file to one second with the same size:
+    // git then sees the edit only through its racy-clean check, which depends
+    // on the index file's mtime. The gate's temp index must preserve it.
+    const T = "202601010000.00";
+    sh(`touch -t ${T} app.ts && git add app.ts && git -c user.name=t -c user.email=t@t commit -qm base && touch -t ${T} .git/index`);
     await writeFile(join(dir, "app.ts"), "const token = 'sk-live-456';\n");
+    sh(`touch -t ${T} app.ts`);
     await fakeJgrep(INDEX_AWARE);
     const s = await gate({ rules: ["hardcodes a secret"], threshold: 0.85, jgrep: "jgrep" });
     expect(JSON.parse(commitCmd(s, "git commit -am x").trim()).decision).toBe("block");

@@ -4,6 +4,7 @@ import path from "node:path";
 import type { HookEntry, BuildingBlock } from "../catalog/types.js";
 import { applyDefaults } from "../catalog/template-engine.js";
 import { OMH_HOOKS_DIR, OMH_STATE_DIR, OMH_TDD_STATE_FILE } from "../utils/paths.js";
+import { parseHookCommand } from "../core/hook-command.js";
 
 export interface HookInput {
   tool_name: string;
@@ -122,7 +123,7 @@ export async function runTestCase(
   projectDir: string,
   testCase: TestCase,
 ): Promise<TestResult> {
-  // settings.json registers hooks as `bash '/abs/path.sh'`, so hookScript is usually absolute
+  // hookScript is project-relative (anchor stripped by parseHookCommand) or, for legacy configs, absolute
   const hookPath = path.isAbsolute(testCase.hookScript) ? testCase.hookScript : path.join(projectDir, testCase.hookScript);
 
   try {
@@ -182,11 +183,11 @@ export function generateBlockTestCases(
     };
     const aliases = blockIdAliases[block.id] ?? [block.id];
     const matchedHook = registeredHooks?.find((h) => {
-      const scriptName = h.command.replace(/^bash\s+/, "").replace(/^['"]|['"]$/g, "");
+      const scriptName = parseHookCommand(h.command)?.script ?? h.command;
       return aliases.some((alias) => scriptName.includes(alias));
     });
     const hookScript = matchedHook
-      ? matchedHook.command.replace(/^bash\s+/, "").replace(/^['"]|['"]$/g, "")
+      ? parseHookCommand(matchedHook.command)?.script ?? matchedHook.command
       : `${OMH_HOOKS_DIR}/catalog-${block.id}.sh`;
 
     switch (block.id) {

@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { resolveHookScript } from "../core/hook-command.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -79,8 +80,8 @@ export async function checkHarnessCommands(
   const path = await import("node:path");
 
   for (const hook of hooks) {
-    const scriptPath = hook.command.replace(/^bash\s+/, "").replace(/^['"]|['"]$/g, "");
-    const fullPath = path.join(projectDir, scriptPath);
+    const fullPath = resolveHookScript(hook.command, projectDir);
+    if (!fullPath) continue;
 
     let content: string;
     try {
@@ -89,7 +90,7 @@ export async function checkHarnessCommands(
       continue; // 스크립트 파일 없으면 스킵
     }
 
-    const scriptName = path.basename(scriptPath);
+    const scriptName = path.basename(fullPath);
 
     // pre-commit gate류 — 파일명 매칭 확장 + 내용 기반 감지
     if (

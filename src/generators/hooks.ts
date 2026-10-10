@@ -1,16 +1,10 @@
 import { mkdir, writeFile, chmod, readFile, unlink } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, join, relative } from "node:path";
 import type { MergedConfig } from "../core/merged-config.js";
 import type { PlannedFile } from "../core/plan.js";
-import { OMH_HOOKS_DIR, OMH_STATE_DIR, OMH_MANIFEST, OMH_EVENTS_FILE } from "../utils/paths.js";
+import { OMH_DIR, OMH_HOOKS_DIR, OMH_STATE_DIR, OMH_MANIFEST, OMH_EVENTS_FILE } from "../utils/paths.js";
+import { buildHookCommand } from "../core/hook-command.js";
 import { OMH_VERSION } from "../utils/version.js";
-
-// Wrap a path/value in bash single quotes, escaping any embedded single
-// quotes. Single-quoted strings are not subject to shell expansion, so this
-// is safe for paths containing $, backticks, double quotes, etc.
-function shellSingleQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
 
 // Shell-token helpers shared by every generated hook (#109). Guards must not
 // grep the raw command string: text inside quotes or heredocs is data, not a
@@ -312,12 +306,13 @@ _omh_cmd_has_pattern() {
     END { exit found ? 0 : 1 }'
 }`;
 
-function buildLoggerSnippet(event: string, projectDir?: string, mode: "block" | "ask" = "block"): string {
-  const stateDir = projectDir
-    ? `${projectDir}/${OMH_STATE_DIR}`
-    : OMH_STATE_DIR;
+function buildLoggerSnippet(event: string, mode: "block" | "ask" = "block"): string {
+  // Resolve the state dir from the script's own location (<root>/.omh/hooks/x.sh)
+  // so no machine path is baked into the script (#154). Scripts living elsewhere
+  // (only test fixtures) fall back to the cwd.
+  const stateRel = relative(OMH_DIR, OMH_STATE_DIR);
   return `# --- oh-my-harness event logger ---
-_OMH_STATE_DIR=${shellSingleQuote(stateDir)}
+case "$0" in *${OMH_HOOKS_DIR}/*) _OMH_STATE_DIR="$(cd "$(dirname "$0")/.." && pwd -P)/${stateRel}" ;; *) _OMH_STATE_DIR="$PWD/${OMH_STATE_DIR}" ;; esac
 mkdir -p "$_OMH_STATE_DIR" 2>/dev/null || true
 _OMH_HOOK_NAME="$(basename "$0")"
 _OMH_EVENT="${event}"
@@ -389,10 +384,9 @@ trap '_OMH_EXIT_CODE=$?; if [ "$_OMH_LOGGED" -eq 0 ]; then if [ "$_OMH_EXIT_CODE
 export function wrapWithLogger(
   script: string,
   event: string = "unknown",
-  projectDir?: string,
   mode: "block" | "ask" = "block",
 ): string {
-  const snippet = buildLoggerSnippet(event, projectDir, mode);
+  const snippet = buildLoggerSnippet(event, mode);
   if (script.includes("INPUT=$(cat)")) {
     return script.replace("INPUT=$(cat)", () => `INPUT=$(cat)\n\n${snippet}`);
   }
@@ -522,7 +516,7 @@ export async function computeHooks(options: GenerateHooksOptions): Promise<Hooks
   }
 
   const usedScriptNames = new Set<string>();
-  const planned: Array<{ event: string; matcher: string; scriptPath: string; wrappedScript: string }> = [];
+  const planned: Array<{ event: string; matcher: string; scriptRel: string; scriptPath: string; wrappedScript: string }> = [];
 
   for (const hook of allHooks) {
     if (!hook.inline) continue;
@@ -539,8 +533,9 @@ export async function computeHooks(options: GenerateHooksOptions): Promise<Hooks
     planned.push({
       event: hook.event,
       matcher: hook.matcher,
+      scriptRel: `${OMH_HOOKS_DIR}/${scriptName}`,
       scriptPath: join(hooksDir, scriptName),
-      wrappedScript: wrapWithLogger(hook.inline, hook.event, projectDir, hook.mode ?? "block"),
+      wrappedScript: wrapWithLogger(hook.inline, hook.event, hook.mode ?? "block"),
     });
   }
 
@@ -551,7 +546,7 @@ export async function computeHooks(options: GenerateHooksOptions): Promise<Hooks
     hooksConfig[p.event].push({
       // Stop (and SubagentStop) have no matcher support in Claude Code: omit the key rather than emit "".
       ...(p.event === "Stop" || p.event === "SubagentStop" ? {} : { matcher: p.matcher }),
-      hooks: [{ type: "command", command: `bash ${shellSingleQuote(p.scriptPath)}` }],
+      hooks: [{ type: "command", command: buildHookCommand(p.scriptRel, "claude") }],
     });
   }
 

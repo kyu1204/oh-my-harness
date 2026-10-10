@@ -25,7 +25,7 @@ function hasJq(): boolean {
 }
 async function gate(params: Record<string, unknown>) {
   const p = join(aux, "stop-test-gate.sh");
-  await writeFile(p, wrapWithLogger(renderTemplate(stopTestGate.template, params), "Stop", dir), { mode: 0o755 });
+  await writeFile(p, wrapWithLogger(renderTemplate(stopTestGate.template, params), "Stop"), { mode: 0o755 });
   return p;
 }
 function stop(script: string, input: object): string {

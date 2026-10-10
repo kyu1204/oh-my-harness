@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, stat } from "node:fs/promises";
+import { mkdtemp, rm, readFile, stat, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { generate } from "../../src/core/generator.js";
@@ -16,6 +16,26 @@ afterEach(async () => {
 });
 
 describe("generate() pipeline", () => {
+  it("writes no absolute machine path into generated configs or hook scripts (#154)", async () => {
+    const config: MergedConfig = {
+      presets: ["test-preset"],
+      variables: {},
+      claudeMdSections: [],
+      hooks: {
+        preToolUse: [{ id: "cmd-guard", matcher: "Bash", inline: "#!/bin/bash\nset -euo pipefail\nINPUT=$(cat)\nexit 0" }],
+        postToolUse: [],
+      },
+      settings: { permissions: { allow: [], deny: [] } },
+    };
+    await generate({ projectDir: tmpDir, config });
+    const real = await realpath(tmpDir);
+    for (const rel of [".claude/settings.json", ".codex/hooks.json", ".pi/extensions/omh-harness.ts", ".omh/hooks/cmd-guard.sh"]) {
+      const content = await readFile(join(tmpDir, rel), "utf-8");
+      expect(content, rel).not.toContain(tmpDir);
+      expect(content, rel).not.toContain(real);
+    }
+  });
+
   it("generates CLAUDE.md with rule content from MergedConfig", async () => {
     const config: MergedConfig = {
       presets: ["test-preset"],

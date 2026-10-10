@@ -37,7 +37,7 @@ type ToolCallHandler = (
 // .pi/extensions, and dynamically import it to capture the tool_call handler.
 async function setupBridge(mode: "block" | "ask", patterns: string[]): Promise<ToolCallHandler> {
   const rendered = renderTemplate(commandGuard.template, { patterns });
-  const wrapped = wrapWithLogger(rendered, "PreToolUse", undefined, mode);
+  const wrapped = wrapWithLogger(rendered, "PreToolUse", mode);
   await mkdir(join(projectDir, ".omh", "hooks"), { recursive: true });
   const scriptAbs = join(projectDir, ".omh", "hooks", "catalog-command-guard.sh");
   await writeFile(scriptAbs, wrapped, { mode: 0o755 });

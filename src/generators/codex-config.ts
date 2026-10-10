@@ -3,6 +3,7 @@ import path from "node:path";
 import { parse, stringify } from "smol-toml";
 import type { HooksOutput } from "./hooks.js";
 import { isOmhHookCommand } from "../core/managed-hooks.js";
+import { rewriteHookCommand } from "../core/hook-command.js";
 
 export interface GenerateCodexConfigOptions {
   projectDir: string;
@@ -70,7 +71,8 @@ export function buildCodexHooks(hooksOutput: HooksOutput): {
     }
     codexHooks.hooks[event] = entries.map((entry) => ({
       matcher: normalizeMatcher(entry.matcher ?? ""),
-      hooks: entry.hooks.map((h) => ({ type: h.type, command: h.command })),
+      // Codex has no CLAUDE_PROJECT_DIR; re-anchor the command on the git root (#154).
+      hooks: entry.hooks.map((h) => ({ type: h.type, command: rewriteHookCommand(h.command, "codex") })),
     }));
   }
 

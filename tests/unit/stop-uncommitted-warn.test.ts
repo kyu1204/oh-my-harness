@@ -22,7 +22,7 @@ function hasJq(): boolean {
 }
 async function hook() {
   const p = join(aux, "stop-uncommitted-warn.sh");
-  await writeFile(p, wrapWithLogger(renderTemplate(stopUncommittedWarn.template, {}), "Stop", dir), { mode: 0o755 });
+  await writeFile(p, wrapWithLogger(renderTemplate(stopUncommittedWarn.template, {}), "Stop"), { mode: 0o755 });
   return p;
 }
 function stop(script: string): string {

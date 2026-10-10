@@ -433,6 +433,15 @@ describe("generateBlockTestCases", () => {
     expect(cases[0].hookScript).toBe(".omh/hooks/harness-file-guard.sh");
   });
 
+  it("strips the project-dir anchor from registered hook commands (#154)", () => {
+    const entries = [{ block: "path-guard", params: { blockedPaths: ["dist/"] } }];
+    const registeredHooks = [
+      { event: "PreToolUse", matcher: "Edit|Write", command: 'bash "${CLAUDE_PROJECT_DIR}/.omh/hooks/catalog-path-guard.sh"' },
+    ];
+    const cases = generateBlockTestCases(entries, builtinBlocks, undefined, registeredHooks);
+    expect(cases[0].hookScript).toBe(".omh/hooks/catalog-path-guard.sh");
+  });
+
   it("falls back to catalog- prefix when no registered hook matches", () => {
     const entries = [{ block: "path-guard", params: { blockedPaths: ["dist/"] } }];
     const cases = generateBlockTestCases(entries, builtinBlocks);

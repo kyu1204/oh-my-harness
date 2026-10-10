@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { HooksOutput } from "./hooks.js";
+import { rewriteHookCommand } from "../core/hook-command.js";
 
 /**
  * Pi (pi.dev) emitter.
@@ -22,9 +23,9 @@ export interface PiBinding {
   /** Pi tool names this binding intercepts (e.g. ["edit", "write"]). */
   tools: string[];
   /**
-   * The exact shell command line that runs the generated hook, as emitted into
-   * the Claude/Codex settings (e.g. `bash '/abs/.omh/hooks/foo.sh'`). The bridge
-   * runs it through a shell so the format stays identical across all emitters.
+   * The shell command line that runs the generated hook, project-relative
+   * (e.g. `bash '.omh/hooks/foo.sh'`). The bridge runs it through a shell with
+   * cwd = project root, so no machine path is baked into the extension (#154).
    */
   command: string;
 }
@@ -70,7 +71,7 @@ export function extractPiBindings(hooksConfig: HooksOutput["hooksConfig"]): PiBi
     const tools = matcherToPiTools(entry.matcher ?? "");
     if (tools.length === 0) continue;
     for (const hook of entry.hooks) {
-      bindings.push({ tools, command: hook.command });
+      bindings.push({ tools, command: rewriteHookCommand(hook.command, "pi") });
     }
   }
   return bindings;
@@ -133,8 +134,8 @@ export default function (pi: ExtensionAPI) {
       if (!binding.tools.includes(event.toolName)) continue;
 
       const payload = buildPayload(event.toolName, event.input as Record<string, unknown>);
-      // binding.command is a full shell command line (e.g. bash '/abs/foo.sh'),
-      // identical to what Claude/Codex settings invoke — run it through a shell.
+      // binding.command is a full shell command line (e.g. bash '.omh/hooks/foo.sh'),
+      // relative to PROJECT_ROOT — run it through a shell from there.
       const proc = spawnSync(binding.command, {
         cwd: PROJECT_ROOT,
         input: JSON.stringify(payload),

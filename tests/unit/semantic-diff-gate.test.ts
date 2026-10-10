@@ -27,7 +27,7 @@ async function fakeJgrep(script: string) {
 }
 async function gate(params: Record<string, unknown>) {
   const p = join(dir, "sdg.sh");
-  await writeFile(p, wrapWithLogger(renderTemplate(semanticDiffGate.template, params), "PreToolUse", dir), { mode: 0o755 });
+  await writeFile(p, wrapWithLogger(renderTemplate(semanticDiffGate.template, params), "PreToolUse"), { mode: 0o755 });
   return p;
 }
 function commit(script: string, withJgrep = true): string {

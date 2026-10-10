@@ -57,7 +57,7 @@ const CODEX_STDIN = JSON.stringify({
 
 async function buildScript(mode: "block" | "ask"): Promise<string> {
   const rendered = renderTemplate(commandGuard.template, { patterns: ["rm -rf /"] });
-  const wrapped = wrapWithLogger(rendered, "PreToolUse", undefined, mode);
+  const wrapped = wrapWithLogger(rendered, "PreToolUse", mode);
   const scriptPath = join(tmpDir, `command-guard-${mode}.sh`);
   await writeFile(scriptPath, wrapped, { mode: 0o755 });
   return scriptPath;

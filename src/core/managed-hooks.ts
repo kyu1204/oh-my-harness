@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { parseHookCommand } from "./hook-command.js";
 import { OMH_HOOKS_DIR } from "../utils/paths.js";
 
 function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
@@ -56,7 +57,13 @@ export async function isOmhHookCommand(command: unknown, projectDir: string): Pr
   if (!hooksDirReal) return false;
 
   const hooksDirResolved = path.resolve(hooksDir);
-  for (const candidate of extractCommandCandidates(command)) {
+  // A project-root anchor ("${CLAUDE_PROJECT_DIR}/…", git-root form) pins the
+  // script to this project as firmly as an absolute path does (#154).
+  const parsed = parseHookCommand(command);
+  const anchored = parsed?.anchored ? parsed.script : null;
+  const candidates = extractCommandCandidates(command);
+  if (anchored) candidates.unshift(anchored);
+  for (const candidate of new Set(candidates)) {
     const absolute = path.isAbsolute(candidate) ? candidate : path.resolve(projectDir, candidate);
     const candidateReal = await realpathIfPresent(absolute);
     if (candidateReal) {
@@ -68,7 +75,7 @@ export async function isOmhHookCommand(command: unknown, projectDir: string): Pr
     // Fall back to lexical containment only for paths already under this
     // project's hooks directory; real files and symlinks always use realpath.
     const resolved = path.resolve(absolute);
-    if (path.isAbsolute(candidate) && isStrictDescendant(hooksDirResolved, resolved)) return true;
+    if ((path.isAbsolute(candidate) || candidate === anchored) && isStrictDescendant(hooksDirResolved, resolved)) return true;
   }
 
   return false;

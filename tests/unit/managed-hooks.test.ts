@@ -19,7 +19,7 @@ describe("isOmhHookCommand", () => {
   it("recognizes portable (project-dir anchored) commands, present or stale (#154)", async () => {
     await writeFile(join(projectDir, ".omh", "hooks", "guard.sh"), "#!/usr/bin/env bash\n", "utf8");
     const claude = 'bash "${CLAUDE_PROJECT_DIR}/.omh/hooks/guard.sh"';
-    const codex = 'bash "$(d=$PWD; until [ -e "$d/.omh/hooks" ] || [ "$d" = / ]; do d=$(dirname "$d"); done; echo "$d")/.omh/hooks/guard.sh"';
+    const codex = 'bash "$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.omh/hooks/guard.sh"';
     await expect(isOmhHookCommand(claude, projectDir)).resolves.toBe(true);
     await expect(isOmhHookCommand(codex, projectDir)).resolves.toBe(true);
     // stale: script removed on a previous sync, entry must still be reclaimed

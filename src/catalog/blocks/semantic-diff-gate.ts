@@ -43,9 +43,11 @@ GIT_DIR_PATH=$(git rev-parse --git-dir 2>/dev/null) || { _log_event "allow" "ski
 # does not hold what the commit will contain. Preview it in a temporary index:
 # copy the real one, replay every "git add ..." from the command (and
 # "git add -u" for commit -a/--all), then let jgrep read that index through
-# GIT_INDEX_FILE. The real index is never touched.
+# GIT_INDEX_FILE. The real index is never touched. cp -p keeps the index
+# mtime: git's racy-clean check compares it against each entry's cached mtime,
+# and a fresh copy would hide a same-second, same-size edit from "git add -u".
 TMPIDX=$(mktemp)
-if [[ -f "$GIT_DIR_PATH/index" ]]; then cp "$GIT_DIR_PATH/index" "$TMPIDX"; else rm -f "$TMPIDX"; fi
+if [[ -f "$GIT_DIR_PATH/index" ]]; then cp -p "$GIT_DIR_PATH/index" "$TMPIDX"; else rm -f "$TMPIDX"; fi
 export GIT_INDEX_FILE="$TMPIDX"
 # WIDEN=1 means the replay cannot be trusted (cd/pushd in the command, or a
 # git add that fails here): stage every change instead, so nothing that
